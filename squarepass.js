@@ -384,14 +384,12 @@
   /* ---- compact intro shown INSIDE the popup ---- */
   function blockIntroHtml(){
     return (
-      '<div class="sqp-wallet">'+
-        '<div class="bal"><span>🧱 '+pass.bricks+'</span> <span class="lbl">Bricks</span></div>'+
-        '<button class="buy" title="Buying Bricks arrives later" disabled>Buy Bricks · soon</button>'+
+      '<div style="text-align:center;padding:8px 4px 2px">'+
+        '<div style="font-size:42px;line-height:1">🏪</div>'+
+        '<p style="color:#B9C3B4;font-size:13px;line-height:1.55;margin:10px 6px 4px">Build and run your own little shops on the Square. Stock them, collect your Coins while customers roll in, and grow one storefront into a whole block.</p>'+
       '</div>'+
-      storefrontHtml()+
-      '<div class="sqp-blocknote">Earn Bricks from stamps and spend them decorating your storefront. The full builder has its own page.</div>'+
       '<a class="sqp-introcta" href="block.html">Open Build Your Block →</a>'+
-      WALL_NOTE
+      '<div class="sqp-blocknote">Coins are <b>free to earn</b> by playing, and never affect the free prize drawings.</div>'
     );
   }
 
