@@ -65,6 +65,7 @@
   .nav{display:flex;gap:26px;align-items:center}
   .nav a{color:var(--sage);text-decoration:none;font-size:13.5px;font-weight:500;letter-spacing:.02em;transition:color .2s}
   .nav a:hover{color:var(--cream)}
+  .nav-div{width:1px;height:15px;background:var(--line);align-self:center;flex:0 0 auto}
   .btn{font-family:"Work Sans";font-weight:600;font-size:12.5px;letter-spacing:.12em;text-transform:uppercase;
     padding:12px 20px;border-radius:2px;border:none;cursor:pointer;
     background:linear-gradient(180deg,var(--gold-light),var(--gold));color:#14231A;text-decoration:none;
@@ -74,7 +75,7 @@
     padding:9px 14px;border-radius:2px;font-family:"Work Sans";font-size:11px;font-weight:600;
     cursor:pointer;letter-spacing:.14em;text-transform:uppercase;transition:color .2s,border-color .2s}
   .nav-toggle:hover{color:var(--cream);border-color:var(--gold)}
-  @media(max-width:900px){.nav a{display:none}}
+  /* nav collapses into the burger menu on tablet/mobile — see responsive block below */
 
   /* small-caps gold eyebrow with star/rule flanks */
   .eyebrow{font-family:"Work Sans";font-size:12px;font-weight:600;letter-spacing:.28em;
@@ -790,16 +791,18 @@ body.day .page-sky .page-head h1{text-shadow:none}
 .steps .step .n{font-family:'Alfa Slab One',serif;color:var(--gold);font-size:26px}
 .steps .step h3{margin:.4em 0 .3em;font-family:'Playfair Display',serif;font-size:20px}
 .steps .step p{opacity:.82;font-size:15px}
-@media(max-width:880px){
+@media(max-width:1024px){
   .bar{position:relative}
   .nav-burger{display:block}
   .nav{position:absolute;top:calc(100% + 1px);right:0;left:0;flex-direction:column;
     align-items:flex-start;gap:0;background:var(--ink-2,#0C120E);border-top:1px solid var(--line);
     padding:6px 20px 14px;display:none;box-shadow:0 20px 40px rgba(0,0,0,.5)}
   .nav.open{display:flex}
-  .nav a,.nav button{padding:12px 0;width:100%}
+  .nav a,.nav button{padding:12px 0;width:100%;display:block}
+  .nav-div{width:100%;height:1px;margin:7px 0;align-self:stretch}
   .steps{grid-template-columns:1fr}
 }
+@media(max-width:600px){.steps{grid-template-columns:1fr}}
 
 /* ============ FRONT DOOR — two-door entry ============ */
 .door-hero{justify-content:center}
@@ -1005,7 +1008,6 @@ a.stn:hover .lbl b{color:var(--gold)}
 .jumbo{height:250px}
 @media(max-width:640px){.jumbo{height:210px}}
 
-
 /* Entry page: clean standalone doors — override the Times Square treatment */
 .tsq{display:none!important}
 .door-hero{justify-content:center;padding-top:0}
@@ -1016,7 +1018,6 @@ body.day .door{background:linear-gradient(160deg,rgba(20,35,26,.05),rgba(20,35,2
 body.day .door.visit{background:linear-gradient(160deg,rgba(95,174,42,.14),rgba(20,35,26,.03) 62%)}
 body.day .door.lease{background:linear-gradient(160deg,rgba(169,134,58,.16),rgba(20,35,26,.03) 62%)}
 .doormeta a{background:transparent;padding:0}
-
 
 /* day-mode readability: subway open/cornerstone station labels need darker ink on parchment */
 body.day .stn.open .lbl b{color:#2f7d1f}
