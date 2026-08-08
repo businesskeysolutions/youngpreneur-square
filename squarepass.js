@@ -22,7 +22,7 @@
   if(!pass.stamps) pass.stamps = [];
 
   var STAMP_LABEL = {
-    checkin:'Daily check-in', visit:'Visited a storefront', hunt:'Found the hidden ✦',
+    checkin:'Daily check-in', visit:'Visited a storefront', hunt:'Found the Square token',
     vote:'Cast a vote', explore:'Explored the Square'
   };
 
@@ -111,8 +111,10 @@
     background:#12331A;color:#F5F1E6;border:1px solid rgba(201,168,74,.5);border-radius:24px;padding:10px 18px;font-family:"Work Sans",system-ui,sans-serif;
     font-weight:600;font-size:13px;box-shadow:0 10px 30px rgba(0,0,0,.5);opacity:0;transition:opacity .3s,transform .3s;pointer-events:none;white-space:nowrap}
   .sqp-toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
-  .sq-hidden{position:fixed;z-index:8500;color:rgba(233,207,138,.30);font-size:16px;cursor:pointer;transition:color .2s,transform .2s;user-select:none}
-  .sq-hidden:hover{color:#F1DEA2;transform:scale(1.4)}
+  .sq-hidden{position:fixed;z-index:8500;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    font-family:"Alfa Slab One",Georgia,serif;font-size:11px;line-height:1;color:rgba(233,207,138,.34);border:2px solid rgba(233,207,138,.30);
+    background:rgba(201,168,74,.05);cursor:pointer;transition:color .2s,border-color .2s,transform .2s,box-shadow .2s;user-select:none}
+  .sq-hidden:hover{color:#14231A;background:linear-gradient(180deg,#F1DEA2,#C9A84A);border-color:#E9CF8A;transform:scale(1.25);box-shadow:0 0 14px rgba(233,207,138,.75)}
   `;
 
   /* ---------------- DOM ---------------- */
@@ -144,6 +146,7 @@
     var badge = document.getElementById('sqpBadge'); if(badge) badge.textContent = weekCount();
     var panel = scrim && scrim.querySelector('.sqp-panel'); if(!panel) return;
     var total = pass.stamps.length, lit = Math.min(total, GOAL);
+    // skyline: 6 buildings, GOAL windows total
     var perB = Math.ceil(GOAL/6), sky='';
     for(var b=0;b<6;b++){
       var wins='';
@@ -153,7 +156,7 @@
     var tasks = [
       { k:'checkin', label:'Check in today', done: pass.last===today(), hint:'Streak '+(pass.streak||0)+'🔥' },
       { k:'visit',   label:'Visit a storefront', done: kindThisWeek('visit'), hint:'Open any shop ↗' },
-      { k:'hunt',    label:'Find the hidden ✦', done: hasStamp('hunt',today()), hint:'Somewhere on the page' },
+      { k:'hunt',    label:'Find the hidden Square token', done: hasStamp('hunt',today()), hint:'A little gold coin, hidden on the page' },
       { k:'vote',    label:'Vote for Business of the Week', done: kindThisWeek('vote'), hint:'On Ignition Day' },
       { k:'explore', label:'Explore the Square', done: kindThisWeek('explore'), hint:'Enter the walkable Square' }
     ];
@@ -206,13 +209,13 @@
     if(document.querySelector('.sq-hidden')) return;
     var seed = 0, s = today()+location.pathname;
     for(var i=0;i<s.length;i++) seed = (seed*31 + s.charCodeAt(i)) & 0xffffff;
-    var top = 22 + (seed % 60);
-    var left = 8 + ((seed>>4) % 84);
-    var sym = el('span','sq-hidden','✦');
+    var top = 22 + (seed % 60);           // 22%–82%
+    var left = 8 + ((seed>>4) % 84);      // 8%–92%
+    var sym = el('span','sq-hidden','Y');
     sym.style.top = top+'vh'; sym.style.left = left+'vw';
-    sym.title = 'A hidden mark on the Square…';
+    sym.title = 'A hidden Square token…';
     sym.addEventListener('click', function(){
-      if(stamp('hunt', today())) { toast('✦ You found the hidden mark!'); }
+      if(stamp('hunt', today())) { toast('◎ You found the Square token!'); }
       sym.style.display='none';
       open();
     });
@@ -235,5 +238,6 @@
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', start);
   else start();
 
+  // expose a tiny API (for future Build-Your-Block / manual stamps)
   window.SquarePass = { stamp: stamp, open: open, get: function(){ return JSON.parse(JSON.stringify(pass)); } };
 })();
