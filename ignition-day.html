@@ -1,6 +1,257 @@
-# secrets — never commit these
-.env
-.env.*
-supabase/.temp/
-supabase/.branches/
-.DS_Store
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ignition Day — Where Young Minds Ignite, Dreams Take Flight</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,700;0,800;1,500;1,600&family=Work+Sans:wght@400;500;600;700&family=Alfa+Slab+One&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0A0D0B;--ink-2:#0C120E;--forest:#12331A;--forest-2:#0F2716;--panel:#101711;
+    --cream:#F5F1E6;--cream-dim:#EFE9D8;--sage:#9AA79A;--sage-2:#727E73;
+    --gold:#C9A84A;--gold-light:#E9CF8A;--gold-deep:#A9863A;--green:#7AD03A;
+    --line:rgba(201,168,74,.16);--card:rgba(245,241,230,.03);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{background:var(--ink);color:var(--cream);font-family:"Work Sans",system-ui,sans-serif;line-height:1.6;overflow-x:hidden}
+  .frame{position:fixed;inset:11px;border:1px solid rgba(201,168,74,.28);border-radius:2px;pointer-events:none;z-index:80}
+  .wrap{max-width:1120px;margin:0 auto;padding:0 30px}
+  .grad-gold{background:linear-gradient(180deg,#F1DEA2,#E9CF8A 34%,#C9A84A 72%,#A9863A);-webkit-background-clip:text;background-clip:text;color:transparent}
+
+  header{position:sticky;top:0;z-index:60;backdrop-filter:blur(12px);background:linear-gradient(to bottom,rgba(10,13,11,.94),rgba(10,13,11,.5));border-bottom:1px solid var(--line)}
+  .bar{display:flex;align-items:center;justify-content:space-between;height:66px}
+  .mark{font-family:"Playfair Display",serif;font-weight:800;text-transform:uppercase;font-size:15px;letter-spacing:.02em;color:var(--cream);text-decoration:none}
+  .mark b{color:var(--gold)}
+  .back{font-family:"Work Sans";font-weight:600;font-size:12.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--sage);text-decoration:none}
+  .back:hover{color:var(--gold)}
+
+  .eyebrow{font-family:"Work Sans";font-weight:600;font-size:12px;letter-spacing:.26em;text-transform:uppercase;color:var(--gold);display:inline-flex;align-items:center;gap:12px}
+  .eyebrow::before,.eyebrow::after{content:"";width:24px;height:1px;background:linear-gradient(90deg,transparent,var(--gold))}
+  .eyebrow::after{background:linear-gradient(90deg,var(--gold),transparent)}
+
+  .btn{display:inline-block;font-family:"Work Sans";font-weight:600;font-size:12.5px;letter-spacing:.1em;text-transform:uppercase;
+    padding:13px 22px;border-radius:2px;background:linear-gradient(180deg,var(--gold-light),var(--gold));color:#14231A;text-decoration:none;
+    border:none;cursor:pointer;transition:transform .15s,box-shadow .2s}
+  .btn:hover{transform:translateY(-1px);box-shadow:0 8px 24px rgba(201,168,74,.4)}
+  .btn-ghost{display:inline-block;font-family:"Work Sans";font-weight:600;font-size:12.5px;letter-spacing:.1em;text-transform:uppercase;
+    padding:13px 22px;border-radius:2px;border:1px solid var(--gold);color:var(--cream);background:transparent;text-decoration:none;cursor:pointer}
+  .btn-ghost:hover{background:var(--gold);color:#14231A}
+
+  /* hero */
+  .hero{position:relative;overflow:hidden;padding:96px 0 84px;text-align:center;
+    background:radial-gradient(120% 100% at 50% 0%,rgba(201,168,74,.1),transparent 55%),linear-gradient(to bottom,#0b1710,#0a0d0b)}
+  .hero .bulbs{display:flex;justify-content:center;gap:14px;margin-bottom:22px}
+  .hero .bulbs span{width:9px;height:9px;border-radius:50%;background:var(--gold-light);box-shadow:0 0 12px 2px var(--gold);animation:chase 1.4s linear infinite}
+  @keyframes chase{0%,15%{opacity:1;transform:scale(1.2)}45%,100%{opacity:.25;transform:scale(.85)}}
+  .hero h1{font-family:"Alfa Slab One",serif;font-size:clamp(46px,10vw,120px);line-height:.95;text-transform:uppercase;letter-spacing:.01em;margin:14px 0 18px;text-shadow:0 3px 0 rgba(0,0,0,.4),0 0 46px rgba(201,168,74,.5)}
+  .hero .tag{font-family:"Playfair Display",serif;font-style:italic;font-weight:600;font-size:clamp(18px,2.6vw,26px);color:var(--cream)}
+  .hero .sub{color:var(--sage);max-width:56ch;margin:18px auto 0;font-size:17px}
+  .chips{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:24px 0 30px}
+  .chip{font-family:"Work Sans";font-weight:600;font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--gold);border:1px solid var(--gold);padding:7px 14px;border-radius:20px}
+  .hero-cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+
+  section{padding:80px 0;border-top:1px solid var(--line)}
+  .sec-head{text-align:center;max-width:640px;margin:0 auto 44px}
+  .sec-head h2{font-family:"Playfair Display",serif;font-weight:800;text-transform:uppercase;font-size:clamp(26px,3.8vw,42px);line-height:1.05;margin:14px 0 12px}
+  .sec-head p{color:var(--sage);font-size:16px}
+
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  @media(max-width:820px){.grid2,.grid3{grid-template-columns:1fr}}
+  .card{position:relative;border:1px solid var(--line);border-radius:4px;padding:28px 26px;background:var(--card);overflow:hidden;transition:border-color .25s,transform .25s}
+  .card:hover{border-color:rgba(201,168,74,.4);transform:translateY(-3px)}
+  .card.spot{background:linear-gradient(150deg,rgba(201,168,74,.1),transparent 62%);border-color:rgba(201,168,74,.3)}
+  .card .rn{position:absolute;top:4px;right:16px;font-family:"Playfair Display",serif;font-weight:900;font-size:92px;color:rgba(201,168,74,.1)}
+  .card .k{font-family:"Work Sans";font-weight:600;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold)}
+  .card h3{font-family:"Playfair Display",serif;font-weight:800;font-size:22px;text-transform:uppercase;margin:10px 0 10px;line-height:1.05}
+  .card p{color:var(--sage);font-size:14.5px;position:relative}
+
+  .flow{border:1px dashed rgba(201,168,74,.4);border-radius:4px;padding:22px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;justify-content:center;text-align:center;background:rgba(201,168,74,.05);max-width:920px;margin:0 auto}
+  .flow .node{font-family:"Playfair Display",serif;font-style:italic;font-size:15px;color:var(--cream)}
+  .flow .node b{color:var(--gold);font-style:normal;font-family:"Work Sans";font-weight:600;font-size:13px;letter-spacing:.05em;text-transform:uppercase}
+  .flow .arrow{color:var(--gold)}
+
+  .awards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  @media(max-width:760px){.awards{grid-template-columns:1fr 1fr}}
+  @media(max-width:480px){.awards{grid-template-columns:1fr}}
+  .award{border:1px solid var(--line);border-radius:3px;padding:16px 18px;background:var(--card)}
+  .award .an{font-family:"Playfair Display",serif;font-weight:700;font-size:16px;color:var(--cream)}
+  .award .ad{font-family:"Work Sans";font-size:12.5px;color:var(--sage);margin-top:2px}
+  .award .amt{font-family:"Work Sans";font-weight:600;font-size:12.5px;color:var(--gold);margin-top:6px}
+
+  /* voting */
+  .vote{background:var(--forest-2)}
+  .vnote{text-align:center;font-family:"Work Sans";font-weight:600;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);
+    border:1px dashed rgba(201,168,74,.4);border-radius:20px;padding:8px 16px;display:inline-block;margin-bottom:26px}
+  .vote-wrap{text-align:center}
+  .ballot{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;text-align:left}
+  @media(max-width:760px){.ballot{grid-template-columns:1fr}}
+  .cand{border:1px solid var(--line);border-radius:4px;padding:20px;background:var(--ink);display:flex;flex-direction:column;gap:10px}
+  .cand .div{font-family:"Work Sans";font-weight:600;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold)}
+  .cand h4{font-family:"Playfair Display",serif;font-weight:700;font-size:19px}
+  .cand p{color:var(--sage);font-size:14px;flex:1}
+  .cand .row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:4px}
+  .cand .count{font-family:"Work Sans";font-weight:600;font-size:13px;color:var(--cream)}
+  .cand .count b{color:var(--gold)}
+  .vbtn{font-family:"Work Sans";font-weight:600;font-size:12px;letter-spacing:.08em;text-transform:uppercase;padding:9px 16px;border-radius:2px;
+    border:1px solid var(--gold);background:transparent;color:var(--gold);cursor:pointer;transition:background .2s,color .2s}
+  .vbtn:hover{background:var(--gold);color:#14231A}
+  .vbtn.voted{background:var(--green);border-color:var(--green);color:#0a1508;cursor:default}
+
+  /* notify */
+  .notify{text-align:center}
+  .nform{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:22px}
+  .nform input{flex:1;min-width:240px;max-width:360px;background:rgba(245,241,230,.05);border:1px solid var(--line);border-radius:2px;padding:14px 16px;color:var(--cream);font-family:"Work Sans";font-size:15px}
+  .nform input:focus{outline:none;border-color:var(--gold)}
+  .nmsg{margin-top:14px;font-family:"Work Sans";font-weight:600;font-size:14px;color:var(--gold);opacity:0;transition:opacity .3s}
+  .nmsg.show{opacity:1}
+
+  footer{border-top:1px solid var(--line);padding:40px 0;text-align:center}
+  footer .fm{font-family:"Playfair Display",serif;font-weight:800;text-transform:uppercase;font-size:20px}
+  footer .fm b{color:var(--gold)}
+  footer .fn{color:var(--sage);font-size:12.5px;margin-top:10px}
+  @media(prefers-reduced-motion:reduce){*{animation:none!important}}
+</style>
+</head>
+<body>
+<div class="frame"></div>
+
+<header>
+  <div class="wrap bar">
+    <a href="#top" class="mark"><b>Youngpreneur</b> Academy</a>
+    <a href="https://youngpreneursquare.com" class="back">Back to the Square →</a>
+  </div>
+</header>
+
+<!-- HERO -->
+<div class="hero" id="top">
+  <div class="wrap">
+    <div class="eyebrow">Youngpreneur Academy · Powered by the Square</div>
+    <div class="bulbs"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+    <h1 class="grad-gold">Ignition Day</h1>
+    <div class="tag">"Where Young Minds Ignite, Dreams Take Flight."</div>
+    <p class="sub">A rocket-and-runway pitch event for young founders — with a public marketplace and a deal-making deck for established businesses. Winners land a real storefront on Youngpreneur Square.</p>
+    <div class="chips"><span class="chip">✈ Virtual + In person</span><span class="chip">Taking flight late 2027</span><span class="chip">Grades K–12</span></div>
+    <div class="hero-cta"><a href="#notify" class="btn">Get on the runway list</a><a href="#zones" class="btn-ghost">See how it works</a></div>
+  </div>
+</div>
+
+<!-- TWO WAYS TO FLY -->
+<section id="format">
+  <div class="wrap">
+    <div class="sec-head"><div class="eyebrow">Two ways to fly</div><h2>Virtual, in person, or both</h2><p>We can start virtual — open to young founders anywhere — and grow into the room. Same journey, same awards, whichever runway we take off from.</p></div>
+    <div class="grid2">
+      <div class="card"><div class="k">Runway One</div><h3>Virtual</h3><p>Submissions, judging, the public vote, and a live-streamed Takeoff — open to founders beyond St. George. The fastest way to get the first cohort off the ground.</p></div>
+      <div class="card spot"><div class="k">Runway Two</div><h3>In person</h3><p>The full experience — the Launchpad, a real Cargo Bay marketplace, and the Connection Runway for investors — hosted live as the event grows.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ZONES -->
+<section id="zones">
+  <div class="wrap">
+    <div class="sec-head"><div class="eyebrow">The event</div><h2>Three zones, three runways</h2><p>Each zone draws a different crowd — so no one feels like just another vendor table.</p></div>
+    <div class="grid3">
+      <div class="card"><div class="rn">I</div><div class="k">The Launchpad</div><h3>For the youngpreneurs</h3><p>Pitch prep and finalist staging — where young founders get ready and take the stage.</p></div>
+      <div class="card spot"><div class="rn">II</div><div class="k">The Cargo Bay</div><h3>For the public &amp; vendors</h3><p>The pop-up marketplace floor — shop the young founders and local businesses, live.</p></div>
+      <div class="card"><div class="rn">III</div><div class="k">The Connection Runway</div><h3>For investors &amp; business</h3><p>Mentorship, deal-making, and the adult pitch track — entered through the Flight Deck.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- JOURNEY -->
+<section id="journey">
+  <div class="wrap">
+    <div class="sec-head"><div class="eyebrow">The pitch journey</div><h2>From pre-flight to ignition</h2><p>Nine finalists — three each from Elementary, Middle, and High School — take one stage. Winners are chosen on pitch quality alone.</p></div>
+    <div class="flow">
+      <span class="node"><b>Pre-Flight Check</b></span><span class="arrow">→</span>
+      <span class="node">Flight Crew Review</span><span class="arrow">→</span>
+      <span class="node">The Launchpad</span><span class="arrow">→</span>
+      <span class="node"><b>Takeoff</b></span><span class="arrow">→</span>
+      <span class="node"><b>Ignition</b></span>
+    </div>
+  </div>
+</section>
+
+<!-- AWARDS -->
+<section id="awards">
+  <div class="wrap">
+    <div class="sec-head"><div class="eyebrow">What's on the line</div><h2>The awards</h2></div>
+    <div class="awards">
+      <div class="award"><div class="an">Ignition Award</div><div class="ad">Grand prize · best pitch overall</div><div class="amt">~$5,000 package · LLC + trademark + grant</div></div>
+      <div class="award"><div class="an">Liftoff Award</div><div class="ad">1st runner-up</div><div class="amt">$750</div></div>
+      <div class="award"><div class="an">Ascent Award</div><div class="ad">2nd runner-up</div><div class="amt">$500</div></div>
+      <div class="award"><div class="an">First Flight Award</div><div class="ad">Youngest finalist off the podium</div><div class="amt">$250</div></div>
+      <div class="award"><div class="an">Charter Award</div><div class="ad">Most public votes</div><div class="amt">$150</div></div>
+      <div class="award"><div class="an">Tailwind Award</div><div class="ad">Encouragement &amp; momentum</div><div class="amt">$100</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- PUBLIC VOTE -->
+<section class="vote" id="vote">
+  <div class="wrap vote-wrap">
+    <div class="sec-head"><div class="eyebrow">The public vote</div><h2>Cast your vote</h2><p>Open to everyone. The public vote celebrates the crowd favorite and decides the <b>Charter Award</b> — it doesn't pick the finalists, so every complete submission has a shot.</p></div>
+    <div class="vnote">Preview · live voting opens when boarding begins</div>
+    <div class="ballot" id="ballot">
+      <div class="cand"><div class="div">Elementary</div><h4>Sample Founder</h4><p>A one-line idea for the young founder's business goes here.</p><div class="row"><span class="count"><b id="c0">0</b> votes</span><button class="vbtn" data-i="0">▲ Vote</button></div></div>
+      <div class="cand"><div class="div">Middle School</div><h4>Sample Founder</h4><p>A one-line idea for the young founder's business goes here.</p><div class="row"><span class="count"><b id="c1">0</b> votes</span><button class="vbtn" data-i="1">▲ Vote</button></div></div>
+      <div class="cand"><div class="div">High School</div><h4>Sample Founder</h4><p>A one-line idea for the young founder's business goes here.</p><div class="row"><span class="count"><b id="c2">0</b> votes</span><button class="vbtn" data-i="2">▲ Vote</button></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- NOTIFY -->
+<section class="notify" id="notify">
+  <div class="wrap">
+    <div class="sec-head"><div class="eyebrow">Boarding hasn't opened yet</div><h2>Get on the runway list</h2><p>Be first to know when submissions, voting, and tickets go live.</p></div>
+    <form class="nform" id="nform" novalidate>
+      <input type="email" name="EMAIL" placeholder="you@email.com" aria-label="Email address" required>
+      <button class="btn" type="submit">Notify me</button>
+    </form>
+    <div class="nmsg" id="nmsg"></div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="fm"><b>Ignition</b> Day</div>
+    <div class="fn">A Youngpreneur Academy event · Powered by Youngpreneur Square · Details subject to change.</div>
+  </div>
+</footer>
+
+<script>
+  // running lights
+  document.querySelectorAll('.hero .bulbs span').forEach((b,i)=>{ b.style.animationDelay=(i*0.14).toFixed(2)+'s'; });
+  // public-vote preview (in-memory)
+  const counts=[0,0,0];
+  document.querySelectorAll('.vbtn').forEach(btn=>{
+    btn.addEventListener('click',function(){
+      const i=+btn.dataset.i;
+      document.querySelectorAll('.vbtn').forEach(b=>{ b.classList.remove('voted'); b.textContent='▲ Vote'; });
+      counts.forEach((_,j)=>{ if(j!==i) {} });
+      // one vote at a time in the preview
+      counts[i]=1; counts.forEach((c,j)=>{ if(j!==i) counts[j]=0; document.getElementById('c'+j).textContent=counts[j]; });
+      btn.classList.add('voted'); btn.textContent='✓ Voted';
+    });
+  });
+  // notify form
+  (function(){
+    const cfg=window.SQUARE_CONFIG||{};
+    const form=document.getElementById('nform'), msg=document.getElementById('nmsg');
+    if(cfg.newsletterAction){ form.action=cfg.newsletterAction; form.method='post'; form.target='sqHidden';
+      const f=document.createElement('iframe'); f.name='sqHidden'; f.style.display='none'; document.body.appendChild(f); }
+    form.addEventListener('submit',function(e){
+      const em=(form.querySelector('input[type=email]')||{}).value||'';
+      if(!em || em.indexOf('@')<1){ e.preventDefault(); msg.textContent='Enter a valid email.'; msg.classList.add('show'); return; }
+      if(!cfg.newsletterAction){ e.preventDefault(); form.reset(); }
+      msg.textContent="You're on the runway list — we'll radio you before boarding. ✦";
+      msg.classList.add('show');
+    });
+  })();
+</script>
+</body>
+</html>

@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Directory &mdash; Youngpreneur Square</title>
+<meta name="description" content="Search the live directory: 180 storefronts across six streets, plus this week&rsquo;s Now Boarding departures board.">
+<meta name="theme-color" content="#0A0D0B">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Youngpreneur Square">
+<meta property="og:title" content="Directory &mdash; Youngpreneur Square">
+<meta property="og:description" content="Search the live directory: 180 storefronts across six streets, plus this week&rsquo;s Now Boarding departures board.">
+<meta property="og:image" content="https://youngpreneursquare.com/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='10' fill='%230A0D0B'/%3E%3Crect x='4' y='4' width='56' height='56' rx='8' fill='none' stroke='%23C9A84A' stroke-width='2'/%3E%3Ctext x='32' y='44' font-family='Georgia,serif' font-size='38' font-weight='700' text-anchor='middle' fill='%23C9A84A'%3EY%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,700;0,800;0,900;1,500;1,600&family=Work+Sans:wght@400;500;600;700&family=Alfa+Slab+One&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+<div class="frame"></div>
+<div class="vignette"></div>
+<header>
+  <div class="wrap bar">
+    <a href="index.html" class="wordmark"><span class="yp grad-gold">Youngpreneur</span><span class="sq">Square</span><span class="tm">&trade;</span></a>
+    <button class="nav-burger" id="navBurger" aria-label="Menu">&#9776;</button>
+    <nav class="nav" id="navMenu">
+      <a href="index.html" data-p="home">Home</a>
+      <a href="about.html" data-p="about">About</a>
+      <a href="directory.html" class="active" data-p="directory">Directory</a>
+      <a href="pricing.html" data-p="pricing">Pricing</a>
+      <a href="lease.html" data-p="lease">Lease a Storefront</a>
+      <a href="ignition-day.html" data-p="ignition">Ignition Day</a>
+      <button class="nav-toggle" id="toggle">Auto</button>
+    </nav>
+  </div>
+</header>
+<section class="page-head wrap">
+  <div class="eyebrow">The live map</div>
+  <h1>Find a storefront.</h1>
+  <p>Six streets, 180 addresses. Search by street, category, or status &mdash; and see who&rsquo;s taking the Stage this week on the Now Boarding board.</p>
+</section>
+<section id="strip">
+  <div class="wrap">
+    <div class="sec-head">
+      <div><div class="eyebrow">District 01 · The directory of addresses</div><h2>Lease a storefront</h2></div>
+      <p>Every spot has a view, a price, and a waitlist. Occupied storefronts link out to the business's own shop. The better the visibility, the more the <em>address</em> is worth.</p>
+    </div>
+
+    <div class="grid">
+
+      <div class="lot landmark">
+        <div class="l-left">
+          <div class="tier">The crown of the square</div>
+          <h3 class="grad-gold">The Tower</h3>
+          <p class="desc">One sign, dead center, taken by a single brand at a time. This is the address the whole square looks up at — reserved for launch weeks, holiday takeovers, New Year's, and <em>the nights everyone shows up.</em></p>
+        </div>
+        <div class="l-right">
+          <div class="stat">★★★★★</div>
+          <div class="price">$349<span> / week</span></div>
+          <div class="status few">Waitlist open</div>
+          <a href="#" class="lease-btn">Join the waitlist</a>
+        </div>
+      </div>
+
+      <div class="lot occupied">
+        <div class="top">
+          <div><div class="tier">Anchor</div><h3>Corner Tower</h3>
+            <div class="who">Home of <b>Zoe's Bakeshop</b> · founder, age 15</div></div>
+          <span class="badge-t award">★ Liftoff</span>
+        </div>
+        <div class="status leased">Liftoff · granted this year</div>
+        <div class="price">Spotlight<span> · sponsor-funded</span></div>
+        <a href="https://example.com/zoes-bakeshop" target="_blank" rel="noopener" class="lease-btn visit">Visit her shop ↗</a>
+      </div>
+
+      <div class="lot occupied">
+        <div class="top">
+          <div><div class="tier">Premium</div><h3>Runway</h3>
+            <div class="who">Home of <b>Kayden Customs</b> · sneaker customs, age 17</div></div>
+          <span class="badge-t paid">✦ Paid</span>
+        </div>
+        <div class="status leased">Leased through Q4</div>
+        <div class="price">$49<span> / mo</span></div>
+        <a href="https://example.com/kayden-customs" target="_blank" rel="noopener" class="lease-btn visit">Visit the shop ↗</a>
+      </div>
+
+      <div class="lot">
+        <div class="top">
+          <div><div class="tier">Premium</div><h3>Corner Billboard</h3></div>
+          <div class="stat">★★★★<span class="off">★</span></div>
+        </div>
+        <div class="status open">Available now</div>
+        <div class="price">$199<span> / mo</span></div>
+        <a href="#" class="lease-btn">Lease this spot</a>
+      </div>
+
+      <div class="lot occupied">
+        <div class="top">
+          <div><div class="tier">Standard</div><h3>Center Frontage</h3>
+            <div class="who">Home of <b>Bloom by Amara</b> · pressed-flower jewelry, age 16</div></div>
+          <span class="badge-t award">★ Liftoff</span>
+        </div>
+        <div class="status leased">Liftoff storefront</div>
+        <div class="price">Spotlight<span> · mission-funded</span></div>
+        <a href="https://example.com/bloom-by-amara" target="_blank" rel="noopener" class="lease-btn visit">Visit her shop ↗</a>
+      </div>
+
+      <div class="lot">
+        <div class="top">
+          <div><div class="tier">Entry</div><h3>Digital Plaza</h3></div>
+          <div class="stat">★★<span class="off">★</span><span class="off">★</span><span class="off">★</span></div>
+        </div>
+        <div class="status open">Available now</div>
+        <div class="price">$19<span> / mo</span></div>
+        <a href="#" class="lease-btn">Lease this spot</a>
+      </div>
+
+    </div>
+
+    <div class="landlord-note">Every occupied storefront links out to the business's own shop. <b>Youngpreneur Square is the landlord, never the cashier.</b></div>
+  </div>
+</section>
+
+<section class="visit" id="directory">
+  <div class="wrap">
+    <div class="sec-head">
+      <div><div class="eyebrow">Find an address</div><h2>The directory</h2></div>
+      <p>Every space on the square carries a real address and unit. Search the whole district — occupied and available — and claim what's open. New streets open as it fills.</p>
+    </div>
+    <div class="dir-controls">
+      <label class="dir-search"><span class="ic">⌕</span><input id="dirSearch" type="search" placeholder="Search address, business, or category…" aria-label="Search the directory"></label>
+      <select class="dir-select" id="dirStreet" aria-label="Filter by street"></select>
+      <select class="dir-select" id="dirCat" aria-label="Filter by category"></select>
+      <select class="dir-select" id="dirStatus" aria-label="Filter by status">
+        <option value="">All spaces</option>
+        <option value="available">Available</option>
+        <option value="leased">Leased</option>
+        <option value="donated">Liftoff</option>
+      </select>
+    </div>
+    <div class="dir-meta" id="dirMeta"></div>
+    <div class="dir-list" id="dirList"></div>
+  </div>
+</section>
+
+<section id="boarding">
+  <div class="wrap">
+    <div class="sec-head">
+      <div><div class="eyebrow">Changes every week</div><h2>Now Boarding</h2></div>
+      <p>The departures board — the front of the square, refreshed weekly. Brands take the board for a week, so there's always something new taxiing to the Runway. <em>This is why people come back.</em></p>
+    </div>
+    <div class="board" id="npBoard">
+      <div class="board-top"><span class="bt-l">Now Boarding</span><span class="bt-r">This week · updates every Monday</span></div>
+      <div class="board-head"><span>Flight</span><span>Brand</span><span>Gate</span><span>Status</span></div>
+      <div class="brow"><span class="fl">YP 204</span><span class="bn">Meridian Coffee</span><span class="gt">The Runway · A2</span><span class="st boarding">Boarding</span></div>
+      <div class="brow"><span class="fl">YP 118</span><span class="bn">Copper &amp; Oak</span><span class="gt">First Class · 01</span><span class="st boarding">Boarding</span></div>
+      <div class="brow"><span class="fl">YP 077</span><span class="bn">Summit Athletic</span><span class="gt">Ascend Ave · 06</span><span class="st final">Final Call</span></div>
+      <div class="brow"><span class="fl">YP 231</span><span class="bn">Bloom by Amara</span><span class="gt">Corner · Gate ★</span><span class="st boarding">Boarding</span></div>
+      <div class="brow"><span class="fl">YP 305</span><span class="bn">Vertex Labs</span><span class="gt">The Runway · B4</span><span class="st scheduled">Scheduled</span></div>
+      <div class="brow"><span class="fl">— —</span><span class="bn open">Your brand here</span><span class="gt">First Class · Open</span><span class="st take"><a href="lease.html#join">Take the board ↗</a></span></div>
+    </div>
+  </div>
+</section>
+
+<section class="cta">
+  <div class="wrap cta-inner">
+    <div class="eyebrow">Dream · Build · Inspire</div>
+    <h2>The best addresses go <em class="grad-gold">first</em>.</h2>
+    <p>The First Flight gets in first at an introductory rate — and the best addresses only get more valuable as the square fills. <em>Liftoff storefronts sit beside them.</em></p>
+    <a href="#strip" class="btn">Claim your address</a>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-top">
+      <div class="fmark"><span class="grad-gold">Youngpreneur</span> Square</div>
+      <div class="tag">Dream &middot; Build &middot; Inspire</div>
+    </div>
+    <nav class="foot-nav">
+      <a href="index.html">Home</a><a href="about.html">About</a><a href="directory.html">Directory</a>
+      <a href="pricing.html">Pricing</a><a href="lease.html">Lease a Storefront</a><a href="ignition-day.html">Ignition Day</a>
+    </nav>
+    <div class="foot">
+      <div class="fcol"><div class="fnote">Some storefront names, brands, and figures shown are examples while the square fills. Youngpreneur Square is the landlord, never the cashier &mdash; every occupied storefront links out to the business&rsquo;s own shop. A Youngpreneur Production &middot; Est. 2023.</div></div>
+      <div class="fcol"><div class="tm-note"><b>Trademark:</b> YOUNGPRENEUR &mdash; U.S. applications pending / applied for (not yet registered). Filed by Shakori Edwards; first use in commerce July 31, 2023. Classes 041, 025, 035. Use &ldquo;pending&rdquo; or &ldquo;applied for&rdquo; &mdash; not the &reg; symbol &mdash; until a registration issues.</div></div>
+    </div>
+    <div class="foot-legal">&copy; <span id="yr">2026</span> Youngpreneur Square &middot; Dream &middot; Build &middot; Inspire</div>
+  </div>
+</footer>
+<script src="config.js"></script><script src="site.js"></script><script src="directory.js"></script><script src="wiring.js"></script>
+</body></html>

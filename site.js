@@ -1,122 +1,75 @@
-  // ================= SEARCHABLE DIRECTORY =================
+// ============ SITE-WIDE: day/night palette, marquee lights, nav, footer year ============
+// Safe on every page — every DOM lookup is guarded, so pages without a hero sky
+// still get the time-of-day palette and a working nav.
+(function(){
+  // ---- footer year ----
+  var y = document.getElementById('yr'); if (y) y.textContent = new Date().getFullYear();
+
+  // ---- mobile nav toggle ----
+  var burger = document.getElementById('navBurger'), menu = document.getElementById('navMenu');
+  if (burger && menu) burger.addEventListener('click', function(){ menu.classList.toggle('open'); });
+
+  // ---- hero sky (home only) ----
+  var stars = document.getElementById('stars');
+  if (stars) {
+    for (var i=0;i<70;i++){ var s=document.createElement('div'); s.className='star';
+      s.style.left=Math.random()*100+'%'; s.style.top=Math.random()*55+'%';
+      s.style.animationDelay=(Math.random()*5)+'s'; stars.appendChild(s); }
+  }
+  var far = document.getElementById('far');
+  if (far) { [40,62,50,72,45,80,55,68,48,75,52,60,44,70,50].forEach(function(h){
+    var d=document.createElement('div'); d.style.width=(20+Math.random()*26)+'px'; d.style.height=h+'%'; far.appendChild(d); }); }
+
+  var sunEl=document.getElementById('sun'), moonEl=document.getElementById('moon'),
+      starsEl=document.getElementById('stars'), btn=document.getElementById('toggle');
+  var hasSky = !!(sunEl && moonEl && starsEl);
+  var clamp=function(x){return Math.max(0,Math.min(1,x));};
+  var smooth=function(a,b,x){x=clamp((x-a)/(b-a));return x*x*(3-2*x);};
+  function place(el,frac,op){ if(!el) return 0;
+    var x=54+clamp(frac)*40, elev=Math.sin(clamp(frac)*Math.PI), top=86-elev*74;
+    el.style.left=x+'%'; el.style.top=top+'%'; el.style.opacity=op; return elev; }
+  function phaseFor(h){ if(h<6||h>=20)return 'night'; if(h<8)return 'dawn'; if(h<17)return 'day'; return 'dusk'; }
+  function applyAuto(){
+    var d=new Date(), h=d.getHours()+d.getMinutes()/60;
+    document.body.classList.remove('day','dawn','dusk','night');
+    document.body.classList.add(phaseFor(h));
+    if(!hasSky) return;
+    var sf=(h-6)/14, sOp=smooth(5.5,6.8,h)*(1-smooth(19.2,20.6,h));
+    var elev=place(sunEl,sf,sOp);
+    sunEl.style.boxShadow = elev<0.28 ? '0 0 120px 46px rgba(255,120,50,.4)' : '0 0 120px 42px rgba(255,190,80,.35)';
+    var mh = h>=18 ? h-18 : h+6;
+    var mOp = h>=18 ? smooth(18,19.6,h) : (h<=7.5 ? 1-smooth(6,7.5,h) : 0);
+    place(moonEl, mh/12, mOp);
+    starsEl.style.opacity = (h>=20||h<6) ? 1 : (h>=19?smooth(19,20,h):(h<6.5?1-smooth(5,6.5,h):0));
+  }
+  var mode='auto';
+  function render(){
+    if(mode==='auto'){ applyAuto(); }
+    else if(mode==='day'){ document.body.classList.remove('dawn','dusk','night'); document.body.classList.add('day');
+      if(hasSky){ place(sunEl,0.5,1); moonEl.style.opacity=0; starsEl.style.opacity=0; } }
+    else { document.body.classList.remove('day','dawn','dusk'); document.body.classList.add('night');
+      if(hasSky){ place(moonEl,0.5,.95); sunEl.style.opacity=0; starsEl.style.opacity=1; } }
+    if(btn) btn.textContent = mode==='auto' ? 'Auto' : mode==='day' ? 'Day' : 'Night';
+  }
+  if(btn) btn.addEventListener('click', function(){ mode = mode==='auto'?'day':mode==='day'?'night':'auto'; render(); });
+  render();
+  setInterval(function(){ if(mode==='auto') applyAuto(); }, 60000);
+
+  // ---- marquee logo bulbs (home) ----
   (function(){
-    const listEl=document.getElementById('dirList'); if(!listEl) return;
-    const metaEl=document.getElementById('dirMeta'), searchEl=document.getElementById('dirSearch'),
-      streetEl=document.getElementById('dirStreet'), catEl=document.getElementById('dirCat'), statusEl=document.getElementById('dirStatus');
-
-    // seeded RNG so the addresses/tenants stay the same on every visit
-    function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
-    const rnd=mulberry32(20230731), pick=a=>a[Math.floor(rnd()*a.length)];
-
-    const STREETS=[{name:'The Runway'},{name:'The Hangar'},{name:'Takeoff Lane'},
-      {name:'Ascend Avenue'},{name:'First Class Row'},{name:'Founders Way'}];
-    const CATS=['Food & Drink','Retail','Services','Tech','Beauty','Fitness','Auto','Creative','Home','Finance'];
-    const FIRST=['Meridian','Copper','Vertex','Halcyon','Aurelio','Nova','Summit','Coastline','Ironwood','Marlowe',
-      'Kestrel','Juniper','Atlas','Beacon','Onyx','Sage','Ember','Harbor','Lumen','Marigold','Cobalt','Wilder',
-      'Anchor','Cardinal','Hollow','Foxglove','Verde','Crescent','Delmar','Northwind','Bramble','Solace','Aurora','Pike','Grove'];
-    const SUF={
-      'Food & Drink':['Coffee','Kitchen','Bakehouse','Table','Roasters','Provisions'],
-      'Retail':['& Co.','Goods','Supply','Market','Mercantile','Trading Co.'],
-      'Services':['Studio','Works','Agency','Group','Collective'],
-      'Tech':['Labs','Systems','Digital','Technologies','Cloud'],
-      'Beauty':['Beauty','Salon','Skin','Aesthetics','Grooming'],
-      'Fitness':['Fitness','Athletic','Strength','Movement','Cycle'],
-      'Auto':['Motors','Auto','Garage','Detailing','Autoworks'],
-      'Creative':['Studio','Press','Design','Media','Films'],
-      'Home':['Home','Interiors','& Hearth','Living','Furnishings'],
-      'Finance':['Capital','Advisors','Financial','Wealth','Partners']};
-    const DONATED=["Zoe's Bakeshop","Kayden Customs","Bloom by Amara","Deveny Reads","Nova Skate","Milo's Lemonade",
-      "Ava Makes","Jayden's Kicks","Bright Start Crafts","Ren's Candles","Talia Tie-Dye","Marcus Mixtapes"];
-    let dIdx=0;
-
-    let spaces=[];
-    STREETS.forEach(function(st){
-      for(let i=0;i<30;i++){
-        const number=100+Math.floor(i/2)*2, unit=(i%2===0)?'A':'B', r=rnd();
-        let status='available', tenant='', category='', shop='';
-        if(r<0.09) status='donated'; else if(r<0.42) status='leased';
-        if(status==='leased'){ category=pick(CATS); tenant=pick(FIRST)+' '+pick(SUF[category]); }
-        else if(status==='donated'){ category=pick(CATS); tenant=DONATED[dIdx%DONATED.length]; dIdx++; }
-        spaces.push({number:number, unit:unit, street:st.name, status:status, tenant:tenant, category:category, shop:shop});
-      }
-    });
-
-    streetEl.innerHTML='<option value="">All streets</option>'+STREETS.map(s=>'<option>'+s.name+'</option>').join('');
-    catEl.innerHTML='<option value="">All categories</option>'+CATS.map(c=>'<option>'+c+'</option>').join('');
-
-    function pillLabel(s){ return s==='available'?'Available':s==='leased'?'Leased':'Liftoff'; }
-    function rowHTML(sp){
-      const occ=sp.status!=='available';
-      const ten = occ ? '<div class="nm">'+sp.tenant+'</div><div class="cat">'+(sp.category||'')+'</div>'
-                      : '<div class="nm av">Available</div><div class="cat">Ready to lease</div>';
-      const visitHref = sp.shop ? sp.shop : '#';
-      const act = occ ? '<a href="'+visitHref+'" target="_blank" rel="noopener">Visit ↗</a>' : '<a href="lease.html#join">Lease</a>';
-      return '<div class="dir-row"><div class="dir-addr"><span class="num">'+sp.number+' '+sp.street+'</span><br>'+
-        '<span class="unit">Unit '+sp.unit+'</span></div><div class="dir-ten">'+ten+'</div>'+
-        '<span class="dir-pill '+sp.status+'">'+pillLabel(sp.status)+'</span><div class="dir-act">'+act+'</div></div>';
-    }
-    function apply(){
-      const nAvail=spaces.filter(s=>s.status==='available').length,
-            nLeased=spaces.filter(s=>s.status==='leased').length,
-            nDon=spaces.filter(s=>s.status==='donated').length;
-      const q=(searchEl.value||'').toLowerCase().trim(), fs=streetEl.value, fc=catEl.value, fst=statusEl.value;
-      const out=spaces.filter(function(sp){
-        if(fs && sp.street!==fs) return false;
-        if(fc && sp.category!==fc) return false;
-        if(fst && sp.status!==fst) return false;
-        if(q){ const hay=(sp.number+' '+sp.street+' unit '+sp.unit+' '+sp.tenant+' '+sp.category).toLowerCase();
-          if(hay.indexOf(q)<0) return false; }
-        return true;
-      });
-      metaEl.innerHTML='Showing <b>'+out.length+'</b> of '+spaces.length+' spaces across '+STREETS.length+
-        ' streets · <b>'+nAvail+'</b> available · <b>'+nLeased+'</b> leased · <b>'+nDon+'</b> liftoff';
-      listEl.innerHTML = out.length ? out.map(rowHTML).join('')
-        : '<div class="dir-empty">No spaces match — try another search or street.</div>';
-    }
-    [searchEl,streetEl,catEl,statusEl].forEach(el=>el.addEventListener('input',apply));
-    apply();   // render the demo data instantly
-
-    // ---- Now Boarding: live board from Supabase (falls back to the static rows) ----
-    (function(){
-      if(!window.SQ_DB) return;
-      const board=document.getElementById('npBoard'); if(!board) return;
-      const head=board.querySelector('.board-head');
-      const SLABEL={boarding:'Boarding',final_call:'Final Call',scheduled:'Scheduled'};
-      const SCLASS={boarding:'boarding',final_call:'final',scheduled:'scheduled'};
-      // this week's Monday, in UTC, as YYYY-MM-DD
-      const d=new Date(); const day=(d.getUTCDay()+6)%7; d.setUTCDate(d.getUTCDate()-day);
-      const wk=d.toISOString().slice(0,10);
-      window.SQ_DB.from('now_boarding').select('position,flight_code,business_name,gate,status,shop_url')
-        .eq('week_start',wk).order('position',{ascending:true})
-        .then(function(res){
-          if(res.error){ console.warn('Now Boarding: live load failed, keeping demo rows.', res.error.message); return; }
-          if(!res.data || !res.data.length) return;   // no lineup set for this week — keep demo rows
-          board.querySelectorAll('.brow').forEach(el=>el.remove());
-          res.data.forEach(function(r){
-            const row=document.createElement('div'); row.className='brow';
-            const brand = r.shop_url
-              ? '<a href="'+r.shop_url+'" target="_blank" rel="noopener">'+r.business_name+'</a>'
-              : r.business_name;
-            row.innerHTML='<span class="fl">'+r.flight_code+'</span><span class="bn">'+brand+
-              '</span><span class="gt">'+r.gate+'</span><span class="st '+(SCLASS[r.status]||'scheduled')+'">'+
-              (SLABEL[r.status]||'Scheduled')+'</span>';
-            board.appendChild(row);
-          });
-        });
-    })();
-
-    // If Supabase is connected, replace the demo data with the live directory.
-    if(window.SQ_DB){
-      const DBMAP={open:'available',leased:'leased',liftoff:'donated'};
-      window.SQ_DB.from('spaces').select('street,num,unit,status,tenant_name,category,shop_url')
-        .order('street',{ascending:true}).order('num',{ascending:true}).order('unit',{ascending:true})
-        .then(function(res){
-          if(res.error || !res.data || !res.data.length){ if(res.error) console.warn('Directory: live load failed, keeping demo data.', res.error.message); return; }
-          spaces = res.data.map(function(r){
-            return { number:r.num, unit:r.unit, street:r.street, status:DBMAP[r.status]||'available',
-                     tenant:r.tenant_name||'', category:r.category||'', shop:r.shop_url||'' };
-          });
-          apply();
-        });
-    }
+    var frame=document.querySelector('.lm-frame'); if(!frame) return;
+    var mk=function(cls,n,vertical){ var s=document.createElement('span'); s.className=(vertical?'bulb-col ':'bulb-row ')+cls;
+      for(var i=0;i<n;i++){ var d=document.createElement('span'); d.className='bulb'; s.appendChild(d); } return s; };
+    var top=mk('top',16,false), right=mk('right',7,true), bottom=mk('bottom',16,false), left=mk('left',7,true);
+    frame.append(top,right,bottom,left);
+    var order=[].concat([].slice.call(top.children),[].slice.call(right.children),
+      [].slice.call(bottom.children).reverse(),[].slice.call(left.children).reverse());
+    var step=1.5/order.length;
+    order.forEach(function(b,i){ b.style.animationDelay=(i*step).toFixed(3)+'s'; });
   })();
+  // ---- small marquee running lights ----
+  document.querySelectorAll('.marquee-sign .bulbs, .sq-marq .mbulbs, .bd-marq .mbulbs').forEach(function(row){
+    var kids=[].slice.call(row.children), n=kids.length||1, dur=1.3;
+    kids.forEach(function(b,i){ b.style.animationDuration=dur+'s'; b.style.animationDelay=((i/n)*dur).toFixed(3)+'s'; });
+  });
+})();

@@ -1,123 +1,253 @@
-# Youngpreneur Square — Go-Live Runbook
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pricing &mdash; Youngpreneur Square</title>
+<meta name="description" content="Lease an address monthly, take the Stage weekly. First Flight founding rates, first month free, cancel anytime. Plus dealership lots in The Hangar.">
+<meta name="theme-color" content="#0A0D0B">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Youngpreneur Square">
+<meta property="og:title" content="Pricing &mdash; Youngpreneur Square">
+<meta property="og:description" content="Lease an address monthly, take the Stage weekly. First Flight founding rates, first month free, cancel anytime. Plus dealership lots in The Hangar.">
+<meta property="og:image" content="https://youngpreneursquare.com/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='10' fill='%230A0D0B'/%3E%3Crect x='4' y='4' width='56' height='56' rx='8' fill='none' stroke='%23C9A84A' stroke-width='2'/%3E%3Ctext x='32' y='44' font-family='Georgia,serif' font-size='38' font-weight='700' text-anchor='middle' fill='%23C9A84A'%3EY%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,700;0,800;0,900;1,500;1,600&family=Work+Sans:wght@400;500;600;700&family=Alfa+Slab+One&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+<div class="frame"></div>
+<div class="vignette"></div>
+<header>
+  <div class="wrap bar">
+    <a href="index.html" class="wordmark"><span class="yp grad-gold">Youngpreneur</span><span class="sq">Square</span><span class="tm">&trade;</span></a>
+    <button class="nav-burger" id="navBurger" aria-label="Menu">&#9776;</button>
+    <nav class="nav" id="navMenu">
+      <a href="index.html" data-p="home">Home</a>
+      <a href="about.html" data-p="about">About</a>
+      <a href="directory.html" data-p="directory">Directory</a>
+      <a href="pricing.html" class="active" data-p="pricing">Pricing</a>
+      <a href="lease.html" data-p="lease">Lease a Storefront</a>
+      <a href="ignition-day.html" data-p="ignition">Ignition Day</a>
+      <button class="nav-toggle" id="toggle">Auto</button>
+    </nav>
+  </div>
+</header>
+<section class="page-head wrap">
+  <div class="eyebrow">What it costs to fly</div>
+  <h1>Plans &amp; pricing.</h1>
+  <p>Lease an address for a steady monthly home, or take the Stage for a week when you want the spotlight. First month free &mdash; then your founding rate, cancel anytime.</p>
+</section>
+<section id="pricing">
+  <div class="wrap">
+    <div class="sec-head">
+      <div><div class="eyebrow">What it costs to fly</div><h2>Pricing</h2></div>
+      <p>Two ways to be here. <em>Lease an address</em> for a steady monthly home in the directory — or <em>take the Stage</em> for a week, the rotating prime spots the whole square looks at. <b>Your first month is free</b> — then your First Flight rate, locked for year one. Cancel anytime.</p>
+    </div>
 
-Your site **and** its backend are built and tested. This turns them on. The stack is GitHub → Cloudflare Pages → Supabase → Stripe → Brevo/Zoho — all free tiers except Stripe's per-charge fee.
+    <div class="pgroup">The base · lease an address <span class="sm">— monthly, stable, always findable</span></div>
+    <div class="pricing-grid">
+      <div class="pcard">
+        <div class="tier">Takeoff Lane</div><h3>Ground Level</h3>
+        <div class="desc">An entry address to get started and get seen.</div>
+        <div class="intro">$19<span> /mo · First Flight</span></div>
+        <div class="reg">Standard $39/mo · <b>1st month free</b></div>
+        <a href="lease.html#join" class="p-btn" data-lease="Ground Level">Start free</a>
+      </div>
+      <div class="pcard feat">
+        <div class="tier">The Runway</div><h3>Main Strip</h3>
+        <div class="desc">Flagship visibility on the busiest street.</div>
+        <div class="intro">$49<span> /mo · First Flight</span></div>
+        <div class="reg">Standard $89/mo · <b>1st month free</b></div>
+        <a href="lease.html#join" class="p-btn" data-lease="Main Strip">Start free</a>
+      </div>
+      <div class="pcard">
+        <div class="tier">Ascend Avenue</div><h3>Growth</h3>
+        <div class="desc">A featured, mid-premium spot as you climb.</div>
+        <div class="intro">$99<span> /mo · First Flight</span></div>
+        <div class="reg">Standard $149/mo · <b>1st month free</b></div>
+        <a href="lease.html#join" class="p-btn" data-lease="Growth">Start free</a>
+      </div>
+      <div class="pcard">
+        <div class="tier">First Class Row</div><h3>Front Row</h3>
+        <div class="desc">Premium, top-of-square visibility.</div>
+        <div class="intro">$199<span> /mo · First Flight</span></div>
+        <div class="reg">Standard $299/mo · <b>1st month free</b></div>
+        <a href="lease.html#join" class="p-btn" data-lease="Front Row">Start free</a>
+      </div>
+    </div>
 
-Everything you paste to "turn things on" lives in **one block** at the top of `index.html` called `SQUARE_CONFIG`. Until you fill it in, the site still works: the directory shows demo data, signups show a friendly message, and lease buttons go to the waitlist. You switch each piece to live one paste at a time.
+    <div class="pgroup">The Stage · take it for a week <span class="sm">— rotating prime, refreshed every week</span></div>
+    <div class="price-strip">
+      <div class="pstrip tower">
+        <div>
+          <div class="tier">The landmark · one brand at a time</div>
+          <h3 class="grad-gold">The Tower</h3>
+          <div class="desc">Own the center sign for a launch, a holiday, or New Year's — the takeover the whole square looks up at.</div>
+        </div>
+        <div class="pstrip-r">
+          <div class="intro">$199<span> /week · First Flight</span></div>
+          <div class="reg">Standard $349/wk · peak weeks more</div>
+          <a href="lease.html#join" class="p-btn" data-lease="The Tower">Take The Tower</a>
+        </div>
+      </div>
+      <div class="pstrip stage">
+        <div>
+          <div class="tier">The departures board · rotates weekly</div>
+          <h3>Now Boarding</h3>
+          <div class="desc">Take the front-of-square board for a week — the "what's new" everyone checks. A new lineup every week.</div>
+        </div>
+        <div class="pstrip-r">
+          <div class="intro">$39–$75<span> /week</span></div>
+          <div class="reg">By position · First Flight rates</div>
+          <a href="directory.html#boarding" class="p-btn">See the board</a>
+        </div>
+      </div>
+    </div>
 
-There are five steps. You can stop after any of them and still have a real site.
+    <div class="price-strip" style="grid-template-columns:1fr">
+      <div class="pstrip liftoff">
+        <div>
+          <div class="tier">The mission</div>
+          <h3>Liftoff storefronts</h3>
+          <div class="desc">Donated free to young founders — funded by the leases and by sponsors, awarded through the program and Ignition Day.</div>
+        </div>
+        <div class="pstrip-r">
+          <div class="intro">$0<span> · donated</span></div>
+          <a href="index.html#tiers" class="p-btn">How it works</a>
+        </div>
+      </div>
+    </div>
 
----
+    <div class="addons">
+      <div class="ah">Add-ons — boost any address</div>
+      <div class="arow"><span>Journal feature · one issue</span><b>$49</b></div>
+      <div class="arow"><span>Social spotlight to the audience</span><b>$75</b></div>
+      <div class="arow"><span>The Tower · one extra day</span><b>$59</b></div>
+      <div class="arow"><span>White-glove storefront build</span><b>$99 &nbsp;<s>free for First Flight</s></b></div>
+    </div>
 
-## Step 1 — Put it on the internet (GitHub → Cloudflare Pages, ~10 min, free)
+    <div class="pnote"><b>First month free on any address</b> — add your card, get 30 days on the square, then your First Flight rate begins in month two unless you cancel. Cancel anytime in a click. Your <b>address</b> is monthly and stable; the <b>Stage</b> is weekly and rotates, so the front of the square is never the same twice. Pay annually and get <b>2 months free</b>. Standard rates step up as streets fill — First Flight locks year one. The Hangar (dealership lots) is leased separately, from <b>$149/mo</b>.</div>
+  </div>
+</section>
 
-1. Create a **GitHub repo** (e.g. `youngpreneur-square`) and push this whole folder to it. From the folder:
-   ```bash
-   git init && git add . && git commit -m "Youngpreneur Square"
-   git branch -M main
-   git remote add origin https://github.com/YOURNAME/youngpreneur-square.git
-   git push -u origin main
-   ```
-2. Go to **Cloudflare** → **Workers & Pages** → **Create** → **Pages** → **Connect to Git**. Pick the repo.
-3. Build settings: **Framework preset = None**, **Build command = (leave empty)**, **Build output directory = `/`** (the root). Save and deploy.
-4. In a minute you get a live URL like `youngpreneur-square.pages.dev`. **That's your site, live.** Open it on your phone.
+<section class="mile" id="mile">
+  <div class="wrap">
+    <div class="sec-head">
+      <div><div class="eyebrow">District 02</div><h2>The Hangar</h2></div>
+      <p>A dealership doesn't buy an ad. It leases a lot, parks its inventory, and lights it up. Front row costs more, just like the real thing — and no cars change hands here. It's all advertising.</p>
+    </div>
 
-**Your domain (YoungpreneurSquare.com):**
-- Cloudflare Pages → your project → **Custom domains** → **Set up a domain** → type `youngpreneursquare.com`.
-- If your domain's DNS is already on Cloudflare, it wires up automatically. If not, Cloudflare walks you through moving the nameservers (this is the one step only you can do — it needs your registrar login). HTTPS is automatic and free.
+    <div class="mile-scene">
+      <div class="glowline"></div>
+      <div class="floor"></div>
 
-> Every future change: edit, `git push`, and Cloudflare redeploys on its own. GitHub keeps every version — that's your free backup.
+      <div class="cone" style="left:12%;top:6%"></div>
+      <div class="cone" style="left:40%;top:2%"></div>
+      <div class="cone" style="left:70%;top:6%"></div>
 
----
+      <div class="car" style="left:14%;transform:scale(1.05)">
+        <svg width="200" height="86" viewBox="0 0 220 90">
+          <path d="M6,64 C8,49 22,45 40,44 L62,44 L80,27 C86,22 100,21 122,22 L148,23 C167,25 182,34 196,47 L206,56 C210,60 210,66 204,67 L14,67 C8,67 6,66 6,64 Z" fill="#c9a84a"/>
+          <path d="M66,44 L82,30 C88,26 100,25 118,26 L130,27 L131,44 Z" fill="#12241a" opacity=".9"/>
+          <path d="M135,44 L134,27 L146,28 C160,30 172,36 182,46 Z" fill="#12241a" opacity=".9"/>
+          <circle cx="54" cy="67" r="14" fill="#0a150e"/><circle cx="54" cy="67" r="6" fill="#3c4a3a"/>
+          <circle cx="170" cy="67" r="14" fill="#0a150e"/><circle cx="170" cy="67" r="6" fill="#3c4a3a"/>
+          <ellipse cx="205" cy="58" rx="6" ry="4" fill="#fbf3d8"/>
+        </svg>
+      </div>
+      <div class="headlamp" style="left:14%"></div>
+      <div class="bay-label" style="left:14%;bottom:24%">Coastline Motors · Front Row</div>
 
-## Step 2 — Stand up the database (Supabase, ~10 min, free)
+      <div class="car" style="left:42%;transform:scale(.92)">
+        <svg width="200" height="86" viewBox="0 0 220 90">
+          <path d="M6,60 C8,44 20,40 34,39 L54,20 C60,15 78,14 106,15 L150,16 C172,17 188,24 200,40 L208,52 C212,57 212,64 205,65 L13,65 C8,65 6,63 6,60 Z" fill="#e9e3d0"/>
+          <path d="M58,39 L60,22 C64,18 78,17 100,18 L112,19 L112,39 Z" fill="#12241a" opacity=".9"/>
+          <path d="M118,39 L118,19 L138,20 C158,22 172,29 182,39 Z" fill="#12241a" opacity=".9"/>
+          <circle cx="56" cy="65" r="14" fill="#0a150e"/><circle cx="56" cy="65" r="6" fill="#3c4a3a"/>
+          <circle cx="168" cy="65" r="14" fill="#0a150e"/><circle cx="168" cy="65" r="6" fill="#3c4a3a"/>
+          <ellipse cx="206" cy="55" rx="6" ry="4" fill="#fbf3d8"/>
+        </svg>
+      </div>
+      <div class="headlamp" style="left:42%"></div>
+      <div class="bay-label" style="left:42%;bottom:20%">Summit Auto · Center Pad</div>
 
-1. In your existing **Supabase** project, open **SQL Editor → New query.**
-2. Open `supabase/schema.sql` from this folder, copy the whole thing, paste it in, and click **Run.** It builds every table, security rule, and the lease logic, and seeds the 180 addresses so the directory matches the site exactly. *(If it warns that `pg_cron` isn't available, that's fine — only the automatic weekly board rotation is skipped; enable it later under Database → Extensions if you want it.)*
-3. Go to **Project Settings → API** and copy two values: the **Project URL** and the **anon / public** key.
-4. Paste them into `SQUARE_CONFIG` at the top of `index.html`:
-   ```js
-   supabaseUrl: "https://YOURPROJECT.supabase.co",
-   supabaseAnonKey: "eyJ...your anon public key...",
-   ```
-5. `git push`. Now the **directory and Now Boarding board load live from your database.** (The anon key is safe to ship publicly — row-level security only lets the public read the directory and cast a vote, nothing else.)
+      <div class="car" style="left:70%;transform:scale(.82)">
+        <svg width="180" height="78" viewBox="0 0 220 90">
+          <path d="M6,64 C8,49 22,45 40,44 L62,44 L80,27 C86,22 100,21 122,22 L148,23 C167,25 182,34 196,47 L206,56 C210,60 210,66 204,67 L14,67 C8,67 6,66 6,64 Z" fill="#1f5a2a"/>
+          <path d="M66,44 L82,30 C88,26 100,25 118,26 L130,27 L131,44 Z" fill="#0c1a11" opacity=".9"/>
+          <path d="M135,44 L134,27 L146,28 C160,30 172,36 182,46 Z" fill="#0c1a11" opacity=".9"/>
+          <circle cx="54" cy="67" r="14" fill="#0a150e"/><circle cx="54" cy="67" r="6" fill="#3c4a3a"/>
+          <circle cx="170" cy="67" r="14" fill="#0a150e"/><circle cx="170" cy="67" r="6" fill="#3c4a3a"/>
+          <ellipse cx="205" cy="58" rx="6" ry="4" fill="#fbf3d8"/>
+        </svg>
+      </div>
+      <div class="headlamp" style="left:70%"></div>
+      <div class="bay-label" style="left:69%;bottom:17%">Available · Showcase Pad</div>
 
----
+      <div class="bay-open" style="left:29%;bottom:30%">
+        <div class="ring"></div><span>Lot open</span>
+      </div>
+    </div>
 
-## Step 3 — Turn on payments, first month free (Stripe, ~25 min)
+    <div class="grid">
+      <div class="lot">
+        <div class="tier">Premium</div><h3>Front Row</h3>
+        <div class="status few">1 lot left</div>
+        <div class="price">$149<span> / mo</span></div>
+        <a href="#" class="lease-btn">Lease this lot</a>
+      </div>
+      <div class="lot">
+        <div class="tier">Spotlit</div><h3>Showcase Pad</h3>
+        <div class="status open">Available</div>
+        <div class="price">$99<span> / mo</span></div>
+        <a href="#" class="lease-btn">Lease this lot</a>
+      </div>
+      <div class="lot">
+        <div class="tier">Standard</div><h3>Center Aisle</h3>
+        <div class="status leased">Leased</div>
+        <div class="price">$79<span> / mo</span></div>
+        <a href="#" class="lease-btn">Notify me</a>
+      </div>
+      <div class="lot">
+        <div class="tier">Entry</div><h3>Back Row Bay</h3>
+        <div class="status open">Available</div>
+        <div class="price">$49<span> / mo</span></div>
+        <a href="#" class="lease-btn">Lease this lot</a>
+      </div>
+    </div>
+  </div>
+</section>
 
-This is the "first month free, then charged in month two unless they cancel" model — Stripe's built-in free trial does it.
+<section class="cta">
+  <div class="wrap cta-inner">
+    <div class="eyebrow">Dream · Build · Inspire</div>
+    <h2>The best addresses go <em class="grad-gold">first</em>.</h2>
+    <p>The First Flight gets in first at an introductory rate — and the best addresses only get more valuable as the square fills. <em>Liftoff storefronts sit beside them.</em></p>
+    <a href="directory.html#strip" class="btn">Claim your address</a>
+  </div>
+</section>
 
-**One-time setup in Stripe:**
-1. Create/finish your **Stripe** account (this is where your payout bank details go — Stripe holds them, never the website).
-2. **Product catalog → Add product**, one per tier you're selling. For each:
-   - Name it to match the site (e.g. **"Main Strip — The Runway"**).
-   - Price: **recurring, monthly**, at your First Flight rate (e.g. $49).
-   - Click **Add free trial → 30 days.** *(This is what makes month one free — card saved, nothing charged until day 31.)*
-3. On the product, **Create payment link.** Then, on that payment link, set two things (both matter for the automatic directory update):
-   - **Metadata:** add key `square_tier` with the exact tier name as its value — one of: `Ground Level`, `Main Strip`, `Growth`, `Front Row`, `The Tower`, `Front Row Lot`, `Showcase Pad`, `Center Aisle`, `Back Row Bay`.
-   - **Custom fields:** add a text field keyed `business_name` and one keyed `shop_url` (so you capture who they are and where their shop is).
-4. Copy each payment link URL and paste it into `SQUARE_CONFIG.stripeLinks` in `index.html`:
-   ```js
-   stripeLinks: {
-     "Ground Level": "https://buy.stripe.com/...",
-     "Main Strip":   "https://buy.stripe.com/...",
-     "Growth":       "https://buy.stripe.com/...",
-     "Front Row":    "https://buy.stripe.com/...",
-     "The Tower":    "https://buy.stripe.com/...",
-     "Front Row Lot":"https://buy.stripe.com/...",
-     "Showcase Pad": "https://buy.stripe.com/...",
-     "Center Aisle": "https://buy.stripe.com/...",
-     "Back Row Bay": "https://buy.stripe.com/..."
-   },
-   ```
-   Any tier left `""` simply sends people to the waitlist, so you can launch with one or two live and add the rest later. Enable Stripe's **customer portal** (Settings → Billing) so tenants can cancel in a click — that's your "cancel anytime."
-
-**Connect Stripe to the database (the auto-updating directory):**
-5. Install the Supabase CLI and, from this folder, deploy the webhook:
-   ```bash
-   supabase login
-   supabase link --project-ref YOUR_PROJECT_REF
-   supabase functions deploy stripe-webhook --no-verify-jwt
-   ```
-6. Give the function its secrets:
-   ```bash
-   supabase secrets set STRIPE_SECRET_KEY=sk_live_... STRIPE_WEBHOOK_SECRET=whsec_...
-   ```
-   *(SUPABASE_URL and the service-role key are provided to the function automatically — you don't set those.)*
-7. In **Stripe → Developers → Webhooks → Add endpoint**, paste your function's URL (Supabase shows it — it looks like `https://YOURPROJECT.functions.supabase.co/stripe-webhook`). Subscribe it to **`checkout.session.completed`** and **`customer.subscription.deleted`**. Copy the endpoint's **signing secret** (`whsec_...`) — that's the `STRIPE_WEBHOOK_SECRET` from step 6.
-
-Now a completed signup flips the next open address to **Leased** on your live directory by itself, and a cancellation frees it.
-
----
-
-## Step 4 — Capture First Flight emails (Brevo, ~10 min, free)
-
-1. In **Brevo**, create a contact **list**, then **Contacts → Forms → create a form.**
-2. When Brevo shows the embed code, copy the URL inside `<form action="...">`.
-3. Paste it into `SQUARE_CONFIG.newsletterAction` in `index.html`, `git push`. Signups now land in Brevo (the form posts quietly in the background; the visitor never leaves the page).
-4. Point your **Zoho** mailbox (e.g. `hello@youngpreneursquare.com`) as the sender/reply-to inside Brevo so campaigns come from your address.
-
----
-
-## Step 5 — Test, then announce (~10 min)
-
-- Put Stripe in **Test mode** first. Click a pricing **"Start free"** button — it should open Stripe showing **"$X/month after 30-day free trial"** and ask for a card with no charge today. Use test card `4242 4242 4242 4242`, any future date, any CVC. Fill the business name + shop URL fields, complete it, then check Supabase → **Table editor → spaces**: the next open address on that tier's street should now read **leased** with that business. That proves the whole loop.
-- Flip Stripe to **Live** and swap the test payment links for live ones.
-- Submit the **email form** with your own address; confirm it lands in Brevo.
-- Open the live site on phone + desktop: day/night sky, directory search, Now Boarding board all load.
-- Use the **Launch Kit** (founding-tenant invite + press pitch) to fill your First 50.
-
----
-
-## What only you can do (and why)
-
-I can't create accounts, complete Stripe's bank/identity verification, change your domain's DNS, or type any password or card number. Those are: the GitHub/Cloudflare/Stripe/Brevo/Zoho signups, the domain nameserver change, and the Stripe verification. Everything else — the site, the database, the payment logic, the webhook, all the wiring — is built, tested, and in this folder.
-
----
-
-### One-minute version
-1. Push this folder to GitHub → connect it in Cloudflare Pages → **you're live.**
-2. Run `schema.sql` in Supabase, paste the Project URL + anon key into `SQUARE_CONFIG` → **directory goes live.**
-3. In Stripe, make each tier a monthly subscription **with a 30-day free trial**, add `square_tier` metadata + `business_name`/`shop_url` custom fields, create payment links, paste them in. Deploy the `stripe-webhook` function + set its secrets + add the Stripe webhook endpoint → **payments + auto-updating directory go live.**
-4. Paste your Brevo form URL into `newsletterAction` → **email capture goes live.**
-5. Test in Stripe test mode, flip to live, announce.
+<footer>
+  <div class="wrap">
+    <div class="foot-top">
+      <div class="fmark"><span class="grad-gold">Youngpreneur</span> Square</div>
+      <div class="tag">Dream &middot; Build &middot; Inspire</div>
+    </div>
+    <nav class="foot-nav">
+      <a href="index.html">Home</a><a href="about.html">About</a><a href="directory.html">Directory</a>
+      <a href="pricing.html">Pricing</a><a href="lease.html">Lease a Storefront</a><a href="ignition-day.html">Ignition Day</a>
+    </nav>
+    <div class="foot">
+      <div class="fcol"><div class="fnote">Some storefront names, brands, and figures shown are examples while the square fills. Youngpreneur Square is the landlord, never the cashier &mdash; every occupied storefront links out to the business&rsquo;s own shop. A Youngpreneur Production &middot; Est. 2023.</div></div>
+      <div class="fcol"><div class="tm-note"><b>Trademark:</b> YOUNGPRENEUR &mdash; U.S. applications pending / applied for (not yet registered). Filed by Shakori Edwards; first use in commerce July 31, 2023. Classes 041, 025, 035. Use &ldquo;pending&rdquo; or &ldquo;applied for&rdquo; &mdash; not the &reg; symbol &mdash; until a registration issues.</div></div>
+    </div>
+    <div class="foot-legal">&copy; <span id="yr">2026</span> Youngpreneur Square &middot; Dream &middot; Build &middot; Inspire</div>
+  </div>
+</footer>
+<script src="config.js"></script><script src="site.js"></script><script src="wiring.js"></script>
+</body></html>
