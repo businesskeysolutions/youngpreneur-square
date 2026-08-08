@@ -763,6 +763,9 @@
 
 /* ---------- multi-page: responsive nav, active state, footer nav ---------- */
 .nav a.active{color:var(--gold)}
+/* in-content links read on-brand (gold), not default blue */
+section p a:not(.btn):not(.p-btn):not(.lease-btn), section li a:not(.btn){color:var(--gold);text-decoration:underline;text-underline-offset:.15em;transition:color .2s}
+section p a:not(.btn):not(.p-btn):not(.lease-btn):hover, section li a:not(.btn):hover{color:var(--gold-light)}
 .nav-burger{display:none;background:none;border:1px solid var(--line);color:var(--cream);
   font-size:20px;line-height:1;padding:6px 11px;border-radius:5px;cursor:pointer}
 .foot-nav{display:flex;flex-wrap:wrap;gap:18px;margin:18px 0 6px;padding:14px 0;
