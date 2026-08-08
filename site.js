@@ -64,7 +64,7 @@
     frame.append(top,right,bottom,left);
     var order=[].concat([].slice.call(top.children),[].slice.call(right.children),
       [].slice.call(bottom.children).reverse(),[].slice.call(left.children).reverse());
-    var step=1.5/order.length;
+    var step=4.6/order.length;   // one calm lap of the frame per ~4.6s, lit bulb travels one-by-one
     order.forEach(function(b,i){ b.style.animationDelay=(i*step).toFixed(3)+'s'; });
   })();
   // ---- small marquee running lights ----

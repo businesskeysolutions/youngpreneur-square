@@ -7,13 +7,13 @@
 
     const PLOTS=[
       {x:220,w:150,h:150,cls:'sage', type:'shop',    brand:'Vertex Tech',    loc:'Skyline',   who:'Student-run tech studio',            url:'#'},
-      {x:470,w:162,h:214,cls:'gold', type:'awarded', brand:"Zoe's Bakeshop", loc:'Corner',    who:'Cottage bakery · founder, age 15',   url:'https://example.com/zoes-bakeshop'},
+      {x:470,w:162,h:214,cls:'gold', type:'awarded', brand:"Zoe's Bakeshop", loc:'Corner',    who:'Cottage bakery · founder, age 15',   url:'#'},
       {x:730,w:150,h:150,             type:'open'},
-      {x:970,w:168,h:250,cls:'cream',type:'shop',    brand:'Kayden Customs', loc:'Runway', who:'Sneaker customs · age 17',           url:'https://example.com/kayden-customs'},
+      {x:970,w:168,h:250,cls:'cream',type:'shop',    brand:'Kayden Customs', loc:'Broadway', who:'Sneaker customs · age 17',           url:'#'},
       {x:1240,w:212,h:322,           type:'marquee'},
-      {x:1545,w:162,h:242,cls:'gold',type:'awarded', brand:'Bloom by Amara', loc:'Center',    who:'Pressed-flower jewelry · age 16',    url:'https://example.com/bloom-by-amara'},
+      {x:1545,w:162,h:242,cls:'gold',type:'awarded', brand:'Bloom by Amara', loc:'Center',    who:'Pressed-flower jewelry · age 16',    url:'#'},
       {x:1805,w:150,h:150,           type:'open'},
-      {x:2040,w:162,h:202,cls:'brass',type:'shop',   brand:'Deveny Reads',   loc:'Gateway',   who:'Book subscription boxes · age 14',   url:'#'},
+      {x:2040,w:162,h:202,cls:'brass',type:'shop',   brand:'Deveny Reads',   loc:'Fifth Ave',   who:'Book subscription boxes · age 14',   url:'#'},
       {x:2300,w:158,h:174,cls:'cream',type:'shop',   brand:'Nova Skate',     loc:'Plaza',     who:'Skate brand · age 17',              url:'#'}
     ];
     const WORLD=Math.max.apply(null,PLOTS.map(p=>p.x+p.w))+380;
@@ -44,12 +44,12 @@
       b.style.left=p.x+'px';b.style.width=p.w+'px';b.style.height=p.h+'px';
       if(p.type==='marquee'){
         b.innerHTML='<div class="sq-marq"><div class="mbulbs"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>'+
-          '<div class="k">The Landmark</div><div class="name grad-gold">The Tower</div><div class="now">One brand at a time</div>'+
+          '<div class="k">The Landmark</div><div class="name grad-gold">The Marquee</div><div class="now">One brand at a time</div>'+
           '<div class="enter-tag">Enter ↑</div></div>';
       }else if(p.type==='open'){
         b.innerHTML='<div class="sq-board"><div class="b-brand">For lease</div><div class="enter-tag">Lease ↑</div></div>';
       }else{
-        const chip=p.type==='awarded'?'<div class="b-chip">★ Liftoff</div>':'<div class="b-chip">✦ Leased</div>';
+        const chip=p.type==='awarded'?'<div class="b-chip">★ Cornerstone</div>':'<div class="b-chip">✦ Leased</div>';
         b.innerHTML='<div class="sq-board">'+chip+'<div class="b-brand">'+p.brand+'</div><div class="b-loc">'+p.loc+'</div><div class="enter-tag">Enter ↑</div></div>';
       }
       b.addEventListener('click',function(){openPlot(p);});
@@ -84,19 +84,21 @@
     function openPlot(p){
       let badge,title,who='',text,btnHtml;
       if(p.type==='marquee'){
-        badge='★ The Landmark';title='The Tower';
+        badge='★ The Landmark';title='The Marquee';
         text='One sign, dead center, taken by a single brand at a time — reserved for launch weeks, holiday takeovers, and the nights the whole square shows up.';
-        btnHtml='<a class="btn" href="#">Join the waitlist</a>';
+        btnHtml='<a class="btn" href="lease.html#join">Join the waitlist</a>';
       }else if(p.type==='open'){
         badge='✦ For lease';title='Available storefront';
         text='An open address on the strip. Lease it and link it straight to your own shop — you keep every sale.';
-        btnHtml='<a class="btn" href="#">Lease this spot</a>';
+        btnHtml='<a class="btn" href="lease.html#join">Lease this spot</a>';
       }else{
-        badge=p.type==='awarded'?'★ Liftoff · Spotlight':'✦ Paid · Leased';title=p.brand;who=p.who;
+        badge=p.type==='awarded'?'★ Cornerstone · Spotlight':'✦ Paid · Leased';title=p.brand;who=p.who;
         text=p.type==='awarded'
           ? "A Spotlight founder's storefront, funded by the mission or a sponsor. It links out to their own shop — the Square never holds the sale."
           : "A leased storefront. It links straight to the business's own shop — the Square is the landlord, never the cashier.";
-        btnHtml='<a class="btn" href="'+p.url+'" target="_blank" rel="noopener">Visit the shop ↗</a>';
+        btnHtml=(p.url && p.url!=='#')
+          ? '<a class="btn" href="'+p.url+'" target="_blank" rel="noopener">Visit the shop ↗</a>'
+          : '<span class="c-demo">Example storefront &middot; demo</span>';
       }
       card.innerHTML='<button class="c-close" id="sqCardClose" aria-label="Close">✕</button>'+
         '<div class="c-badge">'+badge+'</div><h3 class="grad-gold">'+title+'</h3>'+

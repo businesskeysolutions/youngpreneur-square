@@ -4,15 +4,19 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Youngpreneur Square &mdash; Secure an address, not an ad</title>
-<meta name="description" content="A virtual advertising district. Lease a storefront that links to your real shop, take the Stage for a week, and help fund a storefront for a young founder. First month free.">
+<meta name="description" content="A virtual advertising district. Lease a storefront that links to your real shop, or come visit the Square. Every lease helps fund a storefront we donate to a young entrepreneur. First month free.">
 <meta name="theme-color" content="#0A0D0B">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Youngpreneur Square">
 <meta property="og:title" content="Youngpreneur Square &mdash; Secure an address, not an ad">
-<meta property="og:description" content="A virtual advertising district. Lease a storefront that links to your real shop, take the Stage for a week, and help fund a storefront for a young founder. First month free.">
-<meta property="og:image" content="https://youngpreneursquare.com/og-image.png">
+<meta property="og:description" content="A virtual advertising district. Lease a storefront that links to your real shop, or come visit the Square. Every lease helps fund a storefront we donate to a young entrepreneur. First month free.">
+<meta property="og:image" content="https://youngpreneursquare.pages.dev/og-image.png">
+<meta property="og:url" content="https://youngpreneursquare.pages.dev/">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://youngpreneursquare.pages.dev/og-image.png">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='10' fill='%230A0D0B'/%3E%3Crect x='4' y='4' width='56' height='56' rx='8' fill='none' stroke='%23C9A84A' stroke-width='2'/%3E%3Ctext x='32' y='44' font-family='Georgia,serif' font-size='38' font-weight='700' text-anchor='middle' fill='%23C9A84A'%3EY%3C/text%3E%3C/svg%3E">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,700;0,800;0,900;1,500;1,600&family=Work+Sans:wght@400;500;600;700&family=Alfa+Slab+One&display=swap" rel="stylesheet">
@@ -27,21 +31,27 @@
     <a href="index.html" class="wordmark"><span class="yp grad-gold">Youngpreneur</span><span class="sq">Square</span><span class="tm">&trade;</span></a>
     <button class="nav-burger" id="navBurger" aria-label="Menu">&#9776;</button>
     <nav class="nav" id="navMenu">
-      <a href="index.html" class="active" data-p="home">Home</a>
-      <a href="about.html" data-p="about">About</a>
+      <a href="square.html" data-p="square">The Square</a>
       <a href="directory.html" data-p="directory">Directory</a>
       <a href="pricing.html" data-p="pricing">Pricing</a>
       <a href="lease.html" data-p="lease">Lease a Storefront</a>
+      <a href="about.html" data-p="about">About</a>
       <a href="ignition-day.html" data-p="ignition">Ignition Day</a>
       <button class="nav-toggle" id="toggle">Auto</button>
     </nav>
   </div>
 </header>
-<div class="hero" id="top">
+
+<div class="hero door-hero" id="top">
   <div class="afterglow"></div>
   <div class="sun" id="sun"></div>
   <div class="moon" id="moon"></div>
   <div class="stars" id="stars"></div>
+  <div class="tsq">
+    <div class="tsq-glow"></div>
+    <div class="tsq-city" id="tsqCity"></div>
+    <div class="tsq-haze"></div>
+  </div>
 
   <div class="hero-copy wrap centered">
     <div class="logo-marquee">
@@ -54,247 +64,31 @@
         </div>
       </div>
     </div>
-    <h1 class="hero-tag">Secure an <span class="lit grad-gold">address</span>, not an ad.</h1>
-    <p class="sub">Businesses don't buy banners here — they lease a storefront on the square, a real address that links straight to their own shop. Open to any business; every lease helps fund a storefront we donate to a young entrepreneur. <b>We're the landlord, never the cashier.</b></p>
-    <div class="hero-cta">
-      <a href="#" class="btn enter-square">Enter the Square ↗</a>
-      <a href="lease.html#join" class="btn-ghost">Lease a storefront</a>
-    </div>
-  </div>
 
-  <div class="scene">
-  <div class="far" id="far"></div>
-  <div class="skyline">
-    <div class="bldg" style="width:8%;height:50%">
-      <div class="board c-sage"><span class="chip paid">Leased</span><span class="brand">Vertex&nbsp;Tech</span><span class="loc">Skyline</span></div>
-    </div>
-    <div class="bldg" style="width:9.5%;height:68%">
-      <div class="board c-gold awarded flick"><span class="chip">★ Liftoff</span><span class="brand">Zoe's Bakeshop</span><span class="loc">Corner</span></div>
-    </div>
-    <div class="bldg" style="width:10%;height:58%">
-      <div class="board open"><span class="brand">For lease</span></div>
-    </div>
-    <div class="bldg" style="width:11%;height:84%">
-      <div class="board c-cream"><span class="chip paid">Leased</span><span class="brand">Kayden Customs</span><span class="loc">Runway</span></div>
-    </div>
+    <p class="sub door-sub">A virtual advertising district &mdash; lease a storefront that links straight to your real shop, and every lease helps fund one we donate to a young entrepreneur. <b>Pick your door.</b></p>
 
-    <div class="bldg marquee-bldg" style="width:16%;height:100%">
-      <div class="marquee-sign">
-        <div class="bulbs"><span></span><span></span><span></span><span></span><span></span><span></span></div>
-        <div class="k">The Landmark</div><div class="name grad-gold">The Tower</div><div class="now">One brand at a time</div>
+    <div class="doorwrap">
+      <div class="doors">
+        <a class="door visit" href="square.html">
+          <span class="rn">01</span>
+          <span class="k">Come look around</span>
+          <h2>Visit the Square</h2>
+          <p>Walk the lit strip, browse the directory of storefronts, and catch the takeover on The Marquee.</p>
+          <span class="go">Enter the Square ↗</span>
+        </a>
+        <a class="door lease" href="lease.html">
+          <span class="rn">02</span>
+          <span class="k">Have a business?</span>
+          <h2>Lease a Storefront</h2>
+          <p>Claim your address and point it at your shop &mdash; first month free. Already on the Square? Manage your storefront.</p>
+          <span class="go">Lease or manage ↗</span>
+        </a>
       </div>
-    </div>
-
-    <div class="bldg" style="width:11%;height:80%">
-      <div class="board c-gold awarded flick"><span class="chip">★ Liftoff</span><span class="brand">Bloom by Amara</span><span class="loc">Center</span></div>
-    </div>
-    <div class="bldg" style="width:10%;height:56%">
-      <div class="board open"><span class="brand">For lease</span></div>
-    </div>
-    <div class="bldg" style="width:9.5%;height:70%">
-      <div class="board c-brass"><span class="chip paid">Leased</span><span class="brand">Deveny Reads</span><span class="loc">Gateway</span></div>
-    </div>
-    <div class="bldg" style="width:8%;height:48%">
-      <div class="board c-cream"><span class="chip paid">Leased</span><span class="brand">Nova&nbsp;Skate</span><span class="loc">Plaza</span></div>
-    </div>
-  </div>
-
-  <div class="street">
-    <div class="reflect"></div>
-    <div class="curb"></div>
-    <div class="trail white"></div>
-    <div class="trail red"></div>
-    <div class="street-label"><span>You are on the <b>Runway</b></span></div>
-  </div>
-  </div>
-</div>
-
-<div class="ticker">
-  <div class="ticker-track">
-    <span>I got my storefront on <i>the Runway</i><span class="sep">✦</span></span>
-    <span>Spotlight winner — <i>awarded a storefront</i><span class="sep">✦</span></span>
-    <span>Find my shop at <i>the Corner</i><span class="sep">✦</span></span>
-    <span>Catch my launch on <i>The Tower</i><span class="sep">✦</span></span>
-    <span>We took the <i>Gateway Entrance</i><span class="sep">✦</span></span>
-    <span>I got my storefront on <i>the Runway</i><span class="sep">✦</span></span>
-    <span>Spotlight winner — <i>awarded a storefront</i><span class="sep">✦</span></span>
-    <span>Find my shop at <i>the Corner</i><span class="sep">✦</span></span>
-    <span>Catch my launch on <i>The Tower</i><span class="sep">✦</span></span>
-    <span>We took the <i>Gateway Entrance</i><span class="sep">✦</span></span>
-  </div>
-</div>
-
-<section id="districts">
-  <div class="wrap">
-    <div class="sec-head">
-      <div><div class="eyebrow">One square, many addresses</div><h2>The districts</h2></div>
-      <p>Each district maps to how an industry already thinks about space. The model is the same. Only the <em>address</em> changes.</p>
-    </div>
-    <div class="districts">
-      <div class="dcard">
-        <div class="rn">I</div>
-        <div class="num">District 01</div><h3>The Runway</h3>
-        <p>Billboards and storefronts for any business. Each spot links out to its real shop. The face of the square.</p>
-        <div class="tag live">Live now</div>
-      </div>
-      <div class="dcard spot">
-        <div class="rn">II</div>
-        <div class="num">District 02</div><h3>The Hangar</h3>
-        <p>Dealerships lease a lit lot and park their inventory under the lights. Pure advertising — no cars change hands here.</p>
-        <div class="tag live">Now leasing</div>
-      </div>
-      <div class="dcard">
-        <div class="rn">III</div>
-        <div class="num">District 03</div><h3>The Terminal</h3>
-        <p>Storefronts for restaurants, shops, and local names. Coming as the square fills up.</p>
-        <div class="tag soon">Planned</div>
+      <div class="doormeta">
+        Or jump to <a href="pricing.html">Pricing</a> &middot; <a href="directory.html">Directory</a> &middot; <a href="about.html">Our story</a> &middot; <a href="ignition-day.html">Ignition Day</a>
       </div>
     </div>
   </div>
-</section>
-
-<section class="tiers" id="tiers">
-  <div class="wrap">
-    <div class="sec-head">
-      <div><div class="eyebrow">Two doors, one street</div><h2>Leased &amp; Liftoff storefronts</h2></div>
-      <p>Open to any business — and the leases fund the <em>Liftoff storefronts</em> we donate to young entrepreneurs. That's the pitch a sponsor can say yes to.</p>
-    </div>
-
-    <div class="tier-grid">
-      <div class="tier-card pay">
-        <span class="badge">✦ Leased · Open to all</span>
-        <h3>Any business that wants the address</h3>
-        <p>A brand of any size leases a storefront for the visibility and the status of the location — and links it straight to its own Shopify, site, or booking page. No age limit, no gatekeeping.</p>
-        <ul>
-          <li><b>Who it's for:</b> any business with a shop to point to.</li>
-          <li><b>What they get:</b> a recognized address on the strip.</li>
-          <li><b>Where it links:</b> out to their real shop — we never hold the sale.</li>
-        </ul>
-      </div>
-      <div class="tier-card award">
-        <span class="badge">★ Liftoff · The mission</span>
-        <h3>Given to a young entrepreneur</h3>
-        <p>Part of every district is set aside and donated to young founders in the Youngpreneur program — funded by the leases and by sponsors. A Spotlight winner gets a real address, not just a certificate.</p>
-        <ul>
-          <li><b>Who it's for:</b> youth founders earning their first stage.</li>
-          <li><b>How it's funded:</b> paid leases, sponsors, and mission dollars.</li>
-          <li><b>Why it matters:</b> the give-back is the heart of the square.</li>
-        </ul>
-      </div>
-    </div>
-
-    <div class="flow">
-      <span class="node"><b>Leased storefronts</b></span>
-      <span class="arrow">→</span>
-      <span class="node">fund the</span>
-      <span class="arrow">→</span>
-      <span class="node"><b>Liftoff storefronts</b></span>
-      <span class="arrow">→</span>
-      <span class="node">which feed the <b>mission</b></span>
-    </div>
-  </div>
-</section>
-
-<section class="visit" id="live">
-  <div class="wrap">
-    <div class="sec-head">
-      <div><div class="eyebrow">Why anyone shows up</div><h2>Something is always lit</h2></div>
-      <p>People come for the spectacle and the brands, not a sales pitch — from big names on The Tower to the donated storefronts of young founders just getting started. That's what solves the cold-start problem an empty ad district usually has.</p>
-    </div>
-
-    <div class="live-grid">
-      <div class="live">
-        <div class="screen a">
-          <div class="tag on">Live</div>
-          <div class="big">Zoe drops her<br>holiday boxes</div>
-        </div>
-        <div class="body">
-          <div class="loc">On the Corner · Liftoff</div>
-          <h4>Launch week</h4>
-          <p>A founder takes over her storefront for seven days while a new drop goes live on her own shop.</p>
-        </div>
-      </div>
-
-      <div class="live">
-        <div class="screen b">
-          <div class="tag">Tonight, 9pm</div>
-          <div class="big">Spotlight winner<br>reveal</div>
-        </div>
-        <div class="body">
-          <div class="loc">Sponsored moment</div>
-          <h4>An address, awarded live</h4>
-          <p>A sponsor lights a corner of the square to hand a Spotlight winner their first real storefront.</p>
-        </div>
-      </div>
-
-      <div class="live">
-        <div class="screen c">
-          <div class="tag on">Counting down</div>
-          <div class="big">New Year's on<br>The Tower</div>
-        </div>
-        <div class="body">
-          <div class="loc">On The Tower</div>
-          <h4>The takeover of the year</h4>
-          <p>One brand owns the landmark as the clock runs out — the night the whole square watches.</p>
-          <a href="#" class="live-cta balldrop-open">▶ Watch the drop</a>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section class="cta">
-  <div class="wrap cta-inner">
-    <div class="eyebrow">Dream · Build · Inspire</div>
-    <h2>The best addresses go <em class="grad-gold">first</em>.</h2>
-    <p>The First Flight gets in first at an introductory rate — and the best addresses only get more valuable as the square fills. <em>Liftoff storefronts sit beside them.</em></p>
-    <a href="directory.html#strip" class="btn">Claim your address</a>
-  </div>
-</section>
-
-<div id="balldrop" aria-hidden="true">
-  <div class="bd-stars" id="bdStars"></div>
-  <div class="bd-pole"></div>
-  <div class="bd-ball" id="bdBall"></div>
-  <div class="bd-count" id="bdCount"><div class="lbl">Countdown to the takeover</div><div class="n" id="bdNum">10</div></div>
-  <div class="bd-takeover" id="bdTakeover">
-    <div class="hn grad-gold">Happy New Year</div>
-    <div class="sm">Tonight on The Tower</div>
-    <div class="brand">Aurelio</div>
-  </div>
-  <div class="bd-marq" id="bdMarq">
-    <div class="mbulbs"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
-    <div class="k">The Landmark</div><div class="nm grad-gold">The Tower</div>
-  </div>
-  <div class="bd-confetti" id="bdConfetti"></div>
-  <div class="bd-flash" id="bdFlash"></div>
-  <div class="bd-hud">
-    <div class="t"><b>Youngpreneur</b> Square · New Year's Takeover</div>
-    <div class="bd-actions">
-      <button class="bd-btn" id="bdReplay">↻ Replay</button>
-      <button class="bd-btn round" id="bdClose" aria-label="Close">✕</button>
-    </div>
-  </div>
-</div>
-
-<div id="square" aria-hidden="true">
-  <div class="sq-world" id="sqWorld">
-    <div class="sq-sky"><div class="sq-sun" id="sqSun"></div><div class="sq-moon" id="sqMoon"></div><div class="sq-stars" id="sqStars"></div></div>
-    <div class="sq-layer sq-far" id="sqFar"></div>
-    <div class="sq-layer sq-ground" id="sqGround"></div>
-    <div class="sq-layer sq-mid" id="sqMid"></div>
-    <div class="sq-avatar" id="sqAvatar"><span class="glow"></span><div class="fig"><span class="head"></span><span class="body"></span><span class="leg l"></span><span class="leg r"></span></div></div>
-    <div class="sq-fg"></div>
-  </div>
-  <div class="sq-hud">
-    <div class="sq-top">
-      <div class="sq-mark"><b>Youngpreneur</b> Square</div>
-      <button class="sq-close" id="sqClose" aria-label="Close the square">✕</button>
-    </div>
-    <div class="sq-ctrls"><button id="sqLeft" aria-label="Walk left">◀</button><button id="sqRight" aria-label="Walk right">▶</button></div>
-    <div class="sq-hint">Use <b>← →</b> to walk &nbsp;·&nbsp; <b>↑</b> to enter a storefront</div>
-  </div>
-  <div class="sq-modal" id="sqModal"><div class="sq-card" id="sqCard"></div></div>
 </div>
 
 <footer>
@@ -304,7 +98,7 @@
       <div class="tag">Dream &middot; Build &middot; Inspire</div>
     </div>
     <nav class="foot-nav">
-      <a href="index.html">Home</a><a href="about.html">About</a><a href="directory.html">Directory</a>
+      <a href="square.html">The Square</a><a href="about.html">About</a><a href="directory.html">Directory</a>
       <a href="pricing.html">Pricing</a><a href="lease.html">Lease a Storefront</a><a href="ignition-day.html">Ignition Day</a>
     </nav>
     <div class="foot">
@@ -316,6 +110,44 @@
 </footer>
 <script src="config.js"></script>
 <script src="site.js"></script>
-<script src="home.js"></script>
 <script src="wiring.js"></script>
+<script>
+(function(){
+  var city=document.getElementById('tsqCity'); if(!city) return;
+  var W=window.innerWidth, n=W<560?8:(W<900?13:20);
+  var COLORS=['gold','lime','cream','ink','red'];
+  var MSGS=['Now Leasing','Grand Opening','The Daily Drop','Business of the Week','Youngpreneur','Shop the Square','Marquee Takeover','Spotlight','Vote Now','New Arrivals','Cornerstone','Est. 2023','Open Late','Live Tonight','On Broadway','Fifth Ave'];
+  function rc(a){return a[Math.floor(Math.random()*a.length)];}
+  function makeBldg(){
+    var h=130+Math.floor(Math.random()*220), w=44+Math.floor(Math.random()*42);
+    var b=document.createElement('div'); b.className='bldg2'; b.style.height=h+'px'; b.style.width=w+'px';
+    var nb=1+Math.floor(Math.random()*2);
+    for(var j=0;j<nb;j++){
+      var bh=18+Math.floor(Math.random()*24), top=8+Math.floor(Math.random()*Math.max(10,h-bh-16));
+      var bb=document.createElement('div'); bb.className='bb '+rc(COLORS)+(Math.random()<.55?(Math.random()<.5?' pulse':' pulse2'):'');
+      bb.style.top=top+'px'; bb.style.height=bh+'px';
+      var strip=document.createElement('div'); strip.className='bb-strip';
+      for(var s=0;s<6;s++){ strip.appendChild(document.createElement('i')); } bb.appendChild(strip);
+      var t=document.createElement('span'); t.className='bb-txt'; t.textContent=rc(MSGS); bb.appendChild(t);
+      b.appendChild(bb);
+    }
+    return b;
+  }
+  var jumbo=document.createElement('div'); jumbo.className='jumbo';
+  jumbo.innerHTML='<div class="jb-top"><i></i><i></i><i></i><i></i><i></i><i></i></div>'+
+    '<div class="jb-scr"><div class="jb-k" id="jbK">The Daily Drop</div><div class="jb-m" id="jbM">Tonight on The Marquee</div><div class="jb-s">24 hours only</div></div>';
+  var lead=Math.min(3,n), i;
+  for(i=0;i<lead;i++) city.appendChild(makeBldg());
+  city.appendChild(jumbo);
+  for(i=0;i<n-lead;i++) city.appendChild(makeBldg());
+  jumbo.querySelectorAll('.jb-top i').forEach(function(b,k){ b.style.animationDelay=(k*0.16).toFixed(2)+'s'; });
+  var DROPS=[['The Daily Drop','Tonight on The Marquee'],['Business of the Week','Cast your vote'],['Grand Opening','New shops on Broadway'],['Spotlight','A young founder takes the stage'],['Marquee Takeover','One brand, all night'],['Now Leasing','Claim your address']];
+  var di=0;
+  setInterval(function(){
+    di=(di+1)%DROPS.length; var k=document.getElementById('jbK'), m=document.getElementById('jbM');
+    if(k&&m){ k.textContent=DROPS[di][0]; m.textContent=DROPS[di][1]; }
+    var txts=city.querySelectorAll('.bldg2 .bb-txt'); if(txts.length){ txts[Math.floor(Math.random()*txts.length)].textContent=rc(MSGS); }
+  },2600);
+})();
+</script>
 </body></html>
