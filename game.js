@@ -4,7 +4,7 @@
    coins, upgrade, and expand — plus a fullscreen city view and a guided
    first-time tutorial. You also earn coins by VISITING real storefronts on the
    Square (a traffic driver to the businesses that lease). Free to play; coins
-   and prize entries are never bought and never affect prize odds.
+   are earned by playing, never bought.
    Currency: the gold "Y" coin. Persists to localStorage; offline earnings are
    computed from elapsed time. Mount with window.SquareGame.mount(el); coin
    rewards for store visits work on every page via window.SquareGame.rewardVisit.
@@ -40,7 +40,7 @@
 
   function fresh(){
     return { v:2, coins:CFG.startCoins, xp:0, level:1, streak:0, lastDay:'', tut:0,
-      visited:{ day:'', refs:{} },
+      visited:{ day:'', refs:{} }, tokens:{},
       lots:[ {built:false,unlocked:true},{built:false,unlocked:false},{built:false,unlocked:false},
              {built:false,unlocked:false},{built:false,unlocked:false} ] };
   }
@@ -49,6 +49,7 @@
   if(!S || !S.lots) S = fresh();
   if(typeof S.tut !== 'number' && S.tut!=='done') S.tut = (S.lots.some(function(l){return l.built;}) ? 'done' : 0);
   if(!S.visited) S.visited = { day:'', refs:{} };
+  if(!S.tokens) S.tokens = {};
   function save(){ try{ localStorage.setItem(LS, JSON.stringify(S)); }catch(e){} }
 
   /* ---- math ---- */
@@ -118,8 +119,57 @@
     S.visited.refs[ref]=1; S.coins+=CFG.visitCoins; save();
     ensureChrome();
     toast('🛍️ +'+CFG.visitCoins+' coins for visiting '+ref);
-    if(mountEl) render();
+    updateFab(); if(mountEl) render();
     return true;
+  }
+  // finding a stray coin hidden on a page (once per page per day)
+  function rewardToken(key){
+    if(!S.tokens) S.tokens={};
+    if(S.tokens[key]) return false;
+    S.tokens[key]=1; S.coins+=15; save();
+    ensureChrome(); toast('🪙 +15 coins — you found a stray coin!');
+    updateFab(); if(mountEl) render(); return true;
+  }
+  function updateFab(){ var f=document.getElementById('bgFabCoins'); if(f) f.textContent=S.coins; }
+  /* ---- sharing (viral loop) ---- */
+  function shareBlock(){
+    var url='https://youngpreneursquare.pages.dev/block.html';
+    var text="I'm building my block on Youngpreneur Square — come build yours!";
+    try{ if(navigator.share){ navigator.share({title:'Youngpreneur Square', text:text, url:url}).catch(function(){}); return; } }catch(e){}
+    shareFacebook();
+  }
+  function shareFacebook(){
+    var url='https://youngpreneursquare.pages.dev/block.html';
+    window.open('https://www.facebook.com/sharer/sharer.php?u='+encodeURIComponent(url),'_blank','noopener,width=640,height=560');
+  }
+  /* ---- site-wide presence: launcher + stray coins + store-visit rewards ---- */
+  function initPresence(){
+    ensureChrome();
+    if(!document.getElementById('bgFab')){
+      var fab=el('button','bg-fab'); fab.id='bgFab';
+      fab.innerHTML='<span class="yc"></span> <b id="bgFabCoins">'+S.coins+'</b> · Your Block';
+      fab.addEventListener('click', function(){ if(mountEl){ if(!fs) toggleFs(); } else { location.href='block.html'; } });
+      document.body.appendChild(fab);
+    }
+    placeToken();
+    document.addEventListener('click', visitListener, true);
+  }
+  function placeToken(){
+    if(document.querySelector('.bg-token')) return;
+    var day=todayStr(), key='tok:'+location.pathname+':'+day;
+    if(S.tokens && S.tokens[key]) return;
+    var seed=0,s=key; for(var i=0;i<s.length;i++) seed=(seed*31+s.charCodeAt(i))&0xffffff;
+    var top=22+(seed%60), left=8+((seed>>4)%84);
+    var t=el('span','bg-token','<span class="yc"></span>'); t.style.top=top+'vh'; t.style.left=left+'vw'; t.title='A stray coin…';
+    t.addEventListener('click', function(){ if(rewardToken(key)){ t.style.transform='scale(1.7)'; t.style.opacity='0'; setTimeout(function(){ if(t.parentNode) t.parentNode.removeChild(t); },200); } });
+    document.body.appendChild(t);
+  }
+  function visitListener(e){
+    if(!e.target||!e.target.closest) return;
+    var a=e.target.closest('a');
+    if(a){ var ext=a.target==='_blank'&&a.href&&a.hostname&&a.hostname!==location.hostname; if(ext) rewardVisit(a.hostname); }
+    var b=e.target.closest('.sq-b');
+    if(b&&!b.classList.contains('open')&&!b.classList.contains('marquee')){ var br=b.querySelector('.b-brand'); rewardVisit((br&&br.textContent.trim())||'a shop'); }
   }
 
   /* ---------------- styles ---------------- */
@@ -149,6 +199,16 @@
   .bg-fs{flex:0 0 auto;background:rgba(245,241,230,.06);border:1px solid rgba(201,168,74,.3);color:#EFE9D8;
     width:38px;height:38px;border-radius:10px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center}
   .bg-fs:hover{border-color:var(--gold,#C9A84A)}
+  .bg-share{flex:0 0 auto;border:none;width:38px;height:38px;border-radius:10px;font-size:15px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .bg-share.fb{background:#1877F2;color:#fff;font-family:Georgia,serif}
+  .bg-share.gen{background:rgba(245,241,230,.06);color:#EFE9D8;border:1px solid rgba(201,168,74,.3)}
+  .bg-fab{position:fixed;right:18px;bottom:18px;z-index:9000;display:flex;align-items:center;gap:6px;
+    font-family:"Work Sans",system-ui,sans-serif;font-weight:700;font-size:12px;letter-spacing:.03em;color:#14231A;
+    background:linear-gradient(180deg,#F1DEA2,#C9A84A);border:none;border-radius:30px;padding:10px 15px;cursor:pointer;
+    box-shadow:0 8px 26px rgba(0,0,0,.4),0 0 0 1px rgba(201,168,74,.5)}
+  .bg-fab:hover{transform:translateY(-2px)} .bg-fab .yc{font-size:15px} .bg-fab b{font-size:13px;font-family:"Playfair Display",Georgia,serif}
+  .bg-token{position:fixed;z-index:8500;font-size:23px;line-height:1;cursor:pointer;transition:transform .18s,opacity .18s;filter:drop-shadow(0 2px 7px rgba(233,207,138,.75))}
+  .bg-token .yc{width:1em;height:1em} .bg-token:hover{transform:scale(1.22)}
   /* city */
   .bg-city{position:relative;flex:1;min-height:0;overflow-x:auto;overflow-y:hidden;display:flex;align-items:flex-end;
     gap:14px;padding:0 20px 46px;scroll-snap-type:x proximity;
@@ -290,6 +350,8 @@
       '<div class="bg-chip"><span class="yc"></span><span class="v" id="bgCoins">'+S.coins+'</span></div>'+
       '<div class="bg-chip streak"><span class="v">🔥 '+S.streak+'</span></div>'+
       '<div class="bg-lvlbox"><div class="r"><span>Lvl <b>'+S.level+'</b></span><span>'+S.xp+'/'+need+' XP</span></div><div class="bg-xp"><i style="width:'+pct+'%"></i></div></div>'+
+      '<button class="bg-share fb" id="bgFb" title="Share to Facebook">f</button>'+
+      '<button class="bg-share gen" id="bgShare" title="Share your block">📤</button>'+
       '<button class="bg-fs" id="bgFs" title="Fullscreen">'+(fs?'✕':'⛶')+'</button>'+
     '</div>';
   }
@@ -340,6 +402,8 @@
     ev(root,'[data-build]','click',function(e){ openPicker(+e.getAttribute('data-build')); });
     ev(root,'[data-close]','click',function(){ sel=-1; render(); });
     var fsb=root.querySelector('#bgFs'); if(fsb) fsb.addEventListener('click', toggleFs);
+    var fbb=root.querySelector('#bgFb'); if(fbb) fbb.addEventListener('click', shareFacebook);
+    var shb=root.querySelector('#bgShare'); if(shb) shb.addEventListener('click', shareBlock);
   }
   function ev(root,sel2,type,fn){ Array.prototype.forEach.call(root.querySelectorAll(sel2),function(e){
     e.addEventListener(type,function(evt){ fn(e,evt); }); }); }
@@ -401,7 +465,13 @@
   window.SquareGame = {
     mount: mount,
     rewardVisit: rewardVisit,
+    rewardToken: rewardToken,
+    share: shareBlock,
     get: function(){ return JSON.parse(JSON.stringify(S)); },
-    add: function(n){ S.coins+=(n||0); save(); if(mountEl) render(); }
+    add: function(n){ S.coins+=(n||0); save(); updateFab(); if(mountEl) render(); }
   };
+
+  // site-wide presence (launcher, stray coins, visit rewards) runs on every page
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', initPresence);
+  else initPresence();
 })();
