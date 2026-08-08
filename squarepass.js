@@ -480,6 +480,10 @@
     document.body.appendChild(sym);
   }
 
+  // Visiting a real storefront also earns game coins (traffic driver for the
+  // businesses that lease). Handled by the Build Your Block game, once/store/day.
+  function rewardGameVisit(ref){ try { if(window.SquareGame && window.SquareGame.rewardVisit) window.SquareGame.rewardVisit(ref); } catch(e){} }
+
   // ---- global stamp hooks ----
   document.addEventListener('click', function(e){
     if(!e.target || !e.target.closest) return;
@@ -487,14 +491,14 @@
     var a = e.target.closest('a');
     if(a){
       var ext = a.target==='_blank' && a.href && a.hostname && a.hostname!==location.hostname;
-      if(ext) stamp('visit', a.hostname);
+      if(ext){ stamp('visit', a.hostname); rewardGameVisit(a.hostname); }
     }
     // ...or opening a storefront card in the walkable Square (demo shops included).
     var b = e.target.closest('.sq-b');
     if(b && !b.classList.contains('open') && !b.classList.contains('marquee')){
       var brandEl = b.querySelector('.b-brand');
       var brand = (brandEl && brandEl.textContent.trim()) || 'storefront';
-      stamp('visit', brand);
+      stamp('visit', brand); rewardGameVisit(brand);
     }
     if(e.target.closest('.vbtn')) stamp('vote', weekStart());
     if(e.target.closest('.enter-square, .balldrop-open')) stamp('explore', 'square');
