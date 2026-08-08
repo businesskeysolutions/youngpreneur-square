@@ -535,6 +535,13 @@
   .ride-btn{margin-left:auto;pointer-events:auto;background:linear-gradient(180deg,var(--gold-light),var(--gold-deep));color:#14231A;border:none;
     font-family:"Work Sans";font-weight:700;font-size:11.5px;letter-spacing:.04em;padding:7px 13px;border-radius:20px;cursor:pointer;white-space:nowrap;transition:transform .1s}
   .ride-btn:hover{transform:translateY(-1px)}
+  /* collectible coins scattered through the walkable world + subway */
+  .wcoin{position:absolute;bottom:152px;width:27px;height:27px;z-index:5;cursor:pointer;
+    animation:wcbob 1.5s ease-in-out infinite;filter:drop-shadow(0 3px 9px rgba(233,207,138,.75))}
+  .wcoin .yc{width:27px;height:27px;font-size:27px;vertical-align:top}
+  .wcoin.pop{animation:wcpop .38s ease-out forwards;pointer-events:none}
+  @keyframes wcbob{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+  @keyframes wcpop{0%{transform:scale(1);opacity:1}100%{transform:scale(1.9) translateY(-34px);opacity:0}}
 
   /* the avatar */
   .sq-avatar{position:absolute;bottom:116px;width:42px;height:86px;z-index:6}

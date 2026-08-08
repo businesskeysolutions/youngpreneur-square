@@ -54,6 +54,23 @@
       '<div class="b-brand">'+esc(brand)+'</div><div class="b-loc">'+esc(loc)+'</div><div class="enter-tag">Enter ↑</div></div></div>';
   }
 
+  // collectible coins (once per coin per day)
+  function wcoinDay(){ return new Date().toISOString().slice(0,10); }
+  function wcoinGot(){ try{ var w=JSON.parse(localStorage.getItem('yps_wcoins')); if(w&&w.day===wcoinDay()) return w.got||{}; }catch(e){} return {}; }
+  function collectCoin(c){ if(c.__done) return; c.__done=true;
+    var g=wcoinGot(); g[c.dataset.cid]=1; try{ localStorage.setItem('yps_wcoins', JSON.stringify({day:wcoinDay(),got:g})); }catch(e){}
+    if(window.SquareGame && window.SquareGame.reward) window.SquareGame.reward(5, '🪙 +5 coins');
+    c.classList.add('pop'); setTimeout(function(){ if(c.parentNode) c.parentNode.removeChild(c); },380); }
+  function placeCoins(){
+    var got=wcoinGot(), n=Math.min(5, Math.floor(stops.length/2)), xs=[];
+    for(var k=0;k<n;k++) xs.push({id:'sub:'+street+':'+k, cx:150+(k*2+1.4)*SPACING});
+    xs.forEach(function(o){ if(got[o.id]) return;
+      var c=document.createElement('div'); c.className='wcoin'; c.innerHTML='<span class="yc"></span>';
+      c.style.left=(o.cx*K)+'px'; c.dataset.cid=o.id; c.__wx=o.cx*K;
+      c.addEventListener('click',function(e){ e.stopPropagation(); collectCoin(c); });
+      stationsEl.appendChild(c); });
+  }
+
   function layout(){
     K=fitK();
     var count=stops.length;
@@ -64,6 +81,7 @@
       el.__cx=parseFloat(el.style.left)+parseFloat(el.style.width)/2;
       el.addEventListener('click', function(){ openStop(+el.getAttribute('data-i')); });
     });
+    placeCoins();
     track.style.width=WORLD+'px'; track.style.setProperty('--ln', color);
     far.style.width=WORLD+'px';
     ax=clampv(ax,60,WORLD-60);
@@ -79,9 +97,11 @@
     track.style.transform='translateX('+(-cam)+'px)';
     stationsEl.style.transform='translateX('+(-cam)+'px)';
     avatar.style.left=(ax-cam-21)+'px';
-    var best=null, bi=-1, bd=150*K, els=stationsEl.children;
-    for(var i=0;i<els.length;i++){ var d=Math.abs(ax-els[i].__cx); if(d<bd){ bd=d; best=els[i]; bi=i; } }
-    if(best!==near){ if(near) near.classList.remove('near'); near=best; if(near) near.classList.add('near'); nearI=bi; }
+    var best=null, bd=150*K, sts=stationsEl.querySelectorAll('.sq-b');
+    for(var i=0;i<sts.length;i++){ var d=Math.abs(ax-sts[i].__cx); if(d<bd){ bd=d; best=sts[i]; } }
+    if(best!==near){ if(near) near.classList.remove('near'); near=best; if(near) near.classList.add('near'); nearI = best?+best.getAttribute('data-i'):-1; }
+    var coins=stationsEl.querySelectorAll('.wcoin');
+    for(var ci=0;ci<coins.length;ci++){ if(!coins[ci].__done && Math.abs(ax-coins[ci].__wx)<34) collectCoin(coins[ci]); }
     raf=requestAnimationFrame(frame);
   }
 

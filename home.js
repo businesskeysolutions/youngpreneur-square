@@ -68,6 +68,24 @@
       p.el=b;p.center=(p.x+p.w/2)*K;mid.appendChild(b);
     }
 
+    // collectible coins (once per coin per day)
+    function wcoinDay(){ return new Date().toISOString().slice(0,10); }
+    function wcoinGot(){ try{ var w=JSON.parse(localStorage.getItem('yps_wcoins')); if(w&&w.day===wcoinDay()) return w.got||{}; }catch(e){} return {}; }
+    function collectCoin(c){ if(c.__done) return; c.__done=true;
+      var g=wcoinGot(); g[c.dataset.cid]=1; try{ localStorage.setItem('yps_wcoins', JSON.stringify({day:wcoinDay(),got:g})); }catch(e){}
+      if(window.SquareGame && window.SquareGame.reward) window.SquareGame.reward(5, '🪙 +5 coins');
+      c.classList.add('pop'); setTimeout(function(){ if(c.parentNode) c.parentNode.removeChild(c); },380); }
+    function placeCoins(){
+      var got=wcoinGot();
+      [300,780,1180,1650,2050].forEach(function(cx,ci){
+        var id='square:'+ci; if(got[id]) return;
+        var c=document.createElement('div'); c.className='wcoin'; c.innerHTML='<span class="yc"></span>';
+        c.style.left=(cx*K)+'px'; c.dataset.cid=id; c.__wx=cx*K;
+        c.addEventListener('click',function(e){ e.stopPropagation(); collectCoin(c); });
+        mid.appendChild(c);
+      });
+    }
+
     function layout(){
       K=fitK(); WORLD=BASEW*K;
       far.innerHTML=''; far.style.width=WORLD+'px';
@@ -79,6 +97,7 @@
       for(let x=120;x<BASEW;x+=280){const lp=document.createElement('div');lp.className='lamp';lp.style.left=(x*K)+'px';ground.appendChild(lp);}
       mid.innerHTML=''; mid.style.width=WORLD+'px';
       PLOTS.forEach(build);
+      placeCoins();
       ax=clampv(ax,60,WORLD-60);
     }
     layout();
@@ -103,6 +122,8 @@
       let best=null,bd=140*K;
       for(const p of PLOTS){const d=Math.abs(ax-p.center);if(d<bd){bd=d;best=p;}}
       if(best!==near){ if(near&&near.el)near.el.classList.remove('near'); near=best; if(near&&near.el)near.el.classList.add('near'); }
+      var coins=mid.querySelectorAll('.wcoin');
+      for(var ci=0;ci<coins.length;ci++){ if(!coins[ci].__done && Math.abs(ax-coins[ci].__wx)<34) collectCoin(coins[ci]); }
       raf=requestAnimationFrame(frame);
     }
 

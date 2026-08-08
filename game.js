@@ -549,6 +549,7 @@
     mount: mount,
     rewardVisit: rewardVisit,
     rewardToken: rewardToken,
+    reward: function(n,msg){ S.coins+=(n||0); save(); ensureChrome(); if(msg) toast(msg); updateFab(); if(mountEl) render(); },
     share: shareBlock,
     get: function(){ return JSON.parse(JSON.stringify(S)); },
     add: function(n){ S.coins+=(n||0); save(); updateFab(); if(mountEl) render(); }
