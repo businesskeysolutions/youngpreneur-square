@@ -147,6 +147,63 @@
     function closeModal(){ modal.classList.remove('open'); }
     modal.addEventListener('click',function(e){ if(e.target===modal) closeModal(); });
 
+    // ---- character avatar: pick a ready-made one or upload your own ----
+    const AV_KEY='yps_avatar';
+    const AV_PRESETS=['🧑','👩','👨','🧑🏽','👩🏾','🧑🏿','👦','👧','🧔','🧕','🧑‍🦱','🧑‍🎤','🦸','🦹','🧑‍🚀','👽','🤖','🐱'];
+    function getAvatar(){ try{ var a=JSON.parse(localStorage.getItem(AV_KEY)); if(a&&a.v) return a; }catch(e){} return {type:'emoji',v:'🧑'}; }
+    function saveAvatar(a){ try{ localStorage.setItem(AV_KEY, JSON.stringify(a)); }catch(e){} }
+    function headMarkup(a, cls){ return a.type==='img'
+      ? '<div class="'+cls+'" style="background-image:url('+a.v+')"></div>'
+      : '<div class="'+cls+'">'+a.v+'</div>'; }
+    function renderAvatar(){
+      var a=getAvatar();
+      avatar.innerHTML='<span class="glow"></span><div class="fig">'+headMarkup(a,'av-head')+
+        '<div class="av-torso"></div><div class="leg l"></div><div class="leg r"></div></div>';
+      var mini=document.querySelector('#avBtn .mini');
+      if(mini){ if(a.type==='img'){ mini.style.backgroundImage='url('+a.v+')'; mini.textContent=''; } else { mini.style.backgroundImage='none'; mini.textContent=a.v; } }
+    }
+    function downscaleImg(src, size, cb){
+      var img=new Image();
+      img.onload=function(){ try{ var c=document.createElement('canvas'); c.width=size; c.height=size; var ctx=c.getContext('2d');
+        var s=Math.min(img.width,img.height), sx=(img.width-s)/2, sy=(img.height-s)/2;
+        ctx.drawImage(img,sx,sy,s,s,0,0,size,size); cb(c.toDataURL('image/jpeg',0.85)); }catch(e){ cb(null); } };
+      img.onerror=function(){ cb(null); }; img.src=src;
+    }
+    // picker button in the top HUD
+    var avBtn=document.createElement('button'); avBtn.className='av-btn'; avBtn.id='avBtn';
+    avBtn.innerHTML='<span class="mini"></span> You';
+    var topBar=document.querySelector('#square .sq-top');
+    if(topBar){ topBar.insertBefore(avBtn, topBar.querySelector('.sq-close')); }
+    var picker=document.createElement('div'); picker.className='av-picker'; picker.id='avPicker';
+    document.getElementById('square').appendChild(picker);
+    function previewMarkup(){ var a=getAvatar(); return a.type==='img'
+      ? '<div class="big" style="background-image:url('+a.v+')"></div>' : '<div class="big">'+a.v+'</div>'; }
+    function refreshPreview(){ var pv=picker.querySelector('.av-preview'); if(pv) pv.innerHTML=previewMarkup(); }
+    function openPicker(){
+      var a=getAvatar();
+      var opts=AV_PRESETS.map(function(e){ return '<div class="av-opt'+(a.type==='emoji'&&a.v===e?' sel':'')+'" data-e="'+e+'">'+e+'</div>'; }).join('');
+      picker.innerHTML='<div class="av-sheet"><button class="sq-close c-close" id="avClose" aria-label="Close">✕</button>'+
+        '<h3>Choose your character</h3><p>Pick one, or upload your own Memoji, Bitmoji, or photo.</p>'+
+        '<div class="av-preview">'+previewMarkup()+'</div>'+
+        '<div class="av-grid">'+opts+'</div>'+
+        '<label class="av-upload">Upload your own<input type="file" accept="image/*" id="avFile" hidden></label>'+
+        '<div class="av-note">On an iPhone, long-press a Memoji sticker to save it as a photo first, then upload it here.</div>'+
+        '<button class="av-done" id="avDone">Done</button></div>';
+      picker.classList.add('open');
+      picker.querySelector('#avClose').onclick=closePicker;
+      picker.querySelector('#avDone').onclick=closePicker;
+      Array.prototype.forEach.call(picker.querySelectorAll('.av-opt'), function(o){ o.onclick=function(){
+        saveAvatar({type:'emoji',v:o.getAttribute('data-e')}); renderAvatar(); refreshPreview();
+        Array.prototype.forEach.call(picker.querySelectorAll('.av-opt'),function(x){x.classList.remove('sel');}); o.classList.add('sel'); }; });
+      picker.querySelector('#avFile').onchange=function(ev){ var f=ev.target.files&&ev.target.files[0]; if(!f) return;
+        var r=new FileReader(); r.onload=function(){ downscaleImg(r.result,128,function(url){ if(!url) return;
+          saveAvatar({type:'img',v:url}); renderAvatar(); refreshPreview(); }); }; r.readAsDataURL(f); };
+    }
+    function closePicker(){ picker.classList.remove('open'); }
+    picker.addEventListener('click',function(ev){ if(ev.target===picker) closePicker(); });
+    avBtn.onclick=openPicker;
+    renderAvatar();
+
     // ---- open / close the square ----
     // ---- strip sky follows the same day/night as the rest of the site ----
     const sunEl=document.getElementById('sqSun'), moonEl=document.getElementById('sqMoon');
