@@ -1,0 +1,123 @@
+# Youngpreneur Square — Go-Live Runbook
+
+Your site **and** its backend are built and tested. This turns them on. The stack is GitHub → Cloudflare Pages → Supabase → Stripe → Brevo/Zoho — all free tiers except Stripe's per-charge fee.
+
+Everything you paste to "turn things on" lives in **one block** at the top of `index.html` called `SQUARE_CONFIG`. Until you fill it in, the site still works: the directory shows demo data, signups show a friendly message, and lease buttons go to the waitlist. You switch each piece to live one paste at a time.
+
+There are five steps. You can stop after any of them and still have a real site.
+
+---
+
+## Step 1 — Put it on the internet (GitHub → Cloudflare Pages, ~10 min, free)
+
+1. Create a **GitHub repo** (e.g. `youngpreneur-square`) and push this whole folder to it. From the folder:
+   ```bash
+   git init && git add . && git commit -m "Youngpreneur Square"
+   git branch -M main
+   git remote add origin https://github.com/YOURNAME/youngpreneur-square.git
+   git push -u origin main
+   ```
+2. Go to **Cloudflare** → **Workers & Pages** → **Create** → **Pages** → **Connect to Git**. Pick the repo.
+3. Build settings: **Framework preset = None**, **Build command = (leave empty)**, **Build output directory = `/`** (the root). Save and deploy.
+4. In a minute you get a live URL like `youngpreneur-square.pages.dev`. **That's your site, live.** Open it on your phone.
+
+**Your domain (YoungpreneurSquare.com):**
+- Cloudflare Pages → your project → **Custom domains** → **Set up a domain** → type `youngpreneursquare.com`.
+- If your domain's DNS is already on Cloudflare, it wires up automatically. If not, Cloudflare walks you through moving the nameservers (this is the one step only you can do — it needs your registrar login). HTTPS is automatic and free.
+
+> Every future change: edit, `git push`, and Cloudflare redeploys on its own. GitHub keeps every version — that's your free backup.
+
+---
+
+## Step 2 — Stand up the database (Supabase, ~10 min, free)
+
+1. In your existing **Supabase** project, open **SQL Editor → New query.**
+2. Open `supabase/schema.sql` from this folder, copy the whole thing, paste it in, and click **Run.** It builds every table, security rule, and the lease logic, and seeds the 180 addresses so the directory matches the site exactly. *(If it warns that `pg_cron` isn't available, that's fine — only the automatic weekly board rotation is skipped; enable it later under Database → Extensions if you want it.)*
+3. Go to **Project Settings → API** and copy two values: the **Project URL** and the **anon / public** key.
+4. Paste them into `SQUARE_CONFIG` at the top of `index.html`:
+   ```js
+   supabaseUrl: "https://YOURPROJECT.supabase.co",
+   supabaseAnonKey: "eyJ...your anon public key...",
+   ```
+5. `git push`. Now the **directory and Now Boarding board load live from your database.** (The anon key is safe to ship publicly — row-level security only lets the public read the directory and cast a vote, nothing else.)
+
+---
+
+## Step 3 — Turn on payments, first month free (Stripe, ~25 min)
+
+This is the "first month free, then charged in month two unless they cancel" model — Stripe's built-in free trial does it.
+
+**One-time setup in Stripe:**
+1. Create/finish your **Stripe** account (this is where your payout bank details go — Stripe holds them, never the website).
+2. **Product catalog → Add product**, one per tier you're selling. For each:
+   - Name it to match the site (e.g. **"Main Strip — The Runway"**).
+   - Price: **recurring, monthly**, at your First Flight rate (e.g. $49).
+   - Click **Add free trial → 30 days.** *(This is what makes month one free — card saved, nothing charged until day 31.)*
+3. On the product, **Create payment link.** Then, on that payment link, set two things (both matter for the automatic directory update):
+   - **Metadata:** add key `square_tier` with the exact tier name as its value — one of: `Ground Level`, `Main Strip`, `Growth`, `Front Row`, `The Tower`, `Front Row Lot`, `Showcase Pad`, `Center Aisle`, `Back Row Bay`.
+   - **Custom fields:** add a text field keyed `business_name` and one keyed `shop_url` (so you capture who they are and where their shop is).
+4. Copy each payment link URL and paste it into `SQUARE_CONFIG.stripeLinks` in `index.html`:
+   ```js
+   stripeLinks: {
+     "Ground Level": "https://buy.stripe.com/...",
+     "Main Strip":   "https://buy.stripe.com/...",
+     "Growth":       "https://buy.stripe.com/...",
+     "Front Row":    "https://buy.stripe.com/...",
+     "The Tower":    "https://buy.stripe.com/...",
+     "Front Row Lot":"https://buy.stripe.com/...",
+     "Showcase Pad": "https://buy.stripe.com/...",
+     "Center Aisle": "https://buy.stripe.com/...",
+     "Back Row Bay": "https://buy.stripe.com/..."
+   },
+   ```
+   Any tier left `""` simply sends people to the waitlist, so you can launch with one or two live and add the rest later. Enable Stripe's **customer portal** (Settings → Billing) so tenants can cancel in a click — that's your "cancel anytime."
+
+**Connect Stripe to the database (the auto-updating directory):**
+5. Install the Supabase CLI and, from this folder, deploy the webhook:
+   ```bash
+   supabase login
+   supabase link --project-ref YOUR_PROJECT_REF
+   supabase functions deploy stripe-webhook --no-verify-jwt
+   ```
+6. Give the function its secrets:
+   ```bash
+   supabase secrets set STRIPE_SECRET_KEY=sk_live_... STRIPE_WEBHOOK_SECRET=whsec_...
+   ```
+   *(SUPABASE_URL and the service-role key are provided to the function automatically — you don't set those.)*
+7. In **Stripe → Developers → Webhooks → Add endpoint**, paste your function's URL (Supabase shows it — it looks like `https://YOURPROJECT.functions.supabase.co/stripe-webhook`). Subscribe it to **`checkout.session.completed`** and **`customer.subscription.deleted`**. Copy the endpoint's **signing secret** (`whsec_...`) — that's the `STRIPE_WEBHOOK_SECRET` from step 6.
+
+Now a completed signup flips the next open address to **Leased** on your live directory by itself, and a cancellation frees it.
+
+---
+
+## Step 4 — Capture First Flight emails (Brevo, ~10 min, free)
+
+1. In **Brevo**, create a contact **list**, then **Contacts → Forms → create a form.**
+2. When Brevo shows the embed code, copy the URL inside `<form action="...">`.
+3. Paste it into `SQUARE_CONFIG.newsletterAction` in `index.html`, `git push`. Signups now land in Brevo (the form posts quietly in the background; the visitor never leaves the page).
+4. Point your **Zoho** mailbox (e.g. `hello@youngpreneursquare.com`) as the sender/reply-to inside Brevo so campaigns come from your address.
+
+---
+
+## Step 5 — Test, then announce (~10 min)
+
+- Put Stripe in **Test mode** first. Click a pricing **"Start free"** button — it should open Stripe showing **"$X/month after 30-day free trial"** and ask for a card with no charge today. Use test card `4242 4242 4242 4242`, any future date, any CVC. Fill the business name + shop URL fields, complete it, then check Supabase → **Table editor → spaces**: the next open address on that tier's street should now read **leased** with that business. That proves the whole loop.
+- Flip Stripe to **Live** and swap the test payment links for live ones.
+- Submit the **email form** with your own address; confirm it lands in Brevo.
+- Open the live site on phone + desktop: day/night sky, directory search, Now Boarding board all load.
+- Use the **Launch Kit** (founding-tenant invite + press pitch) to fill your First 50.
+
+---
+
+## What only you can do (and why)
+
+I can't create accounts, complete Stripe's bank/identity verification, change your domain's DNS, or type any password or card number. Those are: the GitHub/Cloudflare/Stripe/Brevo/Zoho signups, the domain nameserver change, and the Stripe verification. Everything else — the site, the database, the payment logic, the webhook, all the wiring — is built, tested, and in this folder.
+
+---
+
+### One-minute version
+1. Push this folder to GitHub → connect it in Cloudflare Pages → **you're live.**
+2. Run `schema.sql` in Supabase, paste the Project URL + anon key into `SQUARE_CONFIG` → **directory goes live.**
+3. In Stripe, make each tier a monthly subscription **with a 30-day free trial**, add `square_tier` metadata + `business_name`/`shop_url` custom fields, create payment links, paste them in. Deploy the `stripe-webhook` function + set its secrets + add the Stripe webhook endpoint → **payments + auto-updating directory go live.**
+4. Paste your Brevo form URL into `newsletterAction` → **email capture goes live.**
+5. Test in Stripe test mode, flip to live, announce.

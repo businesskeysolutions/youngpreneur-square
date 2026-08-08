@@ -1,0 +1,287 @@
+-- =============================================================
+-- YOUNGPRENEUR SQUARE — Supabase schema
+-- Paste this whole file into Supabase → SQL Editor → New query → Run.
+-- Safe to re-run: it drops and recreates its own objects.
+-- =============================================================
+
+-- ---------- EXTENSIONS ----------
+create extension if not exists pgcrypto;      -- gen_random_uuid()
+-- pg_cron powers the weekly "Now Boarding" rotation. If your project can't
+-- enable it, skip it — everything else still works; you'd rotate manually.
+-- Wrapped so the whole script never hard-fails if the role can't create it.
+do $$
+begin
+  create extension if not exists pg_cron;
+exception when others then
+  raise notice 'Could not enable pg_cron here — enable it in Dashboard → Database → Extensions, or skip the weekly rotation.';
+end $$;
+
+-- ---------- TABLES ----------
+drop table if exists public.ignition_votes cascade;
+drop table if exists public.ignition_contestants cascade;
+drop table if exists public.now_boarding cascade;
+drop table if exists public.leases cascade;
+drop table if exists public.tenants cascade;
+drop table if exists public.spaces cascade;
+
+-- Every leasable address on the Square (the directory's source of truth).
+create table public.spaces (
+  id           bigint generated always as identity primary key,
+  street       text    not null,
+  num          int     not null,
+  unit         text    not null,
+  status       text    not null default 'open'
+                 check (status in ('open','leased','liftoff')),
+  tenant_name  text,
+  category     text,
+  shop_url     text,
+  featured     boolean not null default false,
+  updated_at   timestamptz not null default now(),
+  unique (street, num, unit)
+);
+create index on public.spaces (status);
+create index on public.spaces (street);
+
+-- A business that has leased at least one space.
+create table public.tenants (
+  id                 uuid primary key default gen_random_uuid(),
+  business_name      text not null,
+  contact_email      text,
+  shop_url           text,
+  stripe_customer_id text,
+  created_at         timestamptz not null default now()
+);
+create index on public.tenants (stripe_customer_id);
+
+-- One lease = one paid (or trialing) subscription tied to a space.
+create table public.leases (
+  id                     uuid primary key default gen_random_uuid(),
+  space_id               bigint references public.spaces(id),
+  tenant_id              uuid   references public.tenants(id),
+  tier                   text   not null,
+  status                 text   not null default 'trialing'
+                           check (status in ('trialing','active','past_due','canceled')),
+  stripe_subscription_id text unique,
+  trial_end              timestamptz,
+  created_at             timestamptz not null default now()
+);
+create index on public.leases (status);
+
+-- The weekly departures board (the freshness engine).
+create table public.now_boarding (
+  id            bigint generated always as identity primary key,
+  week_start    date    not null,
+  position      int     not null,
+  flight_code   text    not null,
+  business_name text    not null,
+  gate          text    not null,
+  status        text    not null default 'scheduled'
+                  check (status in ('boarding','final_call','scheduled')),
+  shop_url      text,
+  unique (week_start, position)
+);
+create index on public.now_boarding (week_start);
+
+-- Ignition Day public vote (held event).
+create table public.ignition_contestants (
+  id        bigint generated always as identity primary key,
+  name      text not null,
+  pitch     text,
+  active    boolean not null default true
+);
+create table public.ignition_votes (
+  id            bigint generated always as identity primary key,
+  contestant_id bigint not null references public.ignition_contestants(id),
+  fingerprint   text   not null,           -- coarse per-browser key to slow ballot-stuffing
+  created_at    timestamptz not null default now(),
+  unique (contestant_id, fingerprint)
+);
+
+-- ---------- ROW LEVEL SECURITY ----------
+-- Anon (the public site) can READ the directory/board/contestants, and cast a
+-- vote — nothing else. All money/tenant writes happen through the Stripe
+-- webhook using the service-role key, which bypasses RLS.
+alter table public.spaces               enable row level security;
+alter table public.now_boarding         enable row level security;
+alter table public.ignition_contestants enable row level security;
+alter table public.ignition_votes       enable row level security;
+alter table public.tenants              enable row level security;  -- no anon policy = no anon access
+alter table public.leases               enable row level security;  -- no anon policy = no anon access
+
+create policy "public read spaces"      on public.spaces               for select using (true);
+create policy "public read board"       on public.now_boarding         for select using (true);
+create policy "public read contestants" on public.ignition_contestants for select using (active);
+create policy "public read votes"       on public.ignition_votes       for select using (true);
+create policy "public cast vote"        on public.ignition_votes       for insert with check (true);
+
+-- ---------- LEASE ASSIGNMENT (called by the Stripe webhook) ----------
+-- Maps a purchased tier to a street, grabs the next open address on it,
+-- flips it to leased, and records the tenant + lease. Atomic and
+-- concurrency-safe (skip locked). For "The Tower" (a Stage takeover, not a
+-- directory address) it records the lease with no space.
+create or replace function public.lease_next_space(
+  p_tier        text,
+  p_business    text,
+  p_shop_url    text,
+  p_email       text,
+  p_customer_id text,
+  p_sub_id      text,
+  p_trial_end   timestamptz default null
+) returns public.leases
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_street  text;
+  v_space   public.spaces;
+  v_tenant  public.tenants;
+  v_lease   public.leases;
+begin
+  -- Idempotency: if we've already recorded this subscription, return it.
+  select * into v_lease from public.leases where stripe_subscription_id = p_sub_id;
+  if found then return v_lease; end if;
+
+  v_street := case p_tier
+    when 'Ground Level'  then 'Takeoff Lane'
+    when 'Main Strip'    then 'The Runway'
+    when 'Growth'        then 'Ascend Avenue'
+    when 'Front Row'     then 'First Class Row'
+    when 'Front Row Lot' then 'The Hangar'
+    when 'Showcase Pad'  then 'The Hangar'
+    when 'Center Aisle'  then 'The Hangar'
+    when 'Back Row Bay'  then 'The Hangar'
+    else null                                  -- 'The Tower' / unknown => no directory space
+  end;
+
+  -- Upsert the tenant by Stripe customer id.
+  select * into v_tenant from public.tenants where stripe_customer_id = p_customer_id;
+  if not found then
+    insert into public.tenants (business_name, contact_email, shop_url, stripe_customer_id)
+    values (coalesce(nullif(p_business,''),'New tenant'), p_email, p_shop_url, p_customer_id)
+    returning * into v_tenant;
+  end if;
+
+  if v_street is not null then
+    select * into v_space
+      from public.spaces
+     where street = v_street and status = 'open'
+     order by num, unit
+     for update skip locked
+     limit 1;
+
+    if found then
+      update public.spaces
+         set status = 'leased',
+             tenant_name = coalesce(nullif(p_business,''), tenant_name),
+             shop_url = p_shop_url,
+             updated_at = now()
+       where id = v_space.id;
+    end if;
+  end if;
+
+  insert into public.leases (space_id, tenant_id, tier, status, stripe_subscription_id, trial_end)
+  values (v_space.id, v_tenant.id, p_tier,
+          case when p_trial_end is not null and p_trial_end > now() then 'trialing' else 'active' end,
+          p_sub_id, p_trial_end)
+  returning * into v_lease;
+
+  return v_lease;
+end;
+$$;
+
+-- Release a space when its subscription is canceled (also called by the webhook).
+create or replace function public.release_lease(p_sub_id text)
+returns void language plpgsql security definer set search_path = public as $$
+declare v_space_id bigint;
+begin
+  update public.leases set status = 'canceled'
+   where stripe_subscription_id = p_sub_id
+   returning space_id into v_space_id;
+  if v_space_id is not null then
+    update public.spaces
+       set status = 'open', tenant_name = null, shop_url = null, category = null, updated_at = now()
+     where id = v_space_id;
+  end if;
+end; $$;
+
+-- ---------- NOW BOARDING WEEKLY ROTATION ----------
+-- Promote next week's lineup to "this week" every Monday. In practice you'll
+-- schedule future weeks; this just advances statuses so the board is never stale.
+create or replace function public.rotate_now_boarding()
+returns void language plpgsql security definer set search_path = public as $$
+declare v_week date := date_trunc('week', now())::date;  -- Monday of the current week
+begin
+  -- If there's no lineup for this week, carry last week's forward.
+  if not exists (select 1 from public.now_boarding where week_start = v_week) then
+    insert into public.now_boarding (week_start, position, flight_code, business_name, gate, status, shop_url)
+    select v_week, position, flight_code, business_name, gate, 'boarding', shop_url
+      from public.now_boarding
+     where week_start = (select max(week_start) from public.now_boarding where week_start < v_week);
+  end if;
+end; $$;
+
+-- Schedule it Mondays 00:05 UTC (ignored silently if pg_cron isn't available).
+do $$
+begin
+  perform cron.schedule('rotate-now-boarding', '5 0 * * 1', 'select public.rotate_now_boarding();');
+exception when others then
+  raise notice 'pg_cron not available — skipping weekly rotation schedule (rotate manually or via an external cron).';
+end $$;
+
+-- ---------- SEED: NOW BOARDING (this week, matches the site) ----------
+insert into public.now_boarding (week_start, position, flight_code, business_name, gate, status) values
+  (date_trunc('week', now())::date, 1, 'YP 204', 'Meridian Coffee',  'The Runway · A2',  'boarding'),
+  (date_trunc('week', now())::date, 2, 'YP 118', 'Copper & Oak',     'First Class · 01', 'boarding'),
+  (date_trunc('week', now())::date, 3, 'YP 077', 'Summit Athletic',  'Ascend Ave · 06',  'final_call'),
+  (date_trunc('week', now())::date, 4, 'YP 231', 'Bloom by Amara',   'Corner · Gate ★',  'boarding'),
+  (date_trunc('week', now())::date, 5, 'YP 305', 'Vertex Labs',      'The Runway · B4',  'scheduled');
+
+-- ---------- SEED: IGNITION DAY CONTESTANTS (edit freely) ----------
+insert into public.ignition_contestants (name, pitch) values
+  ('Zoe''s Bakeshop',    'Small-batch treats, big dreams.'),
+  ('Kayden Customs',     'Hand-built kicks and custom gear.'),
+  ('Bloom by Amara',     'Florals for every celebration.'),
+  ('Nova Skate',         'Boards and lessons for the next generation.');
+
+-- ---------- SEED: SPACES (180 addresses, generated deterministically) ----------
+-- 6 streets x 30 units. Status/tenant/category derived from a stable hash of the
+-- address, so re-running yields the same map. The database is the source of truth;
+-- leasing flips a space to 'leased' via the Stripe webhook.
+with s(street) as (
+  values ('The Runway'),('The Hangar'),('Takeoff Lane'),('Ascend Avenue'),('First Class Row'),('Founders Way')
+),
+cats(cat, cidx) as (
+  values ('Food & Drink',0),('Retail',1),('Services',2),('Tech',3),('Beauty',4),
+         ('Fitness',5),('Auto',6),('Creative',7),('Home',8),('Finance',9)
+),
+firsts(nm, fidx) as (
+  values ('Meridian',0),('Copper',1),('Vertex',2),('Halcyon',3),('Aurelio',4),
+         ('Nova',5),('Summit',6),('Ironwood',7),('Marlowe',8),('Kestrel',9),
+         ('Juniper',10),('Atlas',11),('Beacon',12),('Onyx',13),('Sage',14),
+         ('Harbor',15),('Lumen',16),('Cobalt',17),('Anchor',18),('Cardinal',19)
+),
+sufs(sfx, sfidx) as (
+  values ('Coffee',0),('& Co.',1),('Studio',2),('Labs',3),('Salon',4),
+         ('Athletic',5),('Motors',6),('Press',7),('Home',8),('Capital',9)
+),
+donated(dn, didx) as (
+  values ('Zoe''s Bakeshop',0),('Kayden Customs',1),('Bloom by Amara',2),('Deveny Reads',3),
+         ('Nova Skate',4),('Milo''s Lemonade',5),('Ava Makes',6),('Bright Start Crafts',7)
+),
+grid as (
+  select s.street, g,
+         100 + (g/2)*2 as num,
+         case when g % 2 = 0 then 'A' else 'B' end as unit,
+         (('x'||substr(md5(s.street||'-'||g::text),1,8))::bit(32)::int & 2147483647) as h
+  from s cross join generate_series(0,29) as g
+)
+insert into public.spaces (street, num, unit, status, tenant_name, category)
+select street, num, unit,
+  case when h % 100 < 9 then 'liftoff' when h % 100 < 42 then 'leased' else 'open' end,
+  case
+    when h % 100 < 9  then (select dn from donated where didx = (h/11) % 8)
+    when h % 100 < 42 then (select nm from firsts where fidx = (h/7) % 20) || ' ' || (select sfx from sufs where sfidx = (h/13) % 10)
+    else null end,
+  case when h % 100 < 42 then (select cat from cats where cidx = (h/3) % 10) else null end
+from grid;
