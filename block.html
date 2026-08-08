@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Build Your Block &middot; Youngpreneur Square</title>
+<meta name="description" content="Earn Bricks by collecting stamps around the Square, then decorate your own storefront. A free-to-play corner of Youngpreneur Square.">
+<meta name="theme-color" content="#0A0D0B">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Youngpreneur Square">
+<meta property="og:title" content="Build Your Block &middot; Youngpreneur Square">
+<meta property="og:description" content="Earn Bricks by collecting stamps around the Square, then decorate your own storefront.">
+<meta property="og:image" content="https://youngpreneursquare.pages.dev/og-image.png">
+<meta property="og:url" content="https://youngpreneursquare.pages.dev/block.html">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://youngpreneursquare.pages.dev/og-image.png">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='10' fill='%230A0D0B'/%3E%3Crect x='4' y='4' width='56' height='56' rx='8' fill='none' stroke='%23C9A84A' stroke-width='2'/%3E%3Ctext x='32' y='44' font-family='Georgia,serif' font-size='38' font-weight='700' text-anchor='middle' fill='%23C9A84A'%3EY%3C/text%3E%3C/svg%3E">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,700;0,800;0,900;1,500;1,600&family=Work+Sans:wght@400;500;600;700&family=Alfa+Slab+One&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+<div class="frame"></div>
+<div class="vignette"></div>
+<header>
+  <div class="wrap bar">
+    <a href="index.html" class="wordmark"><span class="yp grad-gold">Youngpreneur</span><span class="sq">Square</span><span class="tm">&trade;</span></a>
+    <button class="nav-burger" id="navBurger" aria-label="Menu">&#9776;</button>
+        <nav class="nav" id="navMenu">
+      <a href="square.html" data-p="square">The Square</a>
+      <a href="directory.html" data-p="directory">Directory</a>
+      <a href="block.html" class="active" data-p="block">Build Your Block</a>
+      <a href="pricing.html" data-p="pricing">Pricing</a>
+      <a href="lease.html" data-p="lease">Lease a Storefront</a>
+      <a href="about.html" data-p="about">About</a>
+      <a href="ignition-day.html" data-p="ignition">Ignition Day</a>
+      <button class="nav-toggle" id="toggle">Auto</button>
+    </nav>
+  </div>
+</header>
+<div class="page-sky" id="top">
+  <div class="afterglow"></div>
+  <div class="sun" id="sun"></div>
+  <div class="moon" id="moon"></div>
+  <div class="stars" id="stars"></div>
+  <section class="page-head wrap">
+    <div class="eyebrow">Play the Square &middot; free to play</div>
+    <h1>Build your block.</h1>
+    <p>Every stamp you collect around the Square earns <b>Bricks</b>. Spend them here, decorating a storefront that&rsquo;s all your own. Bricks are just for fun and never affect the free prize drawings.</p>
+  </section>
+</div>
+
+<section class="story" id="builder">
+  <div class="wrap">
+    <div id="blockMount"><p class="bb-loading" style="text-align:center;color:#9AA79A;padding:30px 0">Loading your block&hellip; open the <b>Square Pass</b> button if it doesn&rsquo;t appear.</p></div>
+  </div>
+</section>
+
+<section class="eco">
+  <div class="wrap">
+    <div class="sec-head">
+      <div><div class="eyebrow">How it works</div><h2>Earn Bricks, then build</h2></div>
+      <p>Bricks come from playing, not paying. Here&rsquo;s how you stack them up.</p>
+    </div>
+    <div class="eco-inner">
+      <div class="eco-cell">
+        <div class="n">1</div>
+        <h4>Collect stamps</h4>
+        <p>Check in daily, visit storefronts, find the hidden Square token, vote on Ignition Day, and explore the walkable Square. Each stamp is a free prize-drawing entry and a handful of Bricks.</p>
+      </div>
+      <div class="eco-cell">
+        <div class="n">2</div>
+        <h4>Spend on cosmetics</h4>
+        <p>Facades, awnings, lights, sidewalk pieces, and pass covers. Everything shows exactly what you get before you buy, so there are no surprises.</p>
+      </div>
+      <div class="eco-cell">
+        <div class="n">3</div>
+        <h4>Make it yours</h4>
+        <p>Your storefront saves on this device and follows you when you add your email. More lots and pieces are on the way.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="cta">
+  <div class="wrap cta-inner">
+    <div class="eyebrow">Dream &middot; Build &middot; Inspire</div>
+    <h2>Go collect some <em class="grad-gold">Bricks</em>.</h2>
+    <p>Wander the walkable Square, open a few storefronts, and find today&rsquo;s hidden token. Then come back and build.</p>
+    <a href="square.html" class="btn">Enter the Square</a>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-top">
+      <div class="fmark"><span class="grad-gold">Youngpreneur</span> Square</div>
+      <div class="tag">Dream &middot; Build &middot; Inspire</div>
+    </div>
+    <nav class="foot-nav">
+      <a href="square.html">The Square</a><a href="directory.html">Directory</a><a href="block.html">Build Your Block</a>
+      <a href="pricing.html">Pricing</a><a href="lease.html">Lease a Storefront</a><a href="about.html">About</a><a href="ignition-day.html">Ignition Day</a>
+    </nav>
+    <div class="foot-legal">&copy; <span id="yr">2026</span> Youngpreneur Square &middot; Dream &middot; Build &middot; Inspire</div>
+  </div>
+</footer>
+<script src="config.js"></script><script src="site.js"></script><script src="wiring.js"></script>
+<script src="squarepass.js"></script>
+<script>
+  (function mount(){
+    var host = document.getElementById('blockMount');
+    if(window.SquarePass && window.SquarePass.mountBlock){ window.SquarePass.mountBlock(host); }
+    else { setTimeout(mount, 120); }
+  })();
+</script>
+</body></html>

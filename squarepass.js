@@ -5,6 +5,9 @@
    prize-drawing entries. Prize entries are ALWAYS free, earned only.
    Phase A: Bricks — a cosmetic-only currency you EARN from stamps and spend on
    Build-Your-Block decorations. Bricks never touch prize entries (the wall).
+   Build-Your-Block lives on its own page (block.html); the pass popup only
+   introduces it and links there. SquarePass.mountBlock(el) renders the full
+   builder into any container.
    Works standalone via localStorage; syncs to Supabase RPCs when available.
    Self-contained: injects its own styles, so it runs on every page.
    ========================================================================== */
@@ -18,6 +21,7 @@
   function today(){ return iso(new Date()); }
   function yesterday(){ var d=new Date(); d.setDate(d.getDate()-1); return iso(d); }
   function weekStart(){ var d=new Date(); var wd=(d.getDay()+6)%7; d.setDate(d.getDate()-wd); return iso(d); }
+  function huntRef(){ return today()+':'+location.pathname; }   // per-page-per-day token
   function load(){ try { return JSON.parse(localStorage.getItem(LS)); } catch(e){ return null; } }
   function persist(){ try { localStorage.setItem(LS, JSON.stringify(pass)); } catch(e){} }
 
@@ -53,8 +57,8 @@
     ref = String(ref==null ? '' : ref);
     if (hasStamp(k, ref)) return false;
     pass.stamps.push({ k:k, ref:ref, ts:new Date().toISOString() });
-    // Earn Bricks (cosmetic jar). This does NOT affect entries — entries are the
-    // count of stamps in the current week and stay free/earned-only.
+    // Earn Bricks (cosmetic jar). Does NOT affect entries — entries are the count
+    // of stamps in the current week and stay free/earned-only.
     var earned = BRICK_REWARD[k] || 5;
     pass.bricks += earned;
     persist(); syncStamp(k, ref);
@@ -79,26 +83,21 @@
      single-select; equipping sets pass.equipped[slot] = id. Bricks are the
      only cost, and they only ever spend here — never on prize entries. */
   var SHOP = [
-    // facade — the storefront wall
     { id:'fac_green',   slot:'facade',   name:'Forest Brick',    price:0,  free:true,  css:'#14231A' },
     { id:'fac_brown',   slot:'facade',   name:'Brownstone',      price:30,            css:'#5a3a2a' },
     { id:'fac_cream',   slot:'facade',   name:'Cream Classic',   price:30,            css:'#cbbf9e' },
     { id:'fac_red',     slot:'facade',   name:'Brick Red',       price:35,            css:'#7a2f28' },
-    // awning — over the door
     { id:'awn_none',    slot:'awning',   name:'No Awning',       price:0,  free:true,  css:'' },
     { id:'awn_green',   slot:'awning',   name:'Green Awning',    price:20,            css:'#2F9E44' },
     { id:'awn_stripe',  slot:'awning',   name:'Striped Awning',  price:25,            css:'repeating-linear-gradient(90deg,#E8433B 0 12px,#F5F1E6 12px 24px)' },
     { id:'awn_gold',    slot:'awning',   name:'Gold Awning',     price:30,            css:'linear-gradient(180deg,#F1DEA2,#C9A84A)' },
-    // lights — across the top
     { id:'lit_none',    slot:'lights',   name:'No Lights',       price:0,  free:true,  css:'' },
     { id:'lit_string',  slot:'lights',   name:'String Lights',   price:20,            css:'#F1DEA2' },
     { id:'lit_neon',    slot:'lights',   name:'Neon Glow',       price:40,            css:'#7AD03A' },
-    // dressing — on the sidewalk
     { id:'drs_none',    slot:'dressing', name:'Bare Sidewalk',   price:0,  free:true,  emoji:'' },
     { id:'drs_planter', slot:'dressing', name:'Planter',         price:15,            emoji:'🪴' },
     { id:'drs_bench',   slot:'dressing', name:'Bench',           price:15,            emoji:'🪑' },
     { id:'drs_tree',    slot:'dressing', name:'Street Tree',     price:20,            emoji:'🌳' },
-    // cover — your pass card
     { id:'cov_gold',    slot:'cover',    name:'Gold Cover',      price:0,  free:true,  css:'linear-gradient(135deg,#E9CF8A,#C9A84A 60%,#A9863A)' },
     { id:'cov_night',   slot:'cover',    name:'Midnight Cover',  price:50,            css:'linear-gradient(135deg,#26324a,#141d2e 60%,#0b1220)', ink:'#EFE9D8' },
     { id:'cov_lime',    slot:'cover',    name:'Lime Marquee',    price:50,            css:'linear-gradient(135deg,#8fe25a,#4fae1f 60%,#2f7d1f)', ink:'#0A0D0B' }
@@ -115,7 +114,6 @@
   function equippedIn(slot){
     var id = pass.equipped[slot];
     if(id && owns(id)) return item(id);
-    // default to the free item in the slot
     for(var i=0;i<SHOP.length;i++){ if(SHOP[i].slot===slot && SHOP[i].free) return SHOP[i]; }
     return null;
   }
@@ -245,10 +243,29 @@
   .sqp-act.buy:disabled{background:rgba(245,241,230,.08);color:#6f7a6d;cursor:not-allowed}
   .sqp-act.eq{background:rgba(122,208,58,.14);color:#9fe06a;border:1px solid rgba(122,208,58,.4)}
   .sqp-act.on{background:#7AD03A;color:#0A0D0B;cursor:default}
+
+  /* --- compact intro (popup) --- */
+  .sqp-introcta{display:block;text-align:center;margin-top:12px;background:linear-gradient(180deg,#E9CF8A,#C9A84A);
+    color:#14231A;font-weight:800;font-size:12.5px;letter-spacing:.05em;text-transform:uppercase;text-decoration:none;
+    border-radius:24px;padding:12px 16px}
+
+  /* --- full Build-Your-Block page mount --- */
+  .sqp-page .sqp-store{width:280px;height:200px}
+  .sqp-page .sqp-store .sqp-win2{width:38px;height:38px;top:24px}
+  .sqp-page .sqp-store .w-l{left:34px}.sqp-page .sqp-store .w-r{right:34px}
+  .sqp-page .sqp-store .sqp-door2{width:64px;height:86px}
+  .sqp-page .sqp-store .sqp-awn{width:104px;height:22px;bottom:86px}
+  .sqp-page .sqp-store .sqp-sign{top:78px;font-size:13px}
+  .sqp-page .sqp-side{height:48px;font-size:30px}
+  .sqp-page .sqp-lot{max-width:560px;margin:0 auto;padding:26px 16px 0}
+  .sqp-page .sqp-grid{grid-template-columns:repeat(auto-fill,minmax(190px,1fr))}
+  .sqp-page .sqp-wallet{max-width:560px;margin:0 auto 16px}
+  .sqp-page .sqp-shop{max-width:560px;margin:18px auto 0}
+  .sqp-page .sqp-blocknote{max-width:560px;margin:14px auto 0;font-size:12.5px}
   `;
 
   /* ---------------- DOM ---------------- */
-  var scrim, fab, toastEl, toastTimer;
+  var scrim, fab, toastEl, toastTimer, blockMount=null;
 
   function el(tag, cls, html){ var e=document.createElement(tag); if(cls) e.className=cls; if(html!=null) e.innerHTML=html; return e; }
   function esc(s){ return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
@@ -283,7 +300,7 @@
     var tasks = [
       { k:'checkin', label:'Check in today', done: pass.last===today(), hint:'Streak '+(pass.streak||0)+'🔥' },
       { k:'visit',   label:'Visit a storefront', done: kindThisWeek('visit'), hint:'Open any shop ↗' },
-      { k:'hunt',    label:'Find the hidden Square token', done: hasStamp('hunt',today()), hint:'A little gold coin, hidden on the page' },
+      { k:'hunt',    label:'Find the hidden Square token', done: hasStamp('hunt',huntRef()), hint:'A gold coin, hidden on each page' },
       { k:'vote',    label:'Vote for Business of the Week', done: kindThisWeek('vote'), hint:'On Ignition Day' },
       { k:'explore', label:'Explore the Square', done: kindThisWeek('explore'), hint:'Enter the walkable Square' }
     ];
@@ -312,7 +329,7 @@
     );
   }
 
-  /* ---- block (build) view ---- */
+  /* ---- storefront preview (shared) ---- */
   function storefrontHtml(){
     var fac = equippedIn('facade'), awn = equippedIn('awning'), lit = equippedIn('lights'), drs = equippedIn('dressing');
     var facCss = fac ? fac.css : '#14231A';
@@ -362,20 +379,54 @@
     });
     return out;
   }
-  function blockViewHtml(){
+  var WALL_NOTE = '<div class="sqp-blocknote">Bricks decorate your block. They <b>don\'t affect prize drawings</b> — entries stay free, earned by collecting stamps.</div>';
+
+  /* ---- compact intro shown INSIDE the popup ---- */
+  function blockIntroHtml(){
     return (
       '<div class="sqp-wallet">'+
         '<div class="bal"><span>🧱 '+pass.bricks+'</span> <span class="lbl">Bricks</span></div>'+
         '<button class="buy" title="Buying Bricks arrives later" disabled>Buy Bricks · soon</button>'+
       '</div>'+
       storefrontHtml()+
-      '<div class="sqp-blocknote">Bricks decorate your block. They <b>don\'t affect prize drawings</b> — entries stay free, earned by collecting stamps.</div>'+
-      '<div class="sqp-shop">'+shopHtml()+'</div>'
+      '<div class="sqp-blocknote">Earn Bricks from stamps and spend them decorating your storefront. The full builder has its own page.</div>'+
+      '<a class="sqp-introcta" href="block.html">Open Build Your Block →</a>'+
+      WALL_NOTE
     );
   }
 
+  /* ---- full builder mounted on block.html ---- */
+  function fullBlockHtml(){
+    return (
+      '<div class="sqp-wallet">'+
+        '<div class="bal"><span>🧱 '+pass.bricks+'</span> <span class="lbl">Bricks</span></div>'+
+        '<button class="buy" title="Buying Bricks arrives later" disabled>Buy Bricks · soon</button>'+
+      '</div>'+
+      storefrontHtml()+
+      WALL_NOTE+
+      '<div class="sqp-shop">'+shopHtml()+'</div>'
+    );
+  }
+  function wireShopButtons(root){
+    Array.prototype.forEach.call(root.querySelectorAll('[data-buy]'), function(b){
+      b.addEventListener('click', function(){ buy(b.getAttribute('data-buy')); });
+    });
+    Array.prototype.forEach.call(root.querySelectorAll('[data-eq]'), function(b){
+      b.addEventListener('click', function(){ equip(b.getAttribute('data-eq')); });
+    });
+  }
+  function renderBlockPage(){
+    if(!blockMount) return;
+    blockMount.className = 'sqp-page';
+    blockMount.innerHTML = fullBlockHtml();
+    wireShopButtons(blockMount);
+  }
+  // Public: render the full Build-Your-Block builder into a container element.
+  function mountBlock(elmnt){ if(!elmnt) return; blockMount = elmnt; renderBlockPage(); }
+
   function render(){
     var badge = document.getElementById('sqpBadge'); if(badge) badge.textContent = weekCount();
+    renderBlockPage();
     var panel = scrim && scrim.querySelector('.sqp-panel'); if(!panel) return;
 
     panel.innerHTML =
@@ -384,17 +435,11 @@
         '<button class="sqp-tab'+(view==='pass'?' active':'')+'" data-view="pass">Pass</button>'+
         '<button class="sqp-tab'+(view==='block'?' active':'')+'" data-view="block">Build your block</button>'+
       '</div>'+
-      (view==='pass' ? passViewHtml() : blockViewHtml());
+      (view==='pass' ? passViewHtml() : blockIntroHtml());
 
     panel.querySelector('.sqp-x').addEventListener('click', close);
     Array.prototype.forEach.call(panel.querySelectorAll('.sqp-tab'), function(t){
       t.addEventListener('click', function(){ view = t.getAttribute('data-view'); render(); });
-    });
-    Array.prototype.forEach.call(panel.querySelectorAll('[data-buy]'), function(b){
-      b.addEventListener('click', function(){ buy(b.getAttribute('data-buy')); });
-    });
-    Array.prototype.forEach.call(panel.querySelectorAll('[data-eq]'), function(b){
-      b.addEventListener('click', function(){ equip(b.getAttribute('data-eq')); });
     });
     var ef = panel.querySelector('#sqpEmailForm');
     if(ef) ef.addEventListener('submit', function(e){
@@ -417,9 +462,11 @@
     clearTimeout(toastTimer); toastTimer = setTimeout(function(){ toastEl.classList.remove('show'); }, 2600);
   }
 
-  // ---- hidden Square token (daily hunt): a subtle gold coin at a date-seeded spot ----
+  // ---- hidden Square token (daily hunt): a subtle gold coin at a date-seeded spot,
+  //      unique per page so collecting more tokens keeps adding stamps + Bricks ----
   function placeHiddenSymbol(){
     if(document.querySelector('.sq-hidden')) return;
+    if(hasStamp('hunt', huntRef())) return;   // already found today's token on this page
     var seed = 0, s = today()+location.pathname;
     for(var i=0;i<s.length;i++) seed = (seed*31 + s.charCodeAt(i)) & 0xffffff;
     var top = 22 + (seed % 60);           // 22%–82%
@@ -428,7 +475,7 @@
     sym.style.top = top+'vh'; sym.style.left = left+'vw';
     sym.title = 'A hidden Square token…';
     sym.addEventListener('click', function(){
-      if(stamp('hunt', today())) { toast('◎ You found the Square token!'); }
+      if(stamp('hunt', huntRef())) { toast('◎ You found the Square token!  ·  +1 entry  ·  +8 🧱'); }
       sym.style.display='none';
       open();
     });
@@ -437,13 +484,22 @@
 
   // ---- global stamp hooks ----
   document.addEventListener('click', function(e){
-    var a = e.target.closest && e.target.closest('a');
+    if(!e.target || !e.target.closest) return;
+    // Visiting a storefront: real external "Visit shop" links...
+    var a = e.target.closest('a');
     if(a){
       var ext = a.target==='_blank' && a.href && a.hostname && a.hostname!==location.hostname;
       if(ext) stamp('visit', a.hostname);
     }
-    if(e.target.closest && e.target.closest('.vbtn')) stamp('vote', weekStart());
-    if(e.target.closest && e.target.closest('.enter-square, .balldrop-open')) stamp('explore', 'square');
+    // ...or opening a storefront card in the walkable Square (demo shops included).
+    var b = e.target.closest('.sq-b');
+    if(b && !b.classList.contains('open') && !b.classList.contains('marquee')){
+      var brandEl = b.querySelector('.b-brand');
+      var brand = (brandEl && brandEl.textContent.trim()) || 'storefront';
+      stamp('visit', brand);
+    }
+    if(e.target.closest('.vbtn')) stamp('vote', weekStart());
+    if(e.target.closest('.enter-square, .balldrop-open')) stamp('explore', 'square');
   }, true);
 
   // boot
@@ -451,10 +507,11 @@
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', start);
   else start();
 
-  // expose a tiny API (for future Build-Your-Block / manual stamps)
+  // expose a tiny API (for Build-Your-Block page / manual stamps)
   window.SquarePass = {
     stamp: stamp, open: open,
     bricks: function(){ return pass.bricks; },
+    mountBlock: mountBlock,
     get: function(){ return JSON.parse(JSON.stringify(pass)); }
   };
 })();
