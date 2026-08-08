@@ -47,11 +47,6 @@
   <div class="sun" id="sun"></div>
   <div class="moon" id="moon"></div>
   <div class="stars" id="stars"></div>
-  <div class="tsq">
-    <div class="tsq-glow"></div>
-    <div class="tsq-city" id="tsqCity"></div>
-    <div class="tsq-haze"></div>
-  </div>
 
   <div class="hero-copy wrap centered">
     <div class="logo-marquee">
@@ -111,43 +106,4 @@
 <script src="config.js"></script>
 <script src="site.js"></script>
 <script src="wiring.js"></script>
-<script>
-(function(){
-  var city=document.getElementById('tsqCity'); if(!city) return;
-  var W=window.innerWidth, n=W<560?8:(W<900?13:20);
-  var COLORS=['gold','lime','cream','ink','red'];
-  var MSGS=['Now Leasing','Grand Opening','The Daily Drop','Business of the Week','Youngpreneur','Shop the Square','Marquee Takeover','Spotlight','Vote Now','New Arrivals','Cornerstone','Est. 2023','Open Late','Live Tonight','On Broadway','Fifth Ave'];
-  function rc(a){return a[Math.floor(Math.random()*a.length)];}
-  function makeBldg(){
-    var h=130+Math.floor(Math.random()*220), w=44+Math.floor(Math.random()*42);
-    var b=document.createElement('div'); b.className='bldg2'; b.style.height=h+'px'; b.style.width=w+'px';
-    var nb=1+Math.floor(Math.random()*2);
-    for(var j=0;j<nb;j++){
-      var bh=18+Math.floor(Math.random()*24), top=8+Math.floor(Math.random()*Math.max(10,h-bh-16));
-      var bb=document.createElement('div'); bb.className='bb '+rc(COLORS)+(Math.random()<.55?(Math.random()<.5?' pulse':' pulse2'):'');
-      bb.style.top=top+'px'; bb.style.height=bh+'px';
-      var strip=document.createElement('div'); strip.className='bb-strip';
-      for(var s=0;s<6;s++){ strip.appendChild(document.createElement('i')); } bb.appendChild(strip);
-      var t=document.createElement('span'); t.className='bb-txt'; t.textContent=rc(MSGS); bb.appendChild(t);
-      b.appendChild(bb);
-    }
-    return b;
-  }
-  var jumbo=document.createElement('div'); jumbo.className='jumbo';
-  jumbo.innerHTML='<div class="jb-top"><i></i><i></i><i></i><i></i><i></i><i></i></div>'+
-    '<div class="jb-scr"><div class="jb-k" id="jbK">The Daily Drop</div><div class="jb-m" id="jbM">Tonight on The Marquee</div><div class="jb-s">24 hours only</div></div>';
-  var lead=Math.min(3,n), i;
-  for(i=0;i<lead;i++) city.appendChild(makeBldg());
-  city.appendChild(jumbo);
-  for(i=0;i<n-lead;i++) city.appendChild(makeBldg());
-  jumbo.querySelectorAll('.jb-top i').forEach(function(b,k){ b.style.animationDelay=(k*0.16).toFixed(2)+'s'; });
-  var DROPS=[['The Daily Drop','Tonight on The Marquee'],['Business of the Week','Cast your vote'],['Grand Opening','New shops on Broadway'],['Spotlight','A young founder takes the stage'],['Marquee Takeover','One brand, all night'],['Now Leasing','Claim your address']];
-  var di=0;
-  setInterval(function(){
-    di=(di+1)%DROPS.length; var k=document.getElementById('jbK'), m=document.getElementById('jbM');
-    if(k&&m){ k.textContent=DROPS[di][0]; m.textContent=DROPS[di][1]; }
-    var txts=city.querySelectorAll('.bldg2 .bb-txt'); if(txts.length){ txts[Math.floor(Math.random()*txts.length)].textContent=rc(MSGS); }
-  },2600);
-})();
-</script>
 </body></html>

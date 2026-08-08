@@ -1004,3 +1004,15 @@ a.stn:hover .lbl b{color:var(--gold)}
 .doormeta a{background:rgba(10,13,11,.55);padding:2px 6px;border-radius:3px}
 .jumbo{height:250px}
 @media(max-width:640px){.jumbo{height:210px}}
+
+
+/* Entry page: clean standalone doors — override the Times Square treatment */
+.tsq{display:none!important}
+.door-hero{justify-content:center;padding-top:0}
+.door{background:linear-gradient(160deg,rgba(245,241,230,.06),rgba(245,241,230,.015))}
+.door.visit{background:linear-gradient(160deg,rgba(122,208,58,.10),rgba(245,241,230,.02) 62%)}
+.door.lease{background:linear-gradient(160deg,rgba(201,168,74,.14),rgba(245,241,230,.02) 62%)}
+body.day .door{background:linear-gradient(160deg,rgba(20,35,26,.05),rgba(20,35,26,.02))}
+body.day .door.visit{background:linear-gradient(160deg,rgba(95,174,42,.14),rgba(20,35,26,.03) 62%)}
+body.day .door.lease{background:linear-gradient(160deg,rgba(169,134,58,.16),rgba(20,35,26,.03) 62%)}
+.doormeta a{background:transparent;padding:0}
