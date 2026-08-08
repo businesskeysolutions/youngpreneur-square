@@ -26,33 +26,29 @@
       {x:1930,w:150,h:196, tier:'broadway',type:'awarded', brand:'Bloom by Amara',  who:'Pressed-flower jewelry · age 16', url:'#'},
       {x:2132,w:130,h:148, tier:'canal',   type:'open'}
     ];
-    const WORLD=Math.max.apply(null,PLOTS.map(p=>p.x+p.w))+380;
+    const BASEW=Math.max.apply(null,PLOTS.map(p=>p.x+p.w))+360;
+    let K=1, WORLD=BASEW, ax=140;
+    const clampv=(v,a,b)=>Math.max(a,Math.min(b,v));
+    // Scale the whole world to fit the screen height, so the tall buildings never
+    // overflow a short (mobile landscape or portrait) viewport and you can see
+    // several at once. No rotation required.
+    function fitK(){ var H=window.innerHeight||600; return Math.max(0.5, Math.min(1,(H-84)/500)); }
 
-    // build stars
+    // stars once (sky layer, scale-independent)
     for(let i=0;i<54;i++){const s=document.createElement('i');
       s.style.left=Math.random()*100+'%';s.style.top=Math.random()*58+'%';
       s.style.opacity=(.3+Math.random()*.5).toFixed(2);s.style.animationDelay=(Math.random()*5)+'s';starsEl.appendChild(s);}
 
-    // far silhouette
-    far.style.width=WORLD+'px';
-    for(let x=-40;x<WORLD;x+=Math.round(56+Math.random()*46)){
-      const fb=document.createElement('div');fb.className='fb';
-      fb.style.left=x+'px';fb.style.width=Math.round(34+Math.random()*30)+'px';
-      fb.style.height=Math.round(70+Math.random()*120)+'px';far.appendChild(fb);}
+    // far-silhouette spec, generated once and positioned per scale
+    const FARSPEC=[];
+    for(let x=-40;x<BASEW;x+=Math.round(56+Math.random()*46)){
+      FARSPEC.push({x:x,w:Math.round(34+Math.random()*30),h:Math.round(70+Math.random()*120)});}
 
-    // ground: road + curb + lamps
-    ground.style.width=WORLD+'px';
-    const road=document.createElement('div');road.className='road';road.style.width=WORLD+'px';ground.appendChild(road);
-    const curb=document.createElement('div');curb.className='curb';curb.style.width=WORLD+'px';ground.appendChild(curb);
-    for(let x=120;x<WORLD;x+=280){const lp=document.createElement('div');lp.className='lamp';lp.style.left=x+'px';ground.appendChild(lp);}
-
-    // buildings
-    mid.style.width=WORLD+'px';
     function build(p){
       const T = TIERS[p.tier] || TIERS.broadway;
       const b=document.createElement('div');
       b.className='sq-b '+T.k+(p.type==='open'?' open':'')+(p.type==='marquee'?' marquee':'');
-      b.style.left=p.x+'px';b.style.width=p.w+'px';b.style.height=p.h+'px';
+      b.style.left=(p.x*K)+'px';b.style.width=(p.w*K)+'px';b.style.height=(p.h*K)+'px';
       if(p.type==='marquee'){
         b.innerHTML='<div class="sq-marq"><div class="mbulbs"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>'+
           '<div class="k">The Landmark</div><div class="name grad-gold">The Marquee</div><div class="now">One brand at a time</div>'+
@@ -68,14 +64,28 @@
           '<div class="b-brand">'+brand+'</div><div class="b-loc">'+T.name+'</div><div class="enter-tag">Enter ↑</div></div>';
       }
       b.addEventListener('click',function(){openPlot(p);});
-      p.el=b;p.center=p.x+p.w/2;mid.appendChild(b);
+      p.el=b;p.center=(p.x+p.w/2)*K;mid.appendChild(b);
     }
-    PLOTS.forEach(build);
+
+    function layout(){
+      K=fitK(); WORLD=BASEW*K;
+      far.innerHTML=''; far.style.width=WORLD+'px';
+      FARSPEC.forEach(function(f){ const fb=document.createElement('div');fb.className='fb';
+        fb.style.left=(f.x*K)+'px';fb.style.width=(f.w*K)+'px';fb.style.height=(f.h*K)+'px';far.appendChild(fb);});
+      ground.innerHTML=''; ground.style.width=WORLD+'px';
+      const road=document.createElement('div');road.className='road';road.style.width=WORLD+'px';ground.appendChild(road);
+      const curb=document.createElement('div');curb.className='curb';curb.style.width=WORLD+'px';ground.appendChild(curb);
+      for(let x=120;x<BASEW;x+=280){const lp=document.createElement('div');lp.className='lamp';lp.style.left=(x*K)+'px';ground.appendChild(lp);}
+      mid.innerHTML=''; mid.style.width=WORLD+'px';
+      PLOTS.forEach(build);
+      ax=clampv(ax,60,WORLD-60);
+    }
+    layout();
 
     // ---- movement + camera ----
-    let ax=140, keyL=false, keyR=false, raf=null, vw=0, near=null;
-    const clampv=(v,a,b)=>Math.max(a,Math.min(b,v));
-    function resize(){vw=world.clientWidth||window.innerWidth;}
+    let keyL=false, keyR=false, raf=null, vw=0, near=null, rzT=null;
+    function resize(){ vw=world.clientWidth||window.innerWidth;
+      clearTimeout(rzT); rzT=setTimeout(function(){ if(sq.classList.contains('open')){ layout(); } }, 160); }
     window.addEventListener('resize',resize);
 
     function frame(){
@@ -88,8 +98,8 @@
       ground.style.transform='translateX('+(-cam)+'px)';
       mid.style.transform='translateX('+(-cam)+'px)';
       avatar.style.left=(ax-cam-21)+'px';
-      // proximity
-      let best=null,bd=150;
+      // proximity (scaled to the current world size)
+      let best=null,bd=140*K;
       for(const p of PLOTS){const d=Math.abs(ax-p.center);if(d<bd){bd=d;best=p;}}
       if(best!==near){ if(near&&near.el)near.el.classList.remove('near'); near=best; if(near&&near.el)near.el.classList.add('near'); }
       raf=requestAnimationFrame(frame);
@@ -153,7 +163,7 @@
 
     function openSquare(e){ if(e)e.preventDefault();
       sq.classList.add('open'); sq.setAttribute('aria-hidden','false'); document.body.classList.add('sq-lock');
-      syncSky(); resize(); if(!raf) raf=requestAnimationFrame(frame); }
+      layout(); vw=world.clientWidth||window.innerWidth; syncSky(); if(!raf) raf=requestAnimationFrame(frame); }
     function closeSquare(){ sq.classList.remove('open'); sq.setAttribute('aria-hidden','true');
       document.body.classList.remove('sq-lock'); if(raf){cancelAnimationFrame(raf);raf=null;} keyL=keyR=false; closeModal(); }
 
