@@ -62,7 +62,7 @@
     var earned = BRICK_REWARD[k] || 5;
     pass.bricks += earned;
     persist(); syncStamp(k, ref);
-    if (!silent) toast('★ Stamp earned — ' + (STAMP_LABEL[k]||k) + '  ·  +1 entry  ·  +' + earned + ' 🧱');
+    if (!silent) toast('★ Stamp earned · ' + (STAMP_LABEL[k]||k) + '  ·  +1 entry  ·  +' + earned + ' 🧱');
     render();
     return true;
   }
@@ -121,18 +121,18 @@
   function buy(id){
     var it = item(id); if(!it) return;
     if(owns(id)){ equip(id); return; }
-    if(pass.bricks < it.price){ toast('Not enough Bricks — earn more by collecting stamps.'); return; }
+    if(pass.bricks < it.price){ toast('Not enough Bricks. Earn more by collecting stamps.'); return; }
     pass.bricks -= it.price;
     pass.owned.push(id);
     pass.equipped[it.slot] = id;
     persist();
-    toast('🧱 Bought & placed — ' + it.name);
+    toast('🧱 Bought & placed · ' + it.name);
     render();
   }
   function equip(id){
     var it = item(id); if(!it || !owns(id)) return;
     pass.equipped[it.slot] = id; persist();
-    toast('Placed — ' + it.name);
+    toast('Placed · ' + it.name);
     render();
   }
 
@@ -325,7 +325,7 @@
       '<div class="sqp-sky-cap">Your skyline: <b>'+lit+'</b> / '+GOAL+' lights on</div>'+
       '<ul class="sqp-tasks">'+taskHtml+'</ul>'+
       emailBlock+
-      '<div class="sqp-note">Collect stamps to light your skyline. Every stamp is an entry in this week\'s drawing — always free. New week, fresh entries.</div>'
+      '<div class="sqp-note">Collect stamps to light your skyline. Every stamp is an entry in this week\'s drawing, always free. New week, fresh entries.</div>'
     );
   }
 
@@ -379,7 +379,7 @@
     });
     return out;
   }
-  var WALL_NOTE = '<div class="sqp-blocknote">Bricks decorate your block. They <b>don\'t affect prize drawings</b> — entries stay free, earned by collecting stamps.</div>';
+  var WALL_NOTE = '<div class="sqp-blocknote">Bricks decorate your block. They <b>don\'t affect prize drawings</b>. Entries stay free, earned by collecting stamps.</div>';
 
   /* ---- compact intro shown INSIDE the popup ---- */
   function blockIntroHtml(){
