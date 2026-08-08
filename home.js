@@ -32,7 +32,8 @@
     // Scale the whole world to fit the screen height, so the tall buildings never
     // overflow a short (mobile landscape or portrait) viewport and you can see
     // several at once. No rotation required.
-    function fitK(){ var H=window.innerHeight||600; return Math.max(0.5, Math.min(1,(H-84)/500)); }
+    function fitK(){ var H=window.innerHeight||600, W=window.innerWidth||800;
+      return Math.max(0.42, Math.min(1, Math.min((H-84)/500, W/760))); }
 
     // stars once (sky layer, scale-independent)
     for(let i=0;i<54;i++){const s=document.createElement('i');
