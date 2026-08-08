@@ -40,7 +40,7 @@
 
   function fresh(){
     return { v:2, coins:CFG.startCoins, xp:0, level:1, streak:0, lastDay:'', tut:0,
-      visited:{ day:'', refs:{} }, tokens:{},
+      visited:{ day:'', refs:{} }, tokens:{}, pid:uuid(), pname:'',
       lots:[ {built:false,unlocked:true},{built:false,unlocked:false},{built:false,unlocked:false},
              {built:false,unlocked:false},{built:false,unlocked:false} ] };
   }
@@ -50,7 +50,11 @@
   if(typeof S.tut !== 'number' && S.tut!=='done') S.tut = (S.lots.some(function(l){return l.built;}) ? 'done' : 0);
   if(!S.visited) S.visited = { day:'', refs:{} };
   if(!S.tokens) S.tokens = {};
-  function save(){ try{ localStorage.setItem(LS, JSON.stringify(S)); }catch(e){} }
+  if(!S.pid) S.pid = uuid();
+  if(typeof S.pname !== 'string') S.pname = '';
+  function save(){ try{ localStorage.setItem(LS, JSON.stringify(S)); }catch(e){} queueSync(); }
+  function uuid(){ try{ if(window.crypto && crypto.randomUUID) return crypto.randomUUID(); }catch(e){}
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,function(c){var r=Math.random()*16|0,v=c==='x'?r:(r&3|8);return v.toString(16);}); }
 
   /* ---- math ---- */
   function cap(l){ return CFG.capBase + (l.lvl-1)*CFG.capPerLvl; }
@@ -140,7 +144,9 @@
   }
   function shareFacebook(){
     var url='https://youngpreneursquare.pages.dev/block.html';
-    window.open('https://www.facebook.com/sharer/sharer.php?u='+encodeURIComponent(url),'_blank','noopener,width=640,height=560');
+    var share='https://www.facebook.com/sharer/sharer.php?u='+encodeURIComponent(url);
+    var w=window.open(share,'fbshare','width=600,height=520');
+    if(!w){ location.href=share; }   // popup blocked -> navigate
   }
   /* ---- site-wide presence: launcher + stray coins + store-visit rewards ---- */
   function initPresence(){
@@ -174,11 +180,13 @@
 
   /* ---------------- styles ---------------- */
   var CSS = `
-  .yc{display:inline-block;width:1.05em;height:1.05em;border-radius:50%;position:relative;vertical-align:-.16em;
-    background:radial-gradient(circle at 36% 30%,#fff4cf,#F1DEA2 42%,#C9A84A 74%,#9c7f34);
-    box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.45),0 1px 2px rgba(0,0,0,.4)}
+  .yc{display:inline-block;width:1.12em;height:1.12em;border-radius:50%;position:relative;vertical-align:-.22em;
+    background:radial-gradient(circle at 33% 27%,#fff7d8 0%,#F4E3A6 26%,#DEB652 58%,#A97d2f 100%);
+    box-shadow:inset 0 1px 1px rgba(255,255,255,.7),inset 0 -1.5px 2px rgba(120,85,20,.55),0 1px 2px rgba(0,0,0,.45)}
+  .yc::before{content:"";position:absolute;inset:8%;border-radius:50%;box-shadow:inset 0 0 0 1px rgba(150,112,36,.45)}
   .yc::after{content:"Y";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-    font-family:"Alfa Slab One",Georgia,serif;font-size:.66em;color:#6b5320;line-height:1}
+    font-family:"Alfa Slab One",Georgia,serif;font-size:.6em;line-height:1;color:#c49b39;
+    text-shadow:0 1px 0 rgba(255,249,220,.8),0 -1px 1px rgba(120,85,20,.6)}
   .bg-game{position:relative;display:flex;flex-direction:column;height:560px;border-radius:16px;overflow:hidden;
     border:1px solid rgba(201,168,74,.25);background:#0b130e;font-family:"Work Sans",system-ui,sans-serif;color:#F5F1E6;max-width:820px;margin:0 auto}
   .bg-game.fs{position:fixed;inset:0;height:100dvh;max-width:none;z-index:9500;border-radius:0;border:none}
@@ -285,6 +293,15 @@
   .bg-row{display:flex;gap:8px}
   .bg-open{flex:1;background:linear-gradient(180deg,#8fe25a,#4fae1f);color:#08210a;border:none;border-radius:8px;padding:12px;font-weight:800;font-size:13px;cursor:pointer}
   .bg-cancel{background:none;border:1px solid rgba(201,168,74,.3);color:#9AA79A;border-radius:8px;padding:12px 16px;cursor:pointer}
+  .lb-list{max-height:52vh;overflow:auto;margin-bottom:12px}
+  .lb-row{display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid rgba(201,168,74,.14)}
+  .lb-rank{width:26px;text-align:center;font-family:"Playfair Display",Georgia,serif;font-weight:800;font-size:16px;color:#C9A84A;flex:0 0 auto}
+  .lb-info{flex:1;min-width:0}.lb-info b{display:block;font-size:13px;color:#EFE9D8}.lb-info span{font-size:11px;color:#9AA79A;display:flex;align-items:center;gap:3px}
+  .bg-mini{flex:0 0 auto;background:rgba(122,208,58,.16);color:#9fe06a;border:1px solid rgba(122,208,58,.4);border-radius:16px;padding:6px 13px;font-size:11px;font-weight:700;cursor:pointer}
+  .visit-city{display:flex;gap:14px;overflow-x:auto;padding:20px 4px 8px;background:linear-gradient(to bottom,#1b2740,#141d16);border-radius:12px;margin-bottom:12px}
+  .visit-city .vb{flex:0 0 auto;width:118px}
+  .visit-city .vb-cap{font-size:10.5px;color:#9AA79A;text-align:center;margin-top:6px}
+  .visit-city .bg-window{min-height:44px}
   /* coach */
   .bg-coach{position:absolute;left:50%;transform:translateX(-50%);z-index:8;max-width:90%;
     background:#12331A;border:1px solid rgba(122,208,58,.55);border-radius:14px;padding:12px 16px;color:#F5F1E6;font-size:13px;
@@ -350,6 +367,7 @@
       '<div class="bg-chip"><span class="yc"></span><span class="v" id="bgCoins">'+S.coins+'</span></div>'+
       '<div class="bg-chip streak"><span class="v">🔥 '+S.streak+'</span></div>'+
       '<div class="bg-lvlbox"><div class="r"><span>Lvl <b>'+S.level+'</b></span><span>'+S.xp+'/'+need+' XP</span></div><div class="bg-xp"><i style="width:'+pct+'%"></i></div></div>'+
+      '<button class="bg-share gen" id="bgLb" title="Leaderboard">🏆</button>'+
       '<button class="bg-share fb" id="bgFb" title="Share to Facebook">f</button>'+
       '<button class="bg-share gen" id="bgShare" title="Share your block">📤</button>'+
       '<button class="bg-fs" id="bgFs" title="Fullscreen">'+(fs?'✕':'⛶')+'</button>'+
@@ -404,6 +422,7 @@
     var fsb=root.querySelector('#bgFs'); if(fsb) fsb.addEventListener('click', toggleFs);
     var fbb=root.querySelector('#bgFb'); if(fbb) fbb.addEventListener('click', shareFacebook);
     var shb=root.querySelector('#bgShare'); if(shb) shb.addEventListener('click', shareBlock);
+    var lbb=root.querySelector('#bgLb'); if(lbb) lbb.addEventListener('click', openLeaderboard);
   }
   function ev(root,sel2,type,fn){ Array.prototype.forEach.call(root.querySelectorAll(sel2),function(e){
     e.addEventListener(type,function(evt){ fn(e,evt); }); }); }
@@ -454,6 +473,70 @@
       Array.prototype.forEach.call(modal.querySelectorAll('.bg-type'),function(c){ c.classList.remove('sel'); }); e.classList.add('sel'); });
     modal.querySelector('#bgOpen').addEventListener('click',function(){ buildShop(picker.lot,picker.type,modal.querySelector('#bgName').value||''); modal.classList.remove('open'); });
     modal.querySelector('#bgCancel').addEventListener('click',function(){ modal.classList.remove('open'); });
+  }
+
+  /* ---- social: cloud sync, leaderboard, visiting blocks ---- */
+  function netWorth(){ var n=S.coins||0; for(var i=0;i<S.lots.length;i++){ var l=S.lots[i]; if(l.built) n+=Math.round(l.lvl*120*TYPES[l.type].earn); } return n; }
+  function citySnapshot(){ return S.lots.filter(function(l){return l.built;}).map(function(l){ return {t:l.type,n:l.name,l:l.lvl}; }); }
+  var syncT=null;
+  function syncBlock(){ if(!window.SQ_DB || !S.pname) return;
+    try{ window.SQ_DB.rpc('block_upsert',{ p_id:S.pid, p_name:S.pname, p_level:S.level, p_net:netWorth(), p_city:citySnapshot() }).then(function(){},function(){}); }catch(e){} }
+  function queueSync(){ if(syncT) clearTimeout(syncT); syncT=setTimeout(syncBlock, 4000); }
+  function ensureModal(){ if(!modal){ modal=el('div','bg-modal'); modal.addEventListener('click',function(e){ if(e.target===modal) modal.classList.remove('open'); }); document.body.appendChild(modal); } return modal; }
+  function showModal(inner, after){ var m=ensureModal(); m.innerHTML='<div class="bg-sheet">'+inner+'</div>'; m.classList.add('open'); if(after) after(m); }
+  function closeModal(){ if(modal) modal.classList.remove('open'); }
+  function wireClose(m){ ev(m,'[data-close]','click',closeModal); }
+
+  function askName(cb){
+    showModal('<h3>Name your block</h3><p>This is how you show up on the leaderboard when other players visit.</p>'+
+      '<input class="bg-name-in" id="pname" maxlength="20" placeholder="Your name or your block\'s name" value="'+esc(S.pname||'')+'">'+
+      '<div class="bg-row"><button class="bg-open" id="pnameSave">Save</button><button class="bg-cancel" data-close>Cancel</button></div>',
+      function(m){ wireClose(m);
+        m.querySelector('#pnameSave').addEventListener('click', function(){
+          var v=(m.querySelector('#pname').value||'').trim().slice(0,20);
+          if(!v){ toast('Enter a name.'); return; }
+          S.pname=v; save(); syncBlock(); closeModal();
+          if(cb) cb(); else toast("Saved — you're on the board!");
+        });
+      });
+  }
+  function openLeaderboard(){
+    if(!S.pname){ askName(function(){ openLeaderboard(); }); return; }
+    syncBlock();
+    showModal('<h3>Top blocks on the Square</h3><p>Loading the biggest little cities…</p>', function(m){
+      if(!window.SQ_DB){ m.querySelector('.bg-sheet').innerHTML='<h3>Leaderboard</h3><p>Can\'t reach the Square right now. Try again in a bit.</p><div class="bg-row"><button class="bg-cancel" data-close>Close</button></div>'; wireClose(m); return; }
+      window.SQ_DB.rpc('block_leaderboard',{p_limit:25}).then(function(res){
+        var rows=(res&&res.data)||[], list='';
+        rows.forEach(function(r,idx){ list+='<div class="lb-row"><span class="lb-rank">'+(idx+1)+'</span>'+
+          '<div class="lb-info"><b>'+esc(r.name)+(r.id===S.pid?' · you':'')+'</b><span>Lvl '+r.level+' · '+r.net_worth+' <span class="yc"></span> net worth</span></div>'+
+          (r.id===S.pid?'':'<button class="bg-mini" data-visit="'+r.id+'">Visit</button>')+'</div>'; });
+        m.querySelector('.bg-sheet').innerHTML='<h3>Top blocks on the Square</h3><p>The biggest little cities right now. Keep building to climb.</p>'+
+          '<div class="lb-list">'+(list||'<p style="color:#9AA79A">Be the very first — build a shop!</p>')+'</div>'+
+          '<div class="bg-row"><button class="bg-cancel" id="editName">Edit my name</button><button class="bg-cancel" data-close>Close</button></div>';
+        ev(m,'[data-visit]','click',function(e){ visitBlock(e.getAttribute('data-visit')); });
+        m.querySelector('#editName').addEventListener('click',function(){ askName(function(){ openLeaderboard(); }); });
+        wireClose(m);
+      }, function(){ m.querySelector('.bg-sheet').innerHTML='<h3>Leaderboard</h3><p>Could not load right now.</p><div class="bg-row"><button class="bg-cancel" data-close>Close</button></div>'; wireClose(m); });
+    });
+  }
+  function snapshotBuildingHtml(sh){
+    var t=TYPES[sh.t]||TYPES.bakery, stars=''; for(var s=0;s<Math.min(5,sh.l);s++) stars+='★';
+    return '<div class="vb"><div class="bg-shopwrap" style="--faceC:'+t.face+';--roofA:'+t.roof+';--signC:'+t.sign+'">'+
+      '<div class="bg-stars2">'+stars+'</div><div class="bg-roof"></div>'+
+      '<div class="bg-sign"><b>'+esc(sh.n||t.name)+'</b></div>'+
+      '<div class="bg-body2"><div class="bg-window"><span>'+t.item+'</span><span>'+t.item+'</span><span>'+t.item+'</span></div><div class="bg-door2">'+t.emoji+'</div></div>'+
+      '</div><div class="vb-cap">'+t.name+' · Lvl '+sh.l+'</div></div>';
+  }
+  function visitBlock(id){
+    if(!window.SQ_DB) return;
+    window.SQ_DB.rpc('block_get',{p_id:id}).then(function(res){
+      var d=(res&&res.data&&res.data[0]); if(!d){ toast('That block is gone.'); return; }
+      var city=d.city||[], b=''; city.forEach(function(sh){ b+=snapshotBuildingHtml(sh); });
+      showModal('<h3>'+esc(d.name)+'’s block</h3><p>Lvl '+d.level+' · '+d.net_worth+' <span class="yc"></span> net worth · '+city.length+' shop'+(city.length===1?'':'s')+'</p>'+
+        '<div class="visit-city">'+(b||'<p style="color:#9AA79A;padding:10px">Just getting started.</p>')+'</div>'+
+        '<div class="bg-row"><button class="bg-cancel" data-back>← Leaderboard</button><button class="bg-cancel" data-close>Close</button></div>',
+        function(m){ wireClose(m); ev(m,'[data-back]','click',function(){ openLeaderboard(); }); });
+    }, function(){ toast('Could not load that block.'); });
   }
 
   /* ---- boot ---- */
