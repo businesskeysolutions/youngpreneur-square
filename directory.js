@@ -9,13 +9,14 @@
     const rnd=mulberry32(20230731), pick=a=>a[Math.floor(rnd()*a.length)];
 
     // Streets = subway lines (NYC-style bullets + MTA colors)
+    // ordered premium-first so the most-visible lines lead the map
     const STREETS=[
-      {name:'Broadway',       bullet:'B', color:'#F5C518', text:'#14231A'},
       {name:'Fifth Avenue',   bullet:'5', color:'#FF6319', text:'#fff'},
+      {name:'Broadway',       bullet:'B', color:'#F5C518', text:'#14231A'},
       {name:'Madison Avenue', bullet:'M', color:'#2F9E44', text:'#fff'},
-      {name:'Canal Street',   bullet:'C', color:'#3A7DD1', text:'#fff'},
+      {name:'Union Square',   bullet:'U', color:'#E8433B', text:'#fff'},
       {name:'Motor Row',      bullet:'R', color:'#B84FC0', text:'#fff'},
-      {name:'Union Square',   bullet:'U', color:'#E8433B', text:'#fff'}
+      {name:'Canal Street',   bullet:'C', color:'#3A7DD1', text:'#fff'}
     ];
     const LINE={}; STREETS.forEach(s=>LINE[s.name]=s);
     // Map any legacy (DB) street names onto the NYC lines so live data keeps working.
@@ -72,7 +73,8 @@
         const nOpen=gs.filter(g=>g.status==='available').length;
         html+='<div class="line" style="--ln:'+s.color+'">'+
           '<div class="line-head"><span class="bullet" style="background:'+s.color+';color:'+s.text+'">'+s.bullet+'</span>'+
-          '<span class="ln-name">'+s.name+'</span><span class="ln-count">'+nOpen+' open · '+gs.length+' stops</span></div>'+
+          '<span class="ln-name">'+s.name+'</span><span class="ln-count">'+nOpen+' open · '+gs.length+' stops</span>'+
+          '<button class="ride-btn" type="button" data-street="'+s.name+'">Ride the line ▶</button></div>'+
           '<div class="route-scroll"><div class="route">';
         gs.forEach(function(sp){
           const cls=statusClass(sp.status), occ=sp.status!=='available';
@@ -123,6 +125,14 @@
     }
     [searchEl,streetEl,catEl,statusEl].forEach(el=>el.addEventListener('input',apply));
     apply();   // render the demo data instantly
+
+    // ride a line: open the rideable subway overlay for that street's stops
+    if(mapEl){ mapEl.addEventListener('click', function(e){
+      var b = e.target.closest ? e.target.closest('.ride-btn') : null; if(!b) return; e.preventDefault();
+      var name=b.getAttribute('data-street'), s=LINE[name];
+      var list=spaces.filter(function(sp){ return toLine(sp.street)===name; });
+      if(window.SquareSubway) window.SquareSubway.ride(name, list, s?{color:s.color, bullet:s.bullet}:{});
+    }); }
 
     // ---- Now Playing: live weekly board from Supabase (falls back to the static rows) ----
     (function(){

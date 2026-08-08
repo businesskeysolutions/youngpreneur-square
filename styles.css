@@ -518,6 +518,24 @@
     color:var(--gold-light);text-transform:uppercase;padding-left:100%;animation:billscroll 7.5s linear infinite}
   @keyframes billscroll{to{transform:translateX(-200%)}}
 
+  /* ---- rideable subway line (the Directory) ---- */
+  #subway{position:fixed;inset:0;z-index:200;display:none;background:#070b08;overflow:hidden;font-family:"Work Sans",sans-serif}
+  #subway.open{display:block}
+  #subStations{position:absolute;left:0;top:0;bottom:0}
+  #subStations .stn-post{position:absolute;left:50%;bottom:-1px;transform:translateX(-50%);width:5px;height:16px;background:linear-gradient(to top,rgba(201,168,74,.55),transparent)}
+  #subTrack{position:absolute;left:0;bottom:0;height:132px}
+  #subTrack .plat{position:absolute;left:0;bottom:0;width:100%;height:132px;background:linear-gradient(to bottom,#0c1a11 0%,#0a140d 60%,#060b08 100%)}
+  #subTrack .route{position:absolute;left:0;bottom:117px;width:100%;height:5px;background:var(--ln,#F5C518);box-shadow:0 0 16px 1px var(--ln,#F5C518);border-radius:3px}
+  #subTrack .ties{position:absolute;left:0;bottom:102px;width:100%;height:9px;background:repeating-linear-gradient(90deg,rgba(201,168,74,.2) 0 7px,transparent 7px 34px)}
+  .sub-linebadge{pointer-events:auto;display:flex;align-items:center;gap:9px;font-family:"Alfa Slab One",serif;font-size:14px;letter-spacing:.02em;color:var(--cream);text-transform:uppercase}
+  .sub-bull{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#14231A;font-size:15px;font-family:"Work Sans";font-weight:800;box-shadow:0 0 12px rgba(0,0,0,.4)}
+  .sub-moon{position:absolute;top:11%;right:12%;width:64px;height:64px;border-radius:50%;background:radial-gradient(circle at 36% 34%,#fff,#e9e3c8);box-shadow:0 0 40px rgba(233,227,200,.4)}
+  body.day .sub-moon{background:radial-gradient(circle at 36% 34%,#fff6cf,#ffd85e);box-shadow:0 0 46px rgba(255,210,90,.7)}
+  .line-head .ln-count{margin-left:10px}
+  .ride-btn{margin-left:auto;pointer-events:auto;background:linear-gradient(180deg,var(--gold-light),var(--gold-deep));color:#14231A;border:none;
+    font-family:"Work Sans";font-weight:700;font-size:11.5px;letter-spacing:.04em;padding:7px 13px;border-radius:20px;cursor:pointer;white-space:nowrap;transition:transform .1s}
+  .ride-btn:hover{transform:translateY(-1px)}
+
   /* the avatar */
   .sq-avatar{position:absolute;bottom:116px;width:42px;height:86px;z-index:6}
   .sq-avatar.left{transform:scaleX(-1)}
