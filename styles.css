@@ -498,6 +498,26 @@
   .sq-b.near .sq-marq{box-shadow:0 0 70px 12px rgba(201,168,74,.62),inset 0 0 22px rgba(201,168,74,.24)}
   .sq-b.near .sq-marq .enter-tag{opacity:1;transform:translateX(-50%) translateY(0)}
 
+  /* --- price / visibility hierarchy: pay more, be seen more --- */
+  .sq-b.t-marquee{z-index:7}
+  .sq-b.t-fifth{z-index:5}
+  .sq-b.t-fifth .sq-board{color:var(--gold);box-shadow:0 0 34px rgba(201,168,74,.6),inset 0 0 18px rgba(201,168,74,.3)}
+  .sq-b.t-fifth .b-brand{font-size:16px}
+  .sq-b.t-madison .sq-board{color:var(--gold-deep);box-shadow:0 0 22px rgba(169,134,58,.42),inset 0 0 13px rgba(169,134,58,.2)}
+  .sq-b.t-broadway .sq-board{color:var(--cream-dim);box-shadow:0 0 18px rgba(239,233,216,.22),inset 0 0 11px rgba(239,233,216,.12)}
+  .sq-b.t-canal{opacity:.9}
+  .sq-b.t-canal .sq-board{color:var(--sage);box-shadow:0 0 12px rgba(154,167,154,.2);min-height:46px;padding:8px 6px}
+  .sq-b.t-canal .b-brand{font-size:12px}
+  .sq-b.t-canal .b-loc{opacity:.7}
+  .b-chip.tier-hi{background:linear-gradient(180deg,#F1DEA2,#C9A84A);color:#14231A;border-color:#E9CF8A}
+  .b-chip.tier-lo{background:rgba(18,23,18,.9);color:var(--sage);border-color:rgba(154,167,154,.4)}
+  /* the Fifth Avenue billboard: a lit scrolling sign only premium spots get */
+  .sq-bill{width:100%;height:20px;border-radius:2px;margin-bottom:6px;overflow:hidden;display:flex;align-items:center;
+    background:linear-gradient(90deg,#3a2f14,#0c0903);border:1px solid rgba(201,168,74,.55);box-shadow:0 0 16px rgba(201,168,74,.5)}
+  .sq-bill span{white-space:nowrap;font-family:"Work Sans";font-weight:700;font-size:10px;letter-spacing:.06em;
+    color:var(--gold-light);text-transform:uppercase;padding-left:100%;animation:billscroll 7.5s linear infinite}
+  @keyframes billscroll{to{transform:translateX(-200%)}}
+
   /* the avatar */
   .sq-avatar{position:absolute;bottom:116px;width:42px;height:86px;z-index:6}
   .sq-avatar.left{transform:scaleX(-1)}

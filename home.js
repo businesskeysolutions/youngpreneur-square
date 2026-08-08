@@ -5,16 +5,26 @@
       avatar=document.getElementById('sqAvatar'), starsEl=document.getElementById('sqStars'),
       modal=document.getElementById('sqModal'), card=document.getElementById('sqCard');
 
+    // Tiers = the price/visibility ladder. Higher tiers are taller, brighter,
+    // more central, and (for Fifth Avenue) get a lit scrolling billboard.
+    const TIERS = {
+      marquee:  { name:'The Marquee',    tag:'the landmark',       k:'t-marquee' },
+      fifth:    { name:'Fifth Avenue',   tag:'front row, premium', k:'t-fifth', bill:true },
+      madison:  { name:'Madison Avenue', tag:'a growth address',   k:'t-madison' },
+      broadway: { name:'Broadway',       tag:'the main strip',     k:'t-broadway' },
+      canal:    { name:'Canal Street',   tag:'a starter address',  k:'t-canal' }
+    };
     const PLOTS=[
-      {x:220,w:150,h:150,cls:'sage', type:'shop',    brand:'Vertex Tech',    loc:'Skyline',   who:'Student-run tech studio',            url:'#'},
-      {x:470,w:162,h:214,cls:'gold', type:'awarded', brand:"Zoe's Bakeshop", loc:'Corner',    who:'Cottage bakery · founder, age 15',   url:'#'},
-      {x:730,w:150,h:150,             type:'open'},
-      {x:970,w:168,h:250,cls:'cream',type:'shop',    brand:'Kayden Customs', loc:'Broadway', who:'Sneaker customs · age 17',           url:'#'},
-      {x:1240,w:212,h:322,           type:'marquee'},
-      {x:1545,w:162,h:242,cls:'gold',type:'awarded', brand:'Bloom by Amara', loc:'Center',    who:'Pressed-flower jewelry · age 16',    url:'#'},
-      {x:1805,w:150,h:150,           type:'open'},
-      {x:2040,w:162,h:202,cls:'brass',type:'shop',   brand:'Deveny Reads',   loc:'Fifth Ave',   who:'Book subscription boxes · age 14',   url:'#'},
-      {x:2300,w:158,h:174,cls:'cream',type:'shop',   brand:'Nova Skate',     loc:'Plaza',     who:'Skate brand · age 17',              url:'#'}
+      {x:170, w:130,h:150, tier:'canal',   type:'shop',    brand:"Milo's Lemonade", who:'Lemonade stand · age 12', url:'#'},
+      {x:352, w:150,h:198, tier:'broadway',type:'shop',    brand:'Kayden Customs',  who:'Sneaker customs · age 17', url:'#'},
+      {x:554, w:132,h:150, tier:'canal',   type:'open'},
+      {x:738, w:178,h:288, tier:'fifth',   type:'awarded', brand:'Deveny Reads',    who:'Book subscription boxes · age 14', url:'#'},
+      {x:968, w:236,h:348, tier:'marquee', type:'marquee'},
+      {x:1256,w:178,h:288, tier:'fifth',   type:'shop',    brand:'Aurelio',         who:'Flagship brand takeover', url:'#'},
+      {x:1486,w:162,h:236, tier:'madison', type:'shop',    brand:'Vertex Tech',     who:'Student-run tech studio · age 16', url:'#'},
+      {x:1700,w:178,h:284, tier:'fifth',   type:'open'},
+      {x:1930,w:150,h:196, tier:'broadway',type:'awarded', brand:'Bloom by Amara',  who:'Pressed-flower jewelry · age 16', url:'#'},
+      {x:2132,w:130,h:148, tier:'canal',   type:'open'}
     ];
     const WORLD=Math.max.apply(null,PLOTS.map(p=>p.x+p.w))+380;
 
@@ -39,18 +49,23 @@
     // buildings
     mid.style.width=WORLD+'px';
     function build(p){
+      const T = TIERS[p.tier] || TIERS.broadway;
       const b=document.createElement('div');
-      b.className='sq-b '+(p.cls||'')+(p.type==='open'?' open':'')+(p.type==='marquee'?' marquee':'');
+      b.className='sq-b '+T.k+(p.type==='open'?' open':'')+(p.type==='marquee'?' marquee':'');
       b.style.left=p.x+'px';b.style.width=p.w+'px';b.style.height=p.h+'px';
       if(p.type==='marquee'){
         b.innerHTML='<div class="sq-marq"><div class="mbulbs"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>'+
           '<div class="k">The Landmark</div><div class="name grad-gold">The Marquee</div><div class="now">One brand at a time</div>'+
           '<div class="enter-tag">Enter ↑</div></div>';
-      }else if(p.type==='open'){
-        b.innerHTML='<div class="sq-board"><div class="b-brand">For lease</div><div class="enter-tag">Lease ↑</div></div>';
       }else{
-        const chip=p.type==='awarded'?'<div class="b-chip">★ Cornerstone</div>':'<div class="b-chip">✦ Leased</div>';
-        b.innerHTML='<div class="sq-board">'+chip+'<div class="b-brand">'+p.brand+'</div><div class="b-loc">'+p.loc+'</div><div class="enter-tag">Enter ↑</div></div>';
+        const bill = T.bill ? '<div class="sq-bill"><span>'+(p.type==='open'?'Prime Fifth Avenue · your brand here':(p.brand+' · on Fifth Avenue'))+'</span></div>' : '';
+        const chipCls = p.tier==='fifth' ? 'tier-hi' : (p.tier==='canal' ? 'tier-lo' : 'tier-mid');
+        let chip, brand;
+        if(p.type==='open'){ chip='✦ For lease'; brand='Open spot'; }
+        else if(p.type==='awarded'){ chip='★ Cornerstone'; brand=p.brand; }
+        else { chip='✦ Leased'; brand=p.brand; }
+        b.innerHTML='<div class="sq-board">'+bill+'<div class="b-chip '+chipCls+'">'+chip+'</div>'+
+          '<div class="b-brand">'+brand+'</div><div class="b-loc">'+T.name+'</div><div class="enter-tag">Enter ↑</div></div>';
       }
       b.addEventListener('click',function(){openPlot(p);});
       p.el=b;p.center=p.x+p.w/2;mid.appendChild(b);
@@ -82,20 +97,32 @@
 
     // ---- modal ----
     function openPlot(p){
+      const T = TIERS[p.tier] || TIERS.broadway;
       let badge,title,who='',text,btnHtml;
       if(p.type==='marquee'){
         badge='★ The Landmark';title='The Marquee';
-        text='One sign, dead center, taken by a single brand at a time — reserved for launch weeks, holiday takeovers, and the nights the whole square shows up.';
+        text='One sign, dead center, taken by a single brand at a time. The most visible spot on the whole Square, reserved for launch weeks, holiday takeovers, and the nights everyone shows up.';
         btnHtml='<a class="btn" href="lease.html#join">Join the waitlist</a>';
       }else if(p.type==='open'){
-        badge='✦ For lease';title='Available storefront';
-        text='An open address on the strip. Lease it and link it straight to your own shop — you keep every sale.';
-        btnHtml='<a class="btn" href="lease.html#join">Lease this spot</a>';
+        badge='✦ For lease · '+T.name;
+        if(p.tier==='fifth'){
+          title='A prime Fifth Avenue address';
+          text='Front and center, tall and lit, the first thing every visitor sees. The most visible address there is. Lease it and put your shop in the spotlight.';
+        }else if(p.tier==='canal'){
+          title='A starter address on Canal Street';
+          text='An affordable spot to get on the map, a modest storefront on a side street. A great place to plant your flag and grow into a bigger address later.';
+        }else{
+          title='An open storefront on '+T.name;
+          text='A spot on '+T.name+', '+T.tag+'. Lease it and link it straight to your own shop, you keep every sale.';
+        }
+        btnHtml='<a class="btn" href="lease.html#join">Lease this '+T.name+' spot</a>';
       }else{
-        badge=p.type==='awarded'?'★ Cornerstone · Spotlight':'✦ Paid · Leased';title=p.brand;who=p.who;
-        text=p.type==='awarded'
-          ? "A Spotlight founder's storefront, funded by the mission or a sponsor. It links out to their own shop — the Square never holds the sale."
-          : "A leased storefront. It links straight to the business's own shop — the Square is the landlord, never the cashier.";
+        badge=(p.type==='awarded'?'★ Cornerstone · ':'✦ Leased · ')+T.name;
+        title=p.brand;who=p.who;
+        var vis = p.tier==='fifth' ? ' One of the most-seen addresses on the Square.' : (p.tier==='canal' ? ' A modest address on a quiet side street.' : '');
+        text=(p.type==='awarded'
+          ? "A Cornerstone founder's storefront, funded by the mission or a sponsor. It links out to their own shop, the Square never holds the sale."
+          : "A leased storefront. It links straight to the business's own shop, the Square is the landlord, never the cashier.")+vis;
         btnHtml=(p.url && p.url!=='#')
           ? '<a class="btn" href="'+p.url+'" target="_blank" rel="noopener">Visit the shop ↗</a>'
           : '<span class="c-demo">Example storefront &middot; demo</span>';
