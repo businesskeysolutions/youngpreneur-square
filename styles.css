@@ -1016,3 +1016,8 @@ body.day .door{background:linear-gradient(160deg,rgba(20,35,26,.05),rgba(20,35,2
 body.day .door.visit{background:linear-gradient(160deg,rgba(95,174,42,.14),rgba(20,35,26,.03) 62%)}
 body.day .door.lease{background:linear-gradient(160deg,rgba(169,134,58,.16),rgba(20,35,26,.03) 62%)}
 .doormeta a{background:transparent;padding:0}
+
+
+/* day-mode readability: subway open/cornerstone station labels need darker ink on parchment */
+body.day .stn.open .lbl b{color:#2f7d1f}
+body.day .stn.corner .lbl b{color:#8a6a1e}
