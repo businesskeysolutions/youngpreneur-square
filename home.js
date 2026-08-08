@@ -166,7 +166,7 @@
       var img=new Image();
       img.onload=function(){ try{ var c=document.createElement('canvas'); c.width=size; c.height=size; var ctx=c.getContext('2d');
         var s=Math.min(img.width,img.height), sx=(img.width-s)/2, sy=(img.height-s)/2;
-        ctx.drawImage(img,sx,sy,s,s,0,0,size,size); cb(c.toDataURL('image/jpeg',0.85)); }catch(e){ cb(null); } };
+        ctx.drawImage(img,sx,sy,s,s,0,0,size,size); cb(c.toDataURL('image/png')); }catch(e){ cb(null); } };
       img.onerror=function(){ cb(null); }; img.src=src;
     }
     // picker button in the top HUD

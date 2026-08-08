@@ -531,9 +531,9 @@
   .sq-avatar.walk .leg.l{animation:sqstep .42s linear infinite}
   .sq-avatar.walk .leg.r{animation:sqstep .42s linear infinite reverse}
   /* upgraded avatar: a portrait bubble (emoji preset or your own photo) on a walking body */
-  .sq-avatar .av-head{position:absolute;left:50%;top:-2px;transform:translateX(-50%);width:31px;height:31px;border-radius:50%;
-    background:#f2e6c6 center/cover no-repeat;border:2px solid var(--gold);box-shadow:0 0 13px rgba(201,168,74,.45);
-    display:flex;align-items:center;justify-content:center;font-size:20px;line-height:1;overflow:hidden;z-index:2}
+  .sq-avatar .av-head{position:absolute;left:50%;top:-3px;transform:translateX(-50%);width:34px;height:34px;border-radius:50%;
+    background:transparent center/cover no-repeat;display:flex;align-items:center;justify-content:center;font-size:28px;line-height:1;
+    overflow:hidden;z-index:2;filter:drop-shadow(0 2px 4px rgba(0,0,0,.45))}
   .sq-avatar.left .av-head{transform:translateX(-50%) scaleX(-1)}
   .sq-avatar .av-torso{position:absolute;left:50%;top:28px;transform:translateX(-50%);width:26px;height:30px;border-radius:10px 10px 7px 7px;
     background:linear-gradient(180deg,var(--gold-light),var(--gold-deep));box-shadow:0 0 16px rgba(201,168,74,.45)}
