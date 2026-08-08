@@ -1,7 +1,10 @@
 /* ============================================================================
-   THE SQUARE PASS — on-device engagement game (Phase 1)
-   Collect stamps (daily check-in + streak, visit a storefront, find the hidden
-   symbol, vote, explore) → your skyline lights up → weekly prize-drawing entries.
+   THE SQUARE PASS — on-device engagement game
+   Phase 1: Collect stamps (daily check-in + streak, visit a storefront, find the
+   hidden Square token, vote, explore) -> your skyline lights up -> weekly
+   prize-drawing entries. Prize entries are ALWAYS free, earned only.
+   Phase A: Bricks — a cosmetic-only currency you EARN from stamps and spend on
+   Build-Your-Block decorations. Bricks never touch prize entries (the wall).
    Works standalone via localStorage; syncs to Supabase RPCs when available.
    Self-contained: injects its own styles, so it runs on every page.
    ========================================================================== */
@@ -20,11 +23,18 @@
 
   var pass = load() || { email:'', stamps:[], streak:0, last:'' };
   if(!pass.stamps) pass.stamps = [];
+  // --- Bricks jar (cosmetic-only). Separate from stamps/entries. ---
+  if(typeof pass.bricks !== 'number') pass.bricks = 20;   // small starter grant
+  if(!pass.owned) pass.owned = [];                        // owned cosmetic ids
+  if(!pass.equipped) pass.equipped = {};                  // { slot: itemId }
+  var view = 'pass'; // 'pass' | 'block'
 
   var STAMP_LABEL = {
     checkin:'Daily check-in', visit:'Visited a storefront', hunt:'Found the Square token',
     vote:'Cast a vote', explore:'Explored the Square'
   };
+  // Bricks earned per newly-earned stamp (cosmetic currency only).
+  var BRICK_REWARD = { checkin:5, visit:5, hunt:8, vote:10, explore:6 };
 
   function hasStamp(k, ref){ return pass.stamps.some(function(s){ return s.k===k && s.ref===ref; }); }
   function weekCount(){ var ws=weekStart(); return pass.stamps.filter(function(s){ return (s.ts||'').slice(0,10) >= ws; }).length; }
@@ -43,8 +53,12 @@
     ref = String(ref==null ? '' : ref);
     if (hasStamp(k, ref)) return false;
     pass.stamps.push({ k:k, ref:ref, ts:new Date().toISOString() });
+    // Earn Bricks (cosmetic jar). This does NOT affect entries — entries are the
+    // count of stamps in the current week and stay free/earned-only.
+    var earned = BRICK_REWARD[k] || 5;
+    pass.bricks += earned;
     persist(); syncStamp(k, ref);
-    if (!silent) toast('★ Stamp earned — ' + (STAMP_LABEL[k]||k) + '  ·  +1 entry');
+    if (!silent) toast('★ Stamp earned — ' + (STAMP_LABEL[k]||k) + '  ·  +1 entry  ·  +' + earned + ' 🧱');
     render();
     return true;
   }
@@ -58,6 +72,70 @@
       stamp('checkin', t, true);
       try { if (window.SQ_DB && pass.email) window.SQ_DB.rpc('passport_checkin', { p_email: pass.email }).then(function(){},function(){}); } catch(e){}
     }
+  }
+
+  /* ---------------- Build-Your-Block: cosmetics catalog ----------------
+     Every item is "see exactly what you buy" (no random boxes). Slots are
+     single-select; equipping sets pass.equipped[slot] = id. Bricks are the
+     only cost, and they only ever spend here — never on prize entries. */
+  var SHOP = [
+    // facade — the storefront wall
+    { id:'fac_green',   slot:'facade',   name:'Forest Brick',    price:0,  free:true,  css:'#14231A' },
+    { id:'fac_brown',   slot:'facade',   name:'Brownstone',      price:30,            css:'#5a3a2a' },
+    { id:'fac_cream',   slot:'facade',   name:'Cream Classic',   price:30,            css:'#cbbf9e' },
+    { id:'fac_red',     slot:'facade',   name:'Brick Red',       price:35,            css:'#7a2f28' },
+    // awning — over the door
+    { id:'awn_none',    slot:'awning',   name:'No Awning',       price:0,  free:true,  css:'' },
+    { id:'awn_green',   slot:'awning',   name:'Green Awning',    price:20,            css:'#2F9E44' },
+    { id:'awn_stripe',  slot:'awning',   name:'Striped Awning',  price:25,            css:'repeating-linear-gradient(90deg,#E8433B 0 12px,#F5F1E6 12px 24px)' },
+    { id:'awn_gold',    slot:'awning',   name:'Gold Awning',     price:30,            css:'linear-gradient(180deg,#F1DEA2,#C9A84A)' },
+    // lights — across the top
+    { id:'lit_none',    slot:'lights',   name:'No Lights',       price:0,  free:true,  css:'' },
+    { id:'lit_string',  slot:'lights',   name:'String Lights',   price:20,            css:'#F1DEA2' },
+    { id:'lit_neon',    slot:'lights',   name:'Neon Glow',       price:40,            css:'#7AD03A' },
+    // dressing — on the sidewalk
+    { id:'drs_none',    slot:'dressing', name:'Bare Sidewalk',   price:0,  free:true,  emoji:'' },
+    { id:'drs_planter', slot:'dressing', name:'Planter',         price:15,            emoji:'🪴' },
+    { id:'drs_bench',   slot:'dressing', name:'Bench',           price:15,            emoji:'🪑' },
+    { id:'drs_tree',    slot:'dressing', name:'Street Tree',     price:20,            emoji:'🌳' },
+    // cover — your pass card
+    { id:'cov_gold',    slot:'cover',    name:'Gold Cover',      price:0,  free:true,  css:'linear-gradient(135deg,#E9CF8A,#C9A84A 60%,#A9863A)' },
+    { id:'cov_night',   slot:'cover',    name:'Midnight Cover',  price:50,            css:'linear-gradient(135deg,#26324a,#141d2e 60%,#0b1220)', ink:'#EFE9D8' },
+    { id:'cov_lime',    slot:'cover',    name:'Lime Marquee',    price:50,            css:'linear-gradient(135deg,#8fe25a,#4fae1f 60%,#2f7d1f)', ink:'#0A0D0B' }
+  ];
+  var SLOTS = [
+    { slot:'facade',   label:'Facade' },
+    { slot:'awning',   label:'Awning' },
+    { slot:'lights',   label:'Lights' },
+    { slot:'dressing', label:'Sidewalk' },
+    { slot:'cover',    label:'Pass cover' }
+  ];
+  function item(id){ for(var i=0;i<SHOP.length;i++){ if(SHOP[i].id===id) return SHOP[i]; } return null; }
+  function owns(id){ var it=item(id); return !!(it && (it.free || pass.owned.indexOf(id)>=0)); }
+  function equippedIn(slot){
+    var id = pass.equipped[slot];
+    if(id && owns(id)) return item(id);
+    // default to the free item in the slot
+    for(var i=0;i<SHOP.length;i++){ if(SHOP[i].slot===slot && SHOP[i].free) return SHOP[i]; }
+    return null;
+  }
+
+  function buy(id){
+    var it = item(id); if(!it) return;
+    if(owns(id)){ equip(id); return; }
+    if(pass.bricks < it.price){ toast('Not enough Bricks — earn more by collecting stamps.'); return; }
+    pass.bricks -= it.price;
+    pass.owned.push(id);
+    pass.equipped[it.slot] = id;
+    persist();
+    toast('🧱 Bought & placed — ' + it.name);
+    render();
+  }
+  function equip(id){
+    var it = item(id); if(!it || !owns(id)) return;
+    pass.equipped[it.slot] = id; persist();
+    toast('Placed — ' + it.name);
+    render();
   }
 
   /* ---------------- styles ---------------- */
@@ -78,6 +156,10 @@
   .sqp-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
   .sqp-head h3{font-family:"Playfair Display",Georgia,serif;font-weight:800;font-size:18px;text-transform:uppercase;letter-spacing:.02em;margin:0}
   .sqp-x{background:none;border:none;color:#9AA79A;font-size:20px;cursor:pointer;line-height:1}
+  .sqp-tabs{display:flex;gap:6px;margin-bottom:12px}
+  .sqp-tab{flex:1;background:rgba(245,241,230,.05);border:1px solid rgba(201,168,74,.22);border-radius:9px;padding:9px 8px;
+    color:#B9C3B4;font-weight:700;font-size:12px;letter-spacing:.05em;text-transform:uppercase;cursor:pointer;text-align:center}
+  .sqp-tab.active{background:linear-gradient(180deg,#E9CF8A,#C9A84A);border-color:#E9CF8A;color:#14231A}
   .sqp-card{position:relative;border-radius:12px;padding:16px 16px 14px;overflow:hidden;
     background:linear-gradient(135deg,#E9CF8A,#C9A84A 60%,#A9863A);color:#14231A;box-shadow:inset 0 0 0 1px rgba(0,0,0,.15)}
   .sqp-card .sqp-swipe{position:absolute;top:0;bottom:0;right:34px;width:16px;background:linear-gradient(180deg,#3a2f14,#171208)}
@@ -109,18 +191,67 @@
   .sqp-note{font-size:11px;color:#7c8b7a;text-align:center;margin-top:12px;line-height:1.5}
   .sqp-toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%) translateY(14px);z-index:9002;
     background:#12331A;color:#F5F1E6;border:1px solid rgba(201,168,74,.5);border-radius:24px;padding:10px 18px;font-family:"Work Sans",system-ui,sans-serif;
-    font-weight:600;font-size:13px;box-shadow:0 10px 30px rgba(0,0,0,.5);opacity:0;transition:opacity .3s,transform .3s;pointer-events:none;white-space:nowrap}
+    font-weight:600;font-size:13px;box-shadow:0 10px 30px rgba(0,0,0,.5);opacity:0;transition:opacity .3s,transform .3s;pointer-events:none;white-space:nowrap;max-width:92vw;overflow:hidden;text-overflow:ellipsis}
   .sqp-toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
   .sq-hidden{position:fixed;z-index:8500;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;
     font-family:"Alfa Slab One",Georgia,serif;font-size:11px;line-height:1;color:rgba(233,207,138,.34);border:2px solid rgba(233,207,138,.30);
     background:rgba(201,168,74,.05);cursor:pointer;transition:color .2s,border-color .2s,transform .2s,box-shadow .2s;user-select:none}
   .sq-hidden:hover{color:#14231A;background:linear-gradient(180deg,#F1DEA2,#C9A84A);border-color:#E9CF8A;transform:scale(1.25);box-shadow:0 0 14px rgba(233,207,138,.75)}
+
+  /* --- Bricks wallet --- */
+  .sqp-wallet{display:flex;align-items:center;justify-content:space-between;margin:2px 0 12px;
+    background:rgba(245,241,230,.05);border:1px solid rgba(201,168,74,.22);border-radius:10px;padding:11px 13px}
+  .sqp-wallet .bal{display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px;color:#F1DEA2}
+  .sqp-wallet .bal .lbl{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#9AA79A}
+  .sqp-wallet .buy{background:rgba(10,13,11,.55);border:1px dashed rgba(201,168,74,.4);border-radius:20px;color:#9AA79A;
+    font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:6px 11px;cursor:not-allowed}
+
+  /* --- storefront preview --- */
+  .sqp-lot{background:linear-gradient(180deg,#0a1410,#0f1a13);border:1px solid rgba(201,168,74,.16);border-radius:12px;
+    padding:16px 12px 0;overflow:hidden}
+  .sqp-store{position:relative;width:180px;max-width:70%;margin:0 auto;height:130px;border-radius:6px 6px 0 0;
+    box-shadow:inset 0 0 0 1px rgba(0,0,0,.25)}
+  .sqp-store .sqp-strlights{position:absolute;top:-9px;left:-6px;right:-6px;height:10px;display:flex;justify-content:space-around;align-items:center}
+  .sqp-store .sqp-strlights i{width:6px;height:6px;border-radius:50%;display:block}
+  .sqp-store .sqp-win2{position:absolute;top:16px;width:26px;height:26px;border-radius:3px;background:rgba(241,222,162,.85);box-shadow:0 0 8px rgba(241,222,162,.5)}
+  .sqp-store .w-l{left:22px}.sqp-store .w-r{right:22px}
+  .sqp-store .sqp-door2{position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:44px;height:58px;
+    background:#20140c;border-radius:4px 4px 0 0;box-shadow:inset 0 0 0 2px rgba(0,0,0,.3)}
+  .sqp-store .sqp-awn{position:absolute;left:50%;transform:translateX(-50%);width:70px;height:16px;border-radius:3px;bottom:58px}
+  .sqp-store .sqp-sign{position:absolute;top:50px;left:50%;transform:translateX(-50%);font-family:"Alfa Slab One",Georgia,serif;
+    font-size:10px;letter-spacing:.04em;color:#F5F1E6;text-shadow:0 1px 2px rgba(0,0,0,.6);white-space:nowrap}
+  .sqp-side{display:flex;align-items:flex-end;justify-content:center;gap:8px;height:34px;margin-top:2px;
+    border-top:3px solid #2a2118;background:repeating-linear-gradient(90deg,#20293f 0 18px,#1a2233 18px 20px);font-size:22px;line-height:1}
+  .sqp-blocknote{font-size:11px;color:#7c8b7a;text-align:center;margin:10px 2px 4px;line-height:1.5}
+  .sqp-blocknote b{color:#7AD03A}
+
+  /* --- shop --- */
+  .sqp-shop{margin-top:14px}
+  .sqp-slot-h{font-family:"Work Sans",sans-serif;font-weight:700;font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+    color:#9AA79A;margin:14px 0 7px}
+  .sqp-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+  .sqp-shopitem{background:rgba(245,241,230,.04);border:1px solid rgba(201,168,74,.18);border-radius:9px;padding:9px;
+    display:flex;align-items:center;gap:9px}
+  .sqp-shopitem.equipped{border-color:#7AD03A;box-shadow:0 0 0 1px rgba(122,208,58,.35)}
+  .sqp-sw{width:30px;height:30px;border-radius:6px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;
+    font-size:18px;line-height:1;box-shadow:inset 0 0 0 1px rgba(0,0,0,.25)}
+  .sqp-shopitem .nm{flex:1;min-width:0}
+  .sqp-shopitem .nm b{display:block;font-size:12px;color:#EFE9D8;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sqp-shopitem .nm span{font-size:11px;color:#C9A84A;font-weight:700}
+  .sqp-shopitem .nm span.free{color:#7c8b7a;font-weight:600}
+  .sqp-act{border:none;border-radius:16px;padding:6px 10px;font-size:10.5px;font-weight:700;letter-spacing:.04em;
+    text-transform:uppercase;cursor:pointer;flex:0 0 auto}
+  .sqp-act.buy{background:linear-gradient(180deg,#E9CF8A,#C9A84A);color:#14231A}
+  .sqp-act.buy:disabled{background:rgba(245,241,230,.08);color:#6f7a6d;cursor:not-allowed}
+  .sqp-act.eq{background:rgba(122,208,58,.14);color:#9fe06a;border:1px solid rgba(122,208,58,.4)}
+  .sqp-act.on{background:#7AD03A;color:#0A0D0B;cursor:default}
   `;
 
   /* ---------------- DOM ---------------- */
   var scrim, fab, toastEl, toastTimer;
 
   function el(tag, cls, html){ var e=document.createElement(tag); if(cls) e.className=cls; if(html!=null) e.innerHTML=html; return e; }
+  function esc(s){ return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
 
   function build(){
     var style = document.createElement('style'); style.textContent = CSS; document.head.appendChild(style);
@@ -140,13 +271,9 @@
     render();
   }
 
-  function initial(){ return (pass.email ? pass.email[0] : 'Y').toUpperCase(); }
-
-  function render(){
-    var badge = document.getElementById('sqpBadge'); if(badge) badge.textContent = weekCount();
-    var panel = scrim && scrim.querySelector('.sqp-panel'); if(!panel) return;
+  /* ---- pass (prize) view ---- */
+  function passViewHtml(){
     var total = pass.stamps.length, lit = Math.min(total, GOAL);
-    // skyline: 6 buildings, GOAL windows total
     var perB = Math.ceil(GOAL/6), sky='';
     for(var b=0;b<6;b++){
       var wins='';
@@ -164,25 +291,111 @@
       return '<li class="'+(t.done?'done':'')+'"><span class="tk">'+(t.done?'✓':'')+'</span>'+
              '<span class="tx">'+t.label+'</span><span class="hint">'+(t.done?'':t.hint)+'</span></li>';
     }).join('');
+    var cover = equippedIn('cover');
+    var coverCss = cover ? cover.css : 'linear-gradient(135deg,#E9CF8A,#C9A84A 60%,#A9863A)';
+    var coverInk = (cover && cover.ink) ? cover.ink : '#14231A';
     var emailBlock = pass.email
-      ? '<div class="sqp-email saved"><p>✓ Saved to <b>'+pass.email.replace(/</g,'')+'</b>. Your entries are locked in for the weekly drawing.</p></div>'
+      ? '<div class="sqp-email saved"><p>✓ Saved to <b>'+esc(pass.email)+'</b>. Your entries are locked in for the weekly drawing.</p></div>'
       : '<div class="sqp-email"><p>Add your email to save your pass across devices and lock in your prize-drawing entries.</p>'+
         '<form id="sqpEmailForm"><input type="email" id="sqpEmail" placeholder="you@email.com" aria-label="Email"><button type="submit">Activate</button></form></div>';
-
-    panel.innerHTML =
-      '<div class="sqp-head"><h3>The Square Pass</h3><button class="sqp-x" aria-label="Close">✕</button></div>'+
-      '<div class="sqp-card"><div class="sqp-swipe"></div>'+
+    return (
+      '<div class="sqp-card" style="background:'+coverCss+';color:'+coverInk+'"><div class="sqp-swipe"></div>'+
         '<div class="sqp-brand">The Square Pass</div><div class="sqp-sub">Youngpreneur Square · Swipe in</div>'+
-        '<div class="sqp-holder">'+ (pass.email ? pass.email : 'Guest pass') +'</div>'+
+        '<div class="sqp-holder">'+ (pass.email ? esc(pass.email) : 'Guest pass') +'</div>'+
         '<div class="sqp-meta"><span>Streak<br><b>'+(pass.streak||0)+'</b></span><span>This week<br><b>'+weekCount()+'</b> entries</span><span>Total stamps<br><b>'+total+'</b></span></div>'+
       '</div>'+
       '<div class="sqp-sky">'+sky+'</div>'+
       '<div class="sqp-sky-cap">Your skyline: <b>'+lit+'</b> / '+GOAL+' lights on</div>'+
       '<ul class="sqp-tasks">'+taskHtml+'</ul>'+
       emailBlock+
-      '<div class="sqp-note">Collect stamps to light your skyline. Every stamp is an entry in this week\'s drawing. New week, fresh entries.</div>';
+      '<div class="sqp-note">Collect stamps to light your skyline. Every stamp is an entry in this week\'s drawing — always free. New week, fresh entries.</div>'
+    );
+  }
+
+  /* ---- block (build) view ---- */
+  function storefrontHtml(){
+    var fac = equippedIn('facade'), awn = equippedIn('awning'), lit = equippedIn('lights'), drs = equippedIn('dressing');
+    var facCss = fac ? fac.css : '#14231A';
+    var lights='';
+    if(lit && lit.css){
+      var dots='';
+      for(var i=0;i<9;i++){ dots += '<i style="background:'+lit.css+';box-shadow:0 0 6px '+lit.css+'"></i>'; }
+      lights = '<div class="sqp-strlights">'+dots+'</div>';
+    }
+    var awning = (awn && awn.css) ? '<div class="sqp-awn" style="background:'+awn.css+'"></div>' : '';
+    var sideItem = (drs && drs.emoji) ? drs.emoji : '';
+    var name = pass.email ? esc(pass.email.split('@')[0]).toUpperCase().slice(0,12) : 'YOUR SHOP';
+    return (
+      '<div class="sqp-lot">'+
+        '<div class="sqp-store" style="background:'+facCss+'">'+
+          lights+
+          '<span class="sqp-win2 w-l"></span><span class="sqp-win2 w-r"></span>'+
+          '<div class="sqp-sign">'+name+'</div>'+
+          awning+
+          '<div class="sqp-door2"></div>'+
+        '</div>'+
+        '<div class="sqp-side">'+ (sideItem?('<span>'+sideItem+'</span>'):'') +'</div>'+
+      '</div>'
+    );
+  }
+  function shopHtml(){
+    var out='';
+    SLOTS.forEach(function(s){
+      var eqId = (equippedIn(s.slot)||{}).id;
+      var rows = SHOP.filter(function(it){ return it.slot===s.slot; }).map(function(it){
+        var isEq = it.id===eqId;
+        var sw = (s.slot==='dressing')
+          ? '<div class="sqp-sw" style="background:#20293f">'+(it.emoji||'∅')+'</div>'
+          : '<div class="sqp-sw" style="background:'+(it.css||'rgba(245,241,230,.06)')+'">'+(it.css?'':'∅')+'</div>';
+        var priceHtml = it.free ? '<span class="free">Free</span>' : '<span>'+it.price+' 🧱</span>';
+        var btn;
+        if(isEq){ btn = '<button class="sqp-act on" disabled>Placed</button>'; }
+        else if(owns(it.id)){ btn = '<button class="sqp-act eq" data-eq="'+it.id+'">Place</button>'; }
+        else {
+          var afford = pass.bricks >= it.price;
+          btn = '<button class="sqp-act buy" data-buy="'+it.id+'"'+(afford?'':' disabled')+'>'+(afford?'Buy':'Need 🧱')+'</button>';
+        }
+        return '<div class="sqp-shopitem'+(isEq?' equipped':'')+'">'+sw+
+               '<div class="nm"><b>'+esc(it.name)+'</b>'+priceHtml+'</div>'+btn+'</div>';
+      }).join('');
+      out += '<div class="sqp-slot-h">'+s.label+'</div><div class="sqp-grid">'+rows+'</div>';
+    });
+    return out;
+  }
+  function blockViewHtml(){
+    return (
+      '<div class="sqp-wallet">'+
+        '<div class="bal"><span>🧱 '+pass.bricks+'</span> <span class="lbl">Bricks</span></div>'+
+        '<button class="buy" title="Buying Bricks arrives later" disabled>Buy Bricks · soon</button>'+
+      '</div>'+
+      storefrontHtml()+
+      '<div class="sqp-blocknote">Bricks decorate your block. They <b>don\'t affect prize drawings</b> — entries stay free, earned by collecting stamps.</div>'+
+      '<div class="sqp-shop">'+shopHtml()+'</div>'
+    );
+  }
+
+  function render(){
+    var badge = document.getElementById('sqpBadge'); if(badge) badge.textContent = weekCount();
+    var panel = scrim && scrim.querySelector('.sqp-panel'); if(!panel) return;
+
+    panel.innerHTML =
+      '<div class="sqp-head"><h3>The Square Pass</h3><button class="sqp-x" aria-label="Close">✕</button></div>'+
+      '<div class="sqp-tabs">'+
+        '<button class="sqp-tab'+(view==='pass'?' active':'')+'" data-view="pass">Pass</button>'+
+        '<button class="sqp-tab'+(view==='block'?' active':'')+'" data-view="block">Build your block</button>'+
+      '</div>'+
+      (view==='pass' ? passViewHtml() : blockViewHtml());
 
     panel.querySelector('.sqp-x').addEventListener('click', close);
+    Array.prototype.forEach.call(panel.querySelectorAll('.sqp-tab'), function(t){
+      t.addEventListener('click', function(){ view = t.getAttribute('data-view'); render(); });
+    });
+    Array.prototype.forEach.call(panel.querySelectorAll('[data-buy]'), function(b){
+      b.addEventListener('click', function(){ buy(b.getAttribute('data-buy')); });
+    });
+    Array.prototype.forEach.call(panel.querySelectorAll('[data-eq]'), function(b){
+      b.addEventListener('click', function(){ equip(b.getAttribute('data-eq')); });
+    });
     var ef = panel.querySelector('#sqpEmailForm');
     if(ef) ef.addEventListener('submit', function(e){
       e.preventDefault();
@@ -204,7 +417,7 @@
     clearTimeout(toastTimer); toastTimer = setTimeout(function(){ toastEl.classList.remove('show'); }, 2600);
   }
 
-  // ---- hidden symbol (daily hunt): a subtle ✦ placed at a date-seeded spot ----
+  // ---- hidden Square token (daily hunt): a subtle gold coin at a date-seeded spot ----
   function placeHiddenSymbol(){
     if(document.querySelector('.sq-hidden')) return;
     var seed = 0, s = today()+location.pathname;
@@ -239,5 +452,9 @@
   else start();
 
   // expose a tiny API (for future Build-Your-Block / manual stamps)
-  window.SquarePass = { stamp: stamp, open: open, get: function(){ return JSON.parse(JSON.stringify(pass)); } };
+  window.SquarePass = {
+    stamp: stamp, open: open,
+    bricks: function(){ return pass.bricks; },
+    get: function(){ return JSON.parse(JSON.stringify(pass)); }
+  };
 })();
