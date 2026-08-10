@@ -156,6 +156,7 @@ const BLUE_PALS=[{fac:'#3a5568',win:'#bfe0ff',trim:'#22384a',glass:1},{fac:'#3a6
 const ORANGE_PALS=[{fac:'#a06a3a',win:'#ffe6b0',trim:'#6a4526'},{fac:'#9a8a4a',win:'#fff2c0',trim:'#6a5a30'},{fac:'#8a7a5a',win:'#ffeec0',trim:'#5a4e3a'},{fac:'#4a7a7a',win:'#d8f0f0',trim:'#2e4e4e'},{fac:'#a05a4a',win:'#ffdcc0',trim:'#6a382a'},{fac:'#8a6a4a',win:'#ffe6b0',trim:'#5a4230'}];
 const PURPLE_PALS=[{fac:'#5a3a6a',win:'#f0d8ff',trim:'#3a2444'},{fac:'#6d3a5a',win:'#ffd8f0',trim:'#44243a'},{fac:'#3a3a6a',win:'#d8dcff',trim:'#242448'},{fac:'#7a3a6a',win:'#ffd8f4',trim:'#4a2444'},{fac:'#8a3a6a',win:'#ffd0ea',trim:'#5a244a'},{fac:'#3a3a5a',win:'#d8d8ff',trim:'#24243a'}];
 const BLACK_PALS=[{fac:'#2a2a2e',win:'#ffe6a0',trim:'#c9b06a'},{fac:'#33332a',win:'#fff0c0',trim:'#c9b06a'},{fac:'#2e2a26',win:'#ffe6a0',trim:'#a98f52'},{fac:'#3a3630',win:'#ffeec0',trim:'#c9b06a'},{fac:'#2a2e33',win:'#e8dcff',trim:'#a9a06a'},{fac:'#38322a',win:'#ffe6a0',trim:'#c9b06a'}];
+const STONE_PALS=[{fac:'#6f6a60',win:'#ffe6c0',trim:'#4a453c'},{fac:'#7a7266',win:'#fff0d0',trim:'#524b40'},{fac:'#645f57',win:'#ffe6c0',trim:'#403b34'},{fac:'#83796a',win:'#ffeecb',trim:'#5a5044'},{fac:'#6a6558',win:'#ffe6c0',trim:'#453f36'},{fac:'#787064',win:'#fff0d0',trim:'#504840'}];
 const LAND_PAL={fac:'#2c2415',win:'#ffe6a0',trim:'#E3C05A'};
 let curPals=PALETTES;
 function texPair(pal){const w=64,h=128;
@@ -344,7 +345,14 @@ function roofDetails(g,w,d,h,tier,pal,mat){
   if(rt==='ac'){ for(let i=0;i<3;i++){const ac=new THREE.Mesh(new THREE.BoxGeometry(rr(1,1.8),rr(.6,1.1),rr(1,1.8)),std({color:0x3a4048,roughness:.8}));ac.position.set(rr(-w/3,w/3),topY+.5,rr(-d/3,d/3));g.add(ac);} }
 }
 
-function makeBiz(x,z,side,tier,data,addr){
+// small wall-mounted digital ad screen on a storefront facade (its own lease-able ad surface)
+function addWallScreen(parent,face,yaw,y,ads){const g=new THREE.Group();
+  const W=3.8,H=2.35;const proud=face>0?0.16:-0.16;
+  const frame=new THREE.Mesh(new THREE.BoxGeometry(W+0.5,H+0.5,0.28),std({color:0x0a0e13,roughness:.6}));frame.position.set(face,y,0);frame.rotation.y=yaw;g.add(frame);
+  makeAnimBillboard(g,face+proud,yaw,y,W,H,ads);
+  g.userData.info={kind:'screen',screen:1,name:'DIGITAL AD SCREEN',status:'screen',addr:'Wall screen · '+curCfg.name,ptier:curCfg.name+' screen',from:'$79',mo:'$79/mo',stripe:'Front Row'};
+  parent.add(g);interact.push(g);return g;}
+function makeBiz(x,z,side,tier,data,addr,screen){
   const T=TIER[tier];const g=new THREE.Group();
   const pal = tier==='landmark' ? LAND_PAL : pick(curPals);
   const w=Math.max(6,T.w+rr(-1,1.2)), d=7+rr(0,1.6), h=Math.max(7,T.h+rr(-1.5,2));
@@ -359,14 +367,17 @@ function makeBiz(x,z,side,tier,data,addr){
   const smat = std({map:stex,emissiveMap:stex,emissive:0xffffff,emissiveIntensity:.6,transparent:true,roughness:.5});signMats.push(smat);
   const sign=new THREE.Mesh(new THREE.PlaneGeometry(w*0.92, data.br? w*0.23 : w*0.22),smat);sign.position.set(face,3.6,0);sign.rotation.y=yaw;g.add(sign);
   const aw=new THREE.Mesh(new THREE.BoxGeometry(.5,.5,d*.84),std({color:data.br?data.br.accent:(data.awn||0xc0432f),roughness:.6}));aw.position.set(side<0?w/2+.25:-w/2-.25,2.35,0);g.add(aw);
-  // address number plate (real "100A" from the directory when present)
+  // building-number plaque — a small mounted plate by the door, separate from the business sign above it
   const addrStr=data.addr||(addr+' '+curCfg.street);const plate=data.plate||addr;
-  const np=new THREE.Mesh(new THREE.PlaneGeometry(0.95,0.6),std({map:numTex(plate),emissive:0xE3C05A,emissiveIntensity:.35,transparent:true}));np.position.set(side<0?w/2+0.05:-w/2-0.05,2.15,d*0.36*(side<0?1:1));np.rotation.y=yaw;g.add(np);signMats.push(np.material);
+  const npx=side<0?w/2+0.05:-w/2-0.05, npz=d*0.32;
+  const plq=new THREE.Mesh(new THREE.BoxGeometry(1.16,0.8,0.12),std({color:0x14100c,roughness:.7,metalness:.2}));plq.position.set(npx,2.2,npz);plq.rotation.y=yaw;g.add(plq);
+  const np=new THREE.Mesh(new THREE.PlaneGeometry(0.95,0.6),std({map:numTex(plate),emissive:0xE3C05A,emissiveIntensity:.42,transparent:true}));np.position.set(side<0?npx+0.07:npx-0.07,2.2,npz);np.rotation.y=yaw;g.add(np);signMats.push(np.material);
   g.userData.info={kind:'biz',tier,name:data.name,status:data.status,cat:data.cat,who:data.who,addr:addrStr,shop:data.shop||'',ptier:data.tier,from:data.from,mo:data.mo,stripe:data.stripe};
   if(data.takeover){const bw=Math.min(w*0.94,9),bh=Math.min(h*0.62,15);makeAnimBillboard(g,face,yaw,h*0.5+1,bw,bh,data.ads||BROADWAY_ADS);g.userData.info.takeover=1;}
   else if((tier==='landmark'||tier==='fifth')&&data.br){
     const btex=markTex(data.br,data.name);const bmat=std({map:btex,emissiveMap:btex,emissive:0xffffff,emissiveIntensity:.7,transparent:true,side:THREE.DoubleSide});signMats.push(bmat);
     const bw=Math.min(w*0.64,6);const board=new THREE.Mesh(new THREE.PlaneGeometry(bw,bw),bmat);board.position.set(face,h+bw/2+1.2,0);board.rotation.y=yaw;g.add(board);}
+  if(screen&&!data.takeover){addWallScreen(g,face,yaw,Math.min(h-1.4,7.2),data.wallAds||((curCfg.spectaculars&&curCfg.spectaculars[0]&&curCfg.spectaculars[0].ads)||BROADWAY_ADS));}
   g.position.set(x,0,z);worldGroup.add(g);interact.push(g);return g;}
 
 function bgBuilding(x,z){const pal=pick(curPals);const w=rr(7,12),d=rr(7,10),h=rr(16,36);const tp=texPair(pal);
@@ -557,7 +568,7 @@ const STREETS=[
  {key:'madison', db:'First Class Row', name:'Madison Avenue', base:300, tier:'Main Strip',   from:'$49',  mo:'$89/mo',  stripe:'Main Strip',   build:'broadway',color:0x6a7aff, pals:BLUE_PALS,  dark:'#0e1430'},
  {key:'park',    db:'Takeoff Lane',    name:'Park Avenue',    base:400, tier:'Ground Level', from:'$19',  mo:'$39/mo',  stripe:'Ground Level', build:'canal',   color:0x3ac0d9, pals:BLUE_PALS,  dark:'#0a2028'},
  {key:'canal',   db:'The Hangar',      name:'Canal Street',   base:500, tier:'Ground Level', from:'$19',  mo:'$39/mo',  stripe:'Ground Level', build:'canal',   color:0x8a94a0, pals:BLACK_PALS, dark:'#1a1c20'},
- {key:'founders',db:'Founders Way',    name:'Founders Way',   base:600, tier:'Cornerstone',  from:'Free', mo:'free',    stripe:'',             build:'canal',   color:0xd24fb0, pals:PURPLE_PALS,dark:'#2a0e24', free:1}
+ {key:'founders',db:'Founders Way',    name:'Founders Way',   base:600, tier:'Cornerstone',  from:'Free', mo:'free',    stripe:'',             build:'canal',   color:0xE3242B, pals:STONE_PALS,  dark:'#2a0d0d', free:1}
 ];
 const MAIN=STREETS[0];
 function demoSpaces(){const out=[];STREETS.forEach(s=>{for(let n=100;n<=128;n+=2)['A','B'].forEach(u=>{const roll=(n+u.charCodeAt(0))%5;out.push({street:s.name,num:n,unit:u,status:roll===0?'open':(roll===1?'liftoff':'leased'),tenant_name:roll===0?null:'Studio '+n+u,shop_url:null});});});return out;}
@@ -586,8 +597,9 @@ function clearWorld(){disposeObj(worldGroup);scene.remove(worldGroup);worldGroup
   winMats.length=0;signMats.length=0;lampBulbs.length=0;lampLights.length=0;interact.length=0;anims.length=0;vehicles.length=0;peds.length=0;}
 function buildWorld(cfg){curCfg=cfg;curPals=cfg.pals;clearWorld();
   groundMat.map=roadTex(cfg.road[0],cfg.road[1],cfg.road[2]);groundMat.needsUpdate=true;
-  let z=-30,lno=1,rno=2;cfg.L.forEach((b,i)=>{const TL=TIER[b[0]];makeBiz(-TL.x,z,-1,b[0],b[1],lno);lno+=2;
-    if(cfg.R[i]){const TR=TIER[cfg.R[i][0]];makeBiz(TR.x,z,1,cfg.R[i][0],cfg.R[i][1],rno);rno+=2;}z+=13;});
+  const scrL=new Set([2,7,12]),scrR=new Set([4,10]); // 3-5 small ad screens spread down the block
+  let z=-30,lno=1,rno=2;cfg.L.forEach((b,i)=>{const TL=TIER[b[0]];makeBiz(-TL.x,z,-1,b[0],b[1],lno,scrL.has(i));lno+=2;
+    if(cfg.R[i]){const TR=TIER[cfg.R[i][0]];makeBiz(TR.x,z,1,cfg.R[i][0],cfg.R[i][1],rno,scrR.has(i));rno+=2;}z+=13;});
   for(let zz=-36;zz<162;zz+=rr(8,12)){bgBuilding(-26-rr(0,6),zz);bgBuilding(26+rr(0,6),zz);}
   for(let xx=-20;xx<=20;xx+=rr(7,11)) bgBuilding(xx,-70-rr(0,20));
   for(let zz=-30;zz<158;zz+=20){streetlight(-6.2,zz);streetlight(6.2,zz);}
@@ -597,12 +609,7 @@ function buildWorld(cfg){curCfg=cfg;curPals=cfg.pals;clearWorld();
     const curb=new THREE.Mesh(new THREE.BoxGeometry(0.28,SW_H+0.14,220),std({color:0x5c6268}));curb.position.set(s*(ROAD_HALF+0.14),(SW_H+0.14)/2,60);worldGroup.add(curb);});
   // painted zebra crosswalks down the length of the street
   for(let z=-16;z<150;z+=22)crosswalk(z);
-  // overhead gantry digital signs (readable head-on down the avenue)
-  const adReel=(cfg.spectaculars&&cfg.spectaculars[0]&&cfg.spectaculars[0].ads)||BROADWAY_ADS;
-  (cfg.spectaculars||[]).forEach(s=>makeGantry(s.z,s.w,s.h,s.ads));
-  // traffic: taxis (animated rooftop ads) + cars (painted side ads); two lanes, spaced out
-  const traffic=[{x:2.3,dir:1,taxi:1,speed:9},{x:-2.3,dir:-1,taxi:1,speed:10},{x:2.3,dir:1,color:0x8a2f2f,speed:7},{x:-2.3,dir:-1,color:0x2a3a6a,speed:11},{x:2.3,dir:1,color:0x2f6a4a,speed:8},{x:-2.3,dir:-1,color:0x7a5a2a,speed:9},{x:2.3,dir:1,taxi:1,speed:8}];
-  let vz=-40;traffic.forEach(t=>{makeVehicle(Object.assign({z:vz,ads:adReel},t));vz+=28;});
+  // (the big overhead street screen + street traffic were removed — the Marquee at the end of the street is the focus; smaller ad screens now live on the buildings)
   (cfg.entrances||[]).forEach(e=>makeEntrance(e));
   makeEndmark(cfg);
   player.position.set(cfg.start.x,Math.abs(cfg.start.x)>=ROAD_HALF?SW_H:0,cfg.start.z);camYaw=Math.PI;lookTilt=0;
@@ -743,6 +750,7 @@ function leaseLink(k){const s=(window.SQUARE_CONFIG&&window.SQUARE_CONFIG.stripe
 function openCard(info){let html='';
   if(info.kind==='entrance'){const hex='#'+info.color.toString(16).padStart(6,'0');const back=/^Back/.test(info.cat||'');
     html='<button class="cclose">✕</button><div class="cbadge" style="color:'+hex+'">🚇 '+info.line+' Line</div><h3>'+(back?info.cat:'Ride to '+info.line)+'</h3><div class="cwho">'+(back?'':info.cat)+'</div><p>'+(back?'Head back to the main strip where every line connects.':'Ride the '+info.line+' line to that street and explore its addresses.')+'</p><div class="cact"><a class="go" id="rideBtn">'+(back?'Ride back ↥':'Ride the line ↧')+'</a></div>';}
+  else if(info.screen){html='<button class="cclose">✕</button><div class="cbadge">▦ Digital ad screen</div><h3>'+info.name+'</h3><div class="cwho">'+info.ptier+' · from '+info.from+', then '+info.mo+'</div><p>A wall-mounted screen on a storefront — rent it to run your ad on a loop right where people are walking. A lighter way onto the Square than a full storefront.</p><div class="cact"><a class="go" href="'+leaseLink(info.stripe)+'">Book this screen</a><a class="alt" href="pricing.html">See rates</a></div>';}
   else if(info.takeover){const marq=info.name==='THE MARQUEE';html='<button class="cclose">✕</button><div class="cbadge">★ '+(info.ptier||'The Tower')+'</div><h3>'+(marq?'The Marquee takeover':info.name)+'</h3><div class="cwho">'+(info.ptier||'The Tower')+' · '+(info.mo||'$499/mo')+' · '+(marq?'the screen the Square opens on':'the screen at the end of the street')+'</div><p>The most-seen surface in the district — one brand at a time, live on the whole building. The premium: you are buying the most visibility there is.</p><div class="cact"><a class="go" href="'+leaseLink(info.stripe)+'">Book the screen</a><a class="alt" href="pricing.html">See rates</a></div>';}
   else if(info.status==='open'){const free=info.from==='Free';html='<button class="cclose">✕</button><div class="cbadge">✦ For lease · '+(info.ptier||'')+'</div><h3>'+info.addr+'</h3><div class="cwho">'+(free?'Free for young founders':(info.ptier+' — from '+info.from+', then '+info.mo))+'</div><p>'+(free?'A free Founders Way storefront for a young founder — get on the map and point it at your shop.':'Lease this address and link it straight to your own shop.')+'</p><div class="cact"><a class="go" href="'+leaseLink(info.stripe)+'">'+(free?'Claim it free':'Lease this spot')+'</a><a class="alt" href="pricing.html">See pricing</a></div>';}
   else{const badge=info.status==='cornerstone'?'★ Founder · free':(info.who==='Liftoff ✈'?'✈ Liftoff':'✦ Leased');const shop=(info.shop&&info.shop.length)?info.shop:'directory.html';html='<button class="cclose">✕</button><div class="cbadge">'+badge+' · '+(info.ptier||'')+'</div><h3>'+info.name+'</h3><div class="cwho">'+info.addr+'</div><p>'+(info.status==='cornerstone'?"A young founder's storefront on Founders Way (free) — it links out to their own shop.":"A leased storefront — it links straight to the business's own shop.")+'</p><div class="cact"><a class="go" href="'+shop+'"'+(info.shop?' target="_blank" rel="noopener"':'')+'>Visit the shop ↗</a><a class="alt" href="directory.html">Directory</a></div>';}
@@ -751,7 +759,7 @@ function openCard(info){let html='';
 
 // ---- city map ----
 function buildMap(){const stage=document.getElementById('mapStage');
-  const C={broadway:'#E3C05A',fifth:'#5fae4a',madison:'#6a7aff',park:'#3ac0d9',canal:'#8a94a0',founders:'#d24fb0'};
+  const C={broadway:'#E3C05A',fifth:'#5fae4a',madison:'#6a7aff',park:'#3ac0d9',canal:'#8a94a0',founders:'#E3242B'};
   // hand-laid octolinear transit map — verticals, horizontals, a diagonal, crossing at interchanges
   const LINES=[
    {k:'broadway',pts:'20,100 300,100',term:[168,100],name:'BROADWAY',sub:'MAIN · MARQUEE',ldy:-15,anc:'middle',big:1},
