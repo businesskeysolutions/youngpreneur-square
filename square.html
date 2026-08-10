@@ -276,6 +276,13 @@ function makeGantry(z,w,h,ads){const g=new THREE.Group();
   makeAnimBillboard(g,0,Math.PI,10.4,w,h,ads);   // faces -z, toward oncoming pedestrians
   g.position.set(0,0,z);worldGroup.add(g);return g;}
 
+// classic theatre-marquee nameplate texture (gold border + bulb rows + serif name)
+function marqueeTex(name){const c=document.createElement('canvas');c.width=1024;c.height=248;const x=c.getContext('2d');
+  x.fillStyle='#15100a';rRect(x,0,0,1024,248,8);x.fill();
+  x.strokeStyle='#E3C05A';x.lineWidth=9;rRect(x,12,12,1000,224,10);x.stroke();
+  x.fillStyle='#ffe6a0';for(let i=0;i<27;i++){const bx=28+i*36.5;x.beginPath();x.arc(bx,28,6.5,0,7);x.fill();x.beginPath();x.arc(bx,220,6.5,0,7);x.fill();}
+  const fs=name.length>11?86:110;x.fillStyle='#F4E3A6';x.font='800 '+fs+'px Georgia';x.textAlign='center';x.textBaseline='middle';x.fillText(name,512,128);
+  return new THREE.CanvasTexture(c);}
 // standalone landmark screen building at the END of the street — the centrepiece (Broadway = the Marquee); road forks around it
 function makeEndmark(cfg){const lm=cfg.landmark;if(!lm)return;const zEnd=168,w=13,d=9,h=32;const g=new THREE.Group();
   const tp=texPair(LAND_PAL);const mat=std({map:tp.map,emissiveMap:tp.emis,emissive:0xffcf7a,emissiveIntensity:S[mode].emis,roughness:.85});winMats.push(mat);
@@ -284,7 +291,11 @@ function makeEndmark(cfg){const lm=cfg.landmark;if(!lm)return;const zEnd=168,w=1
   const spire=new THREE.Mesh(new THREE.CylinderGeometry(.14,.34,9,8),std({color:0xE3C05A,emissive:0xE3C05A,emissiveIntensity:.6}));spire.position.y=h+4.9;g.add(spire);
   const tip=new THREE.Mesh(new THREE.SphereGeometry(.38,10,10),std({color:0xff5a4a,emissive:0xff3a2a,emissiveIntensity:1}));tip.position.y=h+9.5;g.add(tip);lampBulbs.push(tip);
   const base=new THREE.Mesh(new THREE.BoxGeometry(w+9,1,d+7),std({color:0x14120e,roughness:.9}));base.position.set(0,.5,0);g.add(base);
-  const scr=new THREE.Group();scr.position.set(0,0,-d/2-0.12);makeAnimBillboard(scr,0,Math.PI,h*0.5,w*0.86,h*0.5,lm.ads);g.add(scr);
+  const scr=new THREE.Group();scr.position.set(0,0,-d/2-0.12);makeAnimBillboard(scr,0,Math.PI,h*0.5+2.4,w*0.86,h*0.42,lm.ads);g.add(scr);
+  // lit marquee nameplate across the front, below the screen (Broadway reads "THE MARQUEE")
+  const mt=marqueeTex(lm.name);const mmat=std({map:mt,emissiveMap:mt,emissive:0xffffff,emissiveIntensity:.95,transparent:true,side:THREE.DoubleSide});signMats.push(mmat);
+  const mlbl=new THREE.Mesh(new THREE.PlaneGeometry(w*0.96,w*0.96*0.242),mmat);mlbl.position.set(0,6.3,-d/2-0.18);mlbl.rotation.y=Math.PI;g.add(mlbl);
+  [-1,1].forEach(sx=>{const gl=new THREE.PointLight(0xE3C05A,.8,14,2);gl.position.set(sx*3.4,6.3,-d/2-1.2);g.add(gl);lampLights.push(gl);});
   g.position.set(0,0,zEnd);
   g.userData.info={kind:'biz',takeover:1,name:lm.name,addr:lm.name,status:'landmark',tier:'fifth',ptier:lm.tier,from:lm.from,mo:lm.mo,stripe:lm.stripe,who:lm.tier};
   worldGroup.add(g);interact.push(g);
@@ -369,9 +380,9 @@ function makeBiz(x,z,side,tier,data,addr,screen){
   const aw=new THREE.Mesh(new THREE.BoxGeometry(.5,.5,d*.84),std({color:data.br?data.br.accent:(data.awn||0xc0432f),roughness:.6}));aw.position.set(side<0?w/2+.25:-w/2-.25,2.35,0);g.add(aw);
   // building-number plaque — a small mounted plate by the door, separate from the business sign above it
   const addrStr=data.addr||(addr+' '+curCfg.street);const plate=data.plate||addr;
-  const npx=side<0?w/2+0.05:-w/2-0.05, npz=d*0.32;
-  const plq=new THREE.Mesh(new THREE.BoxGeometry(1.16,0.8,0.12),std({color:0x14100c,roughness:.7,metalness:.2}));plq.position.set(npx,2.2,npz);plq.rotation.y=yaw;g.add(plq);
-  const np=new THREE.Mesh(new THREE.PlaneGeometry(0.95,0.6),std({map:numTex(plate),emissive:0xE3C05A,emissiveIntensity:.42,transparent:true}));np.position.set(side<0?npx+0.07:npx-0.07,2.2,npz);np.rotation.y=yaw;g.add(np);signMats.push(np.material);
+  const npx=side<0?w/2+0.06:-w/2-0.06, npz=d*0.30, npy=2.8;
+  const plq=new THREE.Mesh(new THREE.BoxGeometry(1.42,0.98,0.14),std({color:0x14100c,roughness:.6,metalness:.25}));plq.position.set(npx,npy,npz);plq.rotation.y=yaw;g.add(plq);
+  const np=new THREE.Mesh(new THREE.PlaneGeometry(1.16,0.72),std({map:numTex(plate),emissive:0xE3C05A,emissiveIntensity:.6,transparent:true}));np.position.set(side<0?npx+0.08:npx-0.08,npy,npz);np.rotation.y=yaw;g.add(np);signMats.push(np.material);
   g.userData.info={kind:'biz',tier,name:data.name,status:data.status,cat:data.cat,who:data.who,addr:addrStr,shop:data.shop||'',ptier:data.tier,from:data.from,mo:data.mo,stripe:data.stripe};
   if(data.takeover){const bw=Math.min(w*0.94,9),bh=Math.min(h*0.62,15);makeAnimBillboard(g,face,yaw,h*0.5+1,bw,bh,data.ads||BROADWAY_ADS);g.userData.info.takeover=1;}
   else if((tier==='landmark'||tier==='fifth')&&data.br){
