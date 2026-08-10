@@ -493,6 +493,39 @@ const DISTRICTS=[
  {key:'orange',name:'Youth & Education',cat:'Orange line',color:'#e08a2f',x:22,y:78,built:1},
  {key:'black',name:'Luxury Row',cat:'Black line',color:'#c9b06a',x:16,y:34,built:1}];
 
+// --- districts are named places, not business categories: rename the themed ones ---
+const _RENAME={gold:'Midtown',blue:'The Docks',orange:'Highland',purple:'Marquee Row',green:'The Grove',black:'Platinum'};
+Object.entries(_RENAME).forEach(([k,nm])=>{const w=WORLDS[k];if(w){w.name=nm;w.line=nm;w.tag='The '+nm+' district';w.street=nm.toUpperCase();}const d=DISTRICTS.find(x=>x.key===k);if(d){d.name=nm.toUpperCase();d.cat='';}});
+WORLDS.broadway.entrances.forEach(e=>{if(_RENAME[e.to]){e.line=_RENAME[e.to];e.cat=_RENAME[e.to];}});
+
+// --- generate more districts so the city matches the directory (15 districts × 12 = 180 addresses) ---
+const NEIGH=['NORTHSTAR','EVERGREEN','ATLAS','LUMEN','IRONWOOD','CEDAR','ALCOVE','PENNY LANE','THE STANDARD','MAPLE','ODE & CO','VESPER','CANDID','RELM','SUNDRY','HARBOR CO','KETTLE','THE LOOM','PORTER','GRANITE','WILLOW','ASH & CO','THE DEPOT','MARLOW','FABLE','QUAY','EMBER','ROSEWOOD','BRICK & CO','HOLLOW','NIMBUS','ORCHARD','THE POST','LARK','SABLE','MERIT'];
+let _nc=0;
+function initials(nm){return nm.replace(/&/g,'').split(/\s+/).filter(Boolean).map(w=>w[0]).join('').slice(0,2).toUpperCase();}
+function genDistrict(key,name,colorHex,pals,dark){
+  const accent='#'+colorHex.toString(16).padStart(6,'0');const U=name.toUpperCase();
+  const ads=[{brand:U,line:'NOW OPEN · '+U+' LINE',a:dark,b:dark,fg:'#efe8d6',fg2:accent},{brand:'LEASE HERE',line:'ADDRESSES ON '+U,a:dark,b:dark,fg:'#efe8d6',fg2:accent}];
+  const mk=nm=>({mark:initials(nm),bg:dark,fg:'#efe8d6',accent:accent,tag:''});
+  const tiers=[['landmark','fifth','broadway','canal','fifth','broadway'],['fifth','broadway','canal','broadway','fifth','canal']];
+  const rows=tiers.map((row,side)=>row.map((tier,i)=>{
+    if(tier==='landmark'){const nm='THE '+U+' MARQUEE';return [tier,{name:nm,status:'landmark',cat:'The landmark',who:'District takeover',takeover:1,ads:ads,br:mk(nm)}];}
+    const open=(tier==='canal');const corner=(side===0&&i===2)||(side===1&&i===3);const nm=NEIGH[(_nc++)%NEIGH.length];
+    return [tier,{name:open?'FOR LEASE':nm,status:open?'open':(corner?'cornerstone':'leased'),cat:'',who:corner?'Founder, age '+(12+i):'Leased',br:open?null:mk(nm)}];
+  }));
+  return {key,name,street:U,tag:'The '+name+' district',line:name,lineColor:colorHex,pals,road:['#1e2228','#141820','#2a3038'],start:{x:0,z:-22},L:rows[0],R:rows[1],spectaculars:[{x:8,z:2,yaw:0,w:6.5,h:4.4,ads:ads}],entrances:[{x:6.5,z:-16,line:'Broadway',color:0xE3C05A,cat:'Back to Broadway',tier:'premium',to:'broadway'}]};}
+const _NEWD=[
+ {key:'harbor',name:'Harbor',color:0x2fb0a0,pals:GREEN_PALS,dark:'#0e2422'},
+ {key:'heights',name:'The Heights',color:0x6a7aff,pals:BLUE_PALS,dark:'#0e1430'},
+ {key:'oldtown',name:'Old Town',color:0xb07a3a,pals:GOLD_PALS,dark:'#241a0e'},
+ {key:'riverside',name:'Riverside',color:0x3ac0d9,pals:BLUE_PALS,dark:'#0a2028'},
+ {key:'ironworks',name:'Ironworks',color:0x8a94a0,pals:BLACK_PALS,dark:'#1a1c20'},
+ {key:'sunset',name:'Sunset',color:0xe0704a,pals:ORANGE_PALS,dark:'#2a1410'},
+ {key:'parkside',name:'Parkside',color:0x5fae4a,pals:GREEN_PALS,dark:'#12240e'},
+ {key:'uptown',name:'Uptown',color:0xd24fb0,pals:PURPLE_PALS,dark:'#2a0e24'}];
+_NEWD.forEach(d=>{WORLDS[d.key]=genDistrict(d.key,d.name,d.color,d.pals,d.dark);DISTRICTS.push({key:d.key,name:d.name.toUpperCase(),cat:'',color:'#'+d.color.toString(16).padStart(6,'0'),built:1});});
+// even ring layout for all district nodes on the map
+const _nh=DISTRICTS.filter(d=>!d.hub);_nh.forEach((d,i)=>{const a=-Math.PI/2+i*(2*Math.PI/_nh.length);d.x=50+Math.cos(a)*37;d.y=50+Math.sin(a)*31;});
+
 let curCfg=WORLDS.broadway;
 function disposeObj(o){o.traverse(n=>{if(n.geometry)n.geometry.dispose();if(n.material){(Array.isArray(n.material)?n.material:[n.material]).forEach(m=>{if(m.map)m.map.dispose();if(m.emissiveMap)m.emissiveMap.dispose();m.dispose();});}});}
 function clearWorld(){disposeObj(worldGroup);scene.remove(worldGroup);worldGroup=new THREE.Group();scene.add(worldGroup);
