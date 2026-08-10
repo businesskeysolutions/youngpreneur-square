@@ -340,6 +340,13 @@ function makePed(x,z,dir,speed,col){const g=new THREE.Group();
   g.traverse(o=>{if(o.isMesh)o.castShadow=true;});g.rotation.y=dir>0?0:Math.PI;g.position.set(x,SW_H,z);worldGroup.add(g);
   peds.push({g,dir,speed,phase:Math.random()*6.28});return g;}
 
+// flat rooftop nameplate — laid on the roof so the business reads from the Overview (and is clickable from above)
+function roofSignTex(name,open,accent){const c=document.createElement('canvas');c.width=512;c.height=208;const x=c.getContext('2d');
+  x.fillStyle=open?'#0f1712':'#0d1015';rRect(x,6,6,500,196,18);x.fill();
+  x.strokeStyle=open?'#8a94a0':(accent||'#E3C05A');x.lineWidth=9;rRect(x,6,6,500,196,18);x.stroke();
+  const nm=(name||'').slice(0,20),fs=nm.length>13?54:70;
+  x.fillStyle=open?'#cfd8dd':'#F5F1E6';x.font='800 '+fs+'px "Work Sans",Arial';x.textAlign='center';x.textBaseline='middle';x.fillText(nm,256,108);
+  return new THREE.CanvasTexture(c);}
 function roofDetails(g,w,d,h,tier,pal,mat){
   const corn=new THREE.Mesh(new THREE.BoxGeometry(w+.5,.7,d+.5),std({color:pal.trim,roughness:.7}));corn.position.y=h+.35;g.add(corn);
   let topY=h+.7;
@@ -372,6 +379,10 @@ function makeBiz(x,z,side,tier,data,addr,screen){
   winMats.push(mat);
   const body=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);body.position.y=h/2;body.castShadow=true;body.receiveShadow=true;g.add(body);
   roofDetails(g,w,d,h,tier,pal,mat);
+  // rooftop nameplate — glance the whole city (and click a shop) from the Overview
+  {const open=data.status==='open';const rtex=roofSignTex(open?'FOR LEASE':data.name, open, data.br?data.br.accent:'#E3C05A');
+   const rmat=std({map:rtex,emissiveMap:rtex,emissive:0xffffff,emissiveIntensity:.6,transparent:true,side:THREE.DoubleSide});signMats.push(rmat);
+   const rsign=new THREE.Mesh(new THREE.PlaneGeometry(w*0.9,Math.min(d*0.8,w*0.9*0.4)),rmat);rsign.rotation.x=-Math.PI/2;rsign.rotation.z=Math.PI;rsign.position.set(0,h+0.62,0);g.add(rsign);}
   const base=new THREE.Mesh(new THREE.BoxGeometry(w+.3,2.6,d+.3),std({color:0x14100c,roughness:.85}));base.position.y=1.3;base.castShadow=true;g.add(base);
   const face= side<0? w/2+0.06 : -w/2-0.06;const yaw= side<0? Math.PI/2 : -Math.PI/2;
   const stex = data.br ? brandSign(data.name,data.br) : signTex(data.name,data.status==='open'?'#161b16':'#0c120e',SIGNC[tier]);
@@ -380,9 +391,10 @@ function makeBiz(x,z,side,tier,data,addr,screen){
   const aw=new THREE.Mesh(new THREE.BoxGeometry(.5,.5,d*.84),std({color:data.br?data.br.accent:(data.awn||0xc0432f),roughness:.6}));aw.position.set(side<0?w/2+.25:-w/2-.25,2.35,0);g.add(aw);
   // building-number plaque — a small mounted plate by the door, separate from the business sign above it
   const addrStr=data.addr||(addr+' '+curCfg.street);const plate=data.plate||addr;
-  const npx=side<0?w/2+0.06:-w/2-0.06, npz=d*0.30, npy=2.8;
-  const plq=new THREE.Mesh(new THREE.BoxGeometry(1.42,0.98,0.14),std({color:0x14100c,roughness:.6,metalness:.25}));plq.position.set(npx,npy,npz);plq.rotation.y=yaw;g.add(plq);
-  const np=new THREE.Mesh(new THREE.PlaneGeometry(1.16,0.72),std({map:numTex(plate),emissive:0xE3C05A,emissiveIntensity:.6,transparent:true}));np.position.set(side<0?npx+0.08:npx-0.08,npy,npz);np.rotation.y=yaw;g.add(np);signMats.push(np.material);
+  const signH = data.br ? w*0.23 : w*0.22;
+  const npy = 3.6 + signH/2 + 0.74;   // sits directly ABOVE the business sign, centered on the facade
+  const plq=new THREE.Mesh(new THREE.BoxGeometry(1.5,0.92,0.14),std({color:0x14100c,roughness:.6,metalness:.25}));plq.position.set(face,npy,0);plq.rotation.y=yaw;g.add(plq);
+  const np=new THREE.Mesh(new THREE.PlaneGeometry(1.24,0.68),std({map:numTex(plate),emissive:0xE3C05A,emissiveIntensity:.6,transparent:true}));np.position.set(side<0?face+0.08:face-0.08,npy,0);np.rotation.y=yaw;g.add(np);signMats.push(np.material);
   g.userData.info={kind:'biz',tier,name:data.name,status:data.status,cat:data.cat,who:data.who,addr:addrStr,shop:data.shop||'',ptier:data.tier,from:data.from,mo:data.mo,stripe:data.stripe};
   if(data.takeover){const bw=Math.min(w*0.94,9),bh=Math.min(h*0.62,15);makeAnimBillboard(g,face,yaw,h*0.5+1,bw,bh,data.ads||BROADWAY_ADS);g.userData.info.takeover=1;}
   else if((tier==='landmark'||tier==='fifth')&&data.br){
@@ -691,7 +703,8 @@ addEventListener('resize',fitH);addEventListener('orientationchange',fitH);fitH(
 // ---- camera (yaw + tilt up) ----
 let camYaw=Math.PI,camDist=13,camH=8.2,lookTilt=0,overview=false;
 function updateCam(){const p=player.position;
-  if(overview){camera.position.set(30,56,clamp(p.z,-30,55)+40);camera.lookAt(0,4,clamp(p.z,-30,55)-8);return;}
+  if(overview){const ovc=clamp(p.z,-10,140);const a=-camYaw+performance.now()/1000*0.10;const R=78;
+    camera.position.set(Math.sin(a)*R,86,ovc+Math.cos(a)*R);camera.lookAt(0,7,ovc);return;}
   const camY=Math.max(2.2,p.y+camH-lookTilt*4);
   let cx=p.x+Math.sin(camYaw)*camDist,cz=p.z+Math.cos(camYaw)*camDist;
   cx=clamp(cx,-13,13);cz=clamp(cz,-31,164);
