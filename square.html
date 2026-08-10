@@ -750,20 +750,34 @@ function openCard(info){let html='';
   const rb=document.getElementById('rideBtn');if(rb)rb.onclick=()=>travelTo(info.to,info.line,info.color);}
 
 // ---- city map ----
-function buildMap(){const stage=document.getElementById('mapStage');const hub=DISTRICTS.find(d=>d.hub);
-  let svg='<svg viewBox="0 0 100 100" preserveAspectRatio="none" style="overflow:visible">';
-  // thick colored transit lines (pixel-consistent width) + a white casing under each
-  DISTRICTS.filter(d=>!d.hub).forEach(d=>{const L='x1="'+hub.x+'" y1="'+hub.y+'" x2="'+d.x+'" y2="'+d.y+'"';
-    svg+='<line '+L+' stroke="#0a0f18" stroke-width="10" stroke-linecap="round" vector-effect="non-scaling-stroke"/>';
-    svg+='<line '+L+' stroke="'+d.color+'" stroke-width="6" stroke-linecap="round" vector-effect="non-scaling-stroke" opacity="'+(d.built?1:0.4)+'" '+(d.built?'':'stroke-dasharray="5 6"')+'/>';});
-  svg+='</svg>';
-  // intermediate station stops along each built line
-  let dots='';DISTRICTS.filter(d=>!d.hub&&d.built).forEach(d=>{[0.36,0.68].forEach(f=>{const mx=hub.x+(d.x-hub.x)*f,my=hub.y+(d.y-hub.y)*f;dots+='<div class="sdot" style="left:'+mx+'%;top:'+my+'%"></div>';});});
-  let nodes='';DISTRICTS.forEach(d=>{nodes+='<div class="node '+(d.hub?'hub ':'')+(d.built?'live':'')+'" data-k="'+d.key+'" data-n="'+d.name+'" style="left:'+d.x+'%;top:'+d.y+'%;color:'+d.color+'"><div class="dot" style="background:'+d.color+'"></div><div class="lbl">'+d.name+'</div><div class="cat">'+(d.cat||'')+'</div></div>';});
-  let leg='<div class="legend">';DISTRICTS.filter(d=>!d.hub).forEach(d=>{leg+='<span><i style="background:'+d.color+'"></i>'+d.name+'</span>';});leg+='</div>';
-  stage.innerHTML=svg+dots+nodes+leg;
-  stage.querySelectorAll('.node').forEach(n=>n.onclick=()=>{const k=n.dataset.k;document.getElementById('map').classList.remove('on');
-    if(k===curCfg.key){toast('You’re already here');return;}travelTo(k,n.dataset.n);});}
+function buildMap(){const stage=document.getElementById('mapStage');
+  const C={broadway:'#E3C05A',fifth:'#5fae4a',madison:'#6a7aff',park:'#3ac0d9',canal:'#8a94a0',founders:'#d24fb0'};
+  // hand-laid octolinear transit map — verticals, horizontals, a diagonal, crossing at interchanges
+  const LINES=[
+   {k:'broadway',pts:'20,100 300,100',term:[168,100],name:'BROADWAY',sub:'MAIN · MARQUEE',ldy:-15,anc:'middle',big:1},
+   {k:'fifth',   pts:'112,22 112,178',term:[112,22],name:'FIFTH AVE',sub:'Growth',ldy:16,anc:'middle'},
+   {k:'madison', pts:'34,40 76,82 208,82 208,152',term:[208,152],name:'MADISON AVE',sub:'Main Strip',ldy:17,anc:'middle'},
+   {k:'park',    pts:'256,34 256,166',term:[256,34],name:'PARK AVE',sub:'Ground',ldy:16,anc:'middle'},
+   {k:'canal',   pts:'46,146 292,146',term:[46,146],name:'CANAL ST',sub:'Ground',ldy:-12,anc:'start'},
+   {k:'founders',pts:'168,100 118,150 118,182',term:[118,182],name:'FOUNDERS WAY',sub:'Free',ldy:-12,anc:'middle'}
+  ];
+  let s='<svg viewBox="0 0 320 200" preserveAspectRatio="xMidYMid meet" style="width:100%;height:100%;overflow:visible">';
+  LINES.forEach(l=>{s+='<polyline points="'+l.pts+'" fill="none" stroke="#070b12" stroke-width="11" stroke-linejoin="round" stroke-linecap="round"/>';});
+  LINES.forEach(l=>{s+='<polyline points="'+l.pts+'" fill="none" stroke="'+C[l.k]+'" stroke-width="6.5" stroke-linejoin="round" stroke-linecap="round"/>';});
+  // interchange stops where lines cross the Broadway spine (y=100) and Canal (y=146)
+  [[112,100],[208,100],[256,100],[118,132]].forEach(p=>{s+='<circle cx="'+p[0]+'" cy="'+p[1]+'" r="4.6" fill="#0b1220" stroke="#fff" stroke-width="2.6"/>';});
+  [[112,146],[208,146],[256,146]].forEach(p=>{s+='<circle cx="'+p[0]+'" cy="'+p[1]+'" r="3.6" fill="#0b1220" stroke="#fff" stroke-width="2"/>';});
+  // clickable terminus stations + labels
+  LINES.forEach(l=>{const x=l.term[0],y=l.term[1];
+    s+='<g class="mapstn" data-k="'+l.k+'" style="cursor:pointer">';
+    s+='<circle cx="'+x+'" cy="'+y+'" r="'+(l.big?9:7)+'" fill="'+C[l.k]+'" stroke="#fff" stroke-width="'+(l.big?3:2.6)+'"/>';
+    s+='<text x="'+x+'" y="'+(y+l.ldy)+'" fill="#fff" font-size="'+(l.big?11:9.6)+'" font-weight="800" text-anchor="'+l.anc+'" font-family="Work Sans,Arial">'+l.name+'</text>';
+    s+='<text x="'+x+'" y="'+(y+l.ldy+10)+'" fill="#93a0b0" font-size="7.6" text-anchor="'+l.anc+'" font-family="Work Sans,Arial">'+l.sub+'</text>';
+    s+='</g>';});
+  s+='</svg>';
+  stage.innerHTML=s;
+  stage.querySelectorAll('.mapstn').forEach(n=>n.addEventListener('click',()=>{const k=n.dataset.k;document.getElementById('map').classList.remove('on');
+    if(k===curCfg.key){toast('You’re already here');return;}travelTo(k);}));}
 document.getElementById('mapbtn').onclick=()=>{buildMap();document.getElementById('map').classList.add('on');};
 document.getElementById('mapx').onclick=()=>document.getElementById('map').classList.remove('on');
 
