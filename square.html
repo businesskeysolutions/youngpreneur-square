@@ -932,6 +932,18 @@ function tick(now){const dt=Math.min(.05,(now-last)/1000);last=now;
 function resize(){camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);}
 addEventListener('resize',resize);resize();
 
+// ---------- CONTENT FILTER (usernames): normalize then blocklist ----------
+const BAD_WORDS=['fuck','fvck','phuck','fuk','shit','bitch','biatch','bastard','asshole','azzhole','dick','piss','pussy','cunt','whore','slut','wank','jackass','dumbass',
+'sex','porn','penis','vagina','boob','tits','titties','titty','nipple','orgasm','semen','ejaculat','masturbat','blowjob','handjob','boner','horny','milf','dildo','fetish','xxx','nsfw','onlyfans','stripper','cumshot',
+'molest','pedo','pedophile','incest','beastiality','bestiality','hentai',
+'nigger','nigga','faggot','retard','spic','chink','kike','tranny','dyke','coon','wetback','nazi','hitler','kkk'];
+const BOUNDARY_WORDS=['rape','rapist','anal','anus','cum','cock','fag','tit']; // FP-prone-but-important: match only as a standalone token
+function leetLower(s){s=(''+(s||'')).toLowerCase();const L={'0':'o','1':'i','2':'z','3':'e','4':'a','5':'s','6':'g','7':'t','8':'b','9':'g','@':'a','$':'s','!':'i','|':'i','+':'t','(':'c'};
+  return s.replace(/[0-9@$!|+(]/g,c=>L[c]||c);}
+function normText(s){return leetLower(s).replace(/[^a-z]/g,'');}
+function boundaryBad(s){const t=leetLower(s);for(let i=0;i<BOUNDARY_WORDS.length;i++){if(new RegExp('(^|[^a-z])'+BOUNDARY_WORDS[i]+'([^a-z]|$)').test(t))return true;}return false;}
+function contentOk(s){if(boundaryBad(s))return false;const base=normText(s);if(!base)return true;const col=base.replace(/(.)\1+/g,'$1');
+  for(let i=0;i<BAD_WORDS.length;i++){if(base.indexOf(BAD_WORDS[i])>=0||col.indexOf(BAD_WORDS[i])>=0)return false;}return true;}
 // ---------- COIN WALLET (device-saved; daily caps; optional account to save across devices) ----------
 const DAILY_CAP=300, VISIT_BONUS=50, MAX_VISITS_PER_DAY=3;
 let sb=null, session=null, pendingDelta=0, saveTimer=null, authMode='signup';
@@ -995,6 +1007,7 @@ async function doAuth(){const el=id=>document.getElementById(id);
   if(!/.+@.+\..+/.test(email)){el('wMsg').textContent='Enter a valid email.';return;}
   if(pass.length<8){el('wMsg').textContent='Password needs at least 8 characters.';return;}
   if(authMode==='signup'&&!user){el('wMsg').textContent='Pick a username.';return;}
+  if(authMode==='signup'&&!contentOk(user)){el('wMsg').textContent='Please choose a different username — that one isn’t allowed.';return;}
   const btn=el('wCreate');btn.disabled=true;el('wMsg').textContent=authMode==='login'?'Logging in...':'Creating your account...';
   try{let r;
     if(authMode==='login')r=await sb.auth.signInWithPassword({email:email,password:pass});

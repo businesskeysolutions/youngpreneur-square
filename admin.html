@@ -103,6 +103,19 @@
   const show=(id,on)=>el(id).classList.toggle('hidden',!on);
   let ALL=[];
 
+  // content filter (same logic as the Square sign-up): normalize then blocklist
+  const BAD_WORDS=['fuck','fvck','phuck','fuk','shit','bitch','biatch','bastard','asshole','azzhole','dick','piss','pussy','cunt','whore','slut','wank','jackass','dumbass',
+  'sex','porn','penis','vagina','boob','tits','titties','titty','nipple','orgasm','semen','ejaculat','masturbat','blowjob','handjob','boner','horny','milf','dildo','fetish','xxx','nsfw','onlyfans','stripper','cumshot',
+  'molest','pedo','pedophile','incest','beastiality','bestiality','hentai',
+  'nigger','nigga','faggot','retard','spic','chink','kike','tranny','dyke','coon','wetback','nazi','hitler','kkk'];
+  const BOUNDARY_WORDS=['rape','rapist','anal','anus','cum','cock','fag','tit'];
+  function leetLower(s){s=(''+(s||'')).toLowerCase();const L={'0':'o','1':'i','2':'z','3':'e','4':'a','5':'s','6':'g','7':'t','8':'b','9':'g','@':'a','$':'s','!':'i','|':'i','+':'t','(':'c'};
+    return s.replace(/[0-9@$!|+(]/g,c=>L[c]||c);}
+  function normText(s){return leetLower(s).replace(/[^a-z]/g,'');}
+  function boundaryBad(s){const t=leetLower(s);for(let i=0;i<BOUNDARY_WORDS.length;i++){if(new RegExp('(^|[^a-z])'+BOUNDARY_WORDS[i]+'([^a-z]|$)').test(t))return true;}return false;}
+  function contentOk(s){if(boundaryBad(s))return false;const base=normText(s);if(!base)return true;const col=base.replace(/(.)\1+/g,'$1');
+    for(let i=0;i<BAD_WORDS.length;i++){if(base.indexOf(BAD_WORDS[i])>=0||col.indexOf(BAD_WORDS[i])>=0)return false;}return true;}
+
   async function boot(){
     if(!sb){el('loginMsg').textContent='Supabase is not configured on this page.';return;}
     const {data}=await sb.auth.getSession();
@@ -160,7 +173,7 @@
       const link=s.shop_url?('<a class="lnk" href="'+esc(s.shop_url)+'" target="_blank" rel="noopener noreferrer">'+esc(s.shop_url)+' ↗</a>'):'<span class="muted">—</span>';
       tr.innerHTML=
         '<td class="addr">'+s.num+' '+esc(s.street)+'</td>'+
-        '<td>'+(occupied(s)?('<b>'+esc(s.tenant_name||'(no name)')+'</b><div class="muted">'+esc(s.category||'')+'</div>'):'<span class="muted">For lease</span>')+
+        '<td>'+(occupied(s)?('<b>'+esc(s.tenant_name||'(no name)')+'</b>'+((!contentOk(s.tenant_name)||!contentOk(s.category))?' <span class="st rejected">⚠ flagged</span>':'')+'<div class="muted">'+esc(s.category||'')+'</div>'):'<span class="muted">For lease</span>')+
           '<div class="edit" id="ed_'+s.id+'"><input id="tn_'+s.id+'" placeholder="Business name" value="'+esc(s.tenant_name||'')+'"><input id="ct_'+s.id+'" placeholder="Category" value="'+esc(s.category||'')+'"><input id="su_'+s.id+'" placeholder="Shop link (https://...)" value="'+esc(s.shop_url||'')+'"><button class="btn mini" data-save="'+s.id+'">Save edits</button></div></td>'+
         '<td><span class="st '+(occupied(s)?'approved':'')+'">'+esc(s.status||'open')+'</span></td>'+
         '<td><span class="st '+rs+'">'+rs+'</span></td>'+
@@ -178,6 +191,7 @@
   }
   async function moderate(id,act){
     const map={approve:'approved',reject:'rejected',hide:'pending'};
+    if(act==='approve'){const s=ALL.find(x=>x.id===id);if(s&&(!contentOk(s.tenant_name)||!contentOk(s.category))){if(!confirm('This business name or category is flagged by the word filter. Approve it anyway?'))return;}}
     const patch={review_status:map[act],reviewed_at:new Date().toISOString()};
     const r=await sb.from('spaces').update(patch).eq('id',id);
     if(r.error){alert('Could not save: '+r.error.message);return;}
@@ -185,6 +199,8 @@
   }
   async function saveEdit(id){
     const patch={tenant_name:el('tn_'+id).value.trim()||null,category:el('ct_'+id).value.trim()||null,shop_url:el('su_'+id).value.trim()||null};
+    if(patch.tenant_name&&!contentOk(patch.tenant_name)){alert('That business name contains a blocked word. Please edit it before saving.');return;}
+    if(patch.category&&!contentOk(patch.category)){alert('That category contains a blocked word.');return;}
     const r=await sb.from('spaces').update(patch).eq('id',id);
     if(r.error){alert('Could not save edits: '+r.error.message);return;}
     const s=ALL.find(x=>x.id===id);if(s)Object.assign(s,patch);render();
