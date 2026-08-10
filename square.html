@@ -137,7 +137,14 @@
   <div class="wbox">
     <button class="wx" id="wx">✕</button>
     <div class="wtop"><span class="ycoin big"></span><div><div class="wbal" id="wbal">0</div><small><span id="wcap">today's coins</span> · Y-coins</small></div></div>
-    <div id="wGuest">
+    <div id="wAge" class="off">
+      <h3>One quick question</h3>
+      <p>What year were you born? This keeps the Square safe for everyone.</p>
+      <select id="wYear"><option value="">Birth year</option></select>
+      <button class="wbtn full" id="wAgeGo">Continue</button>
+      <div class="wmsg" id="wAgeMsg"></div>
+    </div>
+    <div id="wGuest" class="off">
       <h3 id="wTitle">Save your progress</h3>
       <p id="wIntro">Make a free account to keep your coins across devices and enter for prizes. Your coins are already saved on this device.</p>
       <div class="wform">
@@ -148,13 +155,18 @@
       <button class="wbtn full" id="wCreate">Create account &amp; save</button>
       <div class="wmsg" id="wMsg"></div>
       <div class="wtoggle" id="wToggle">Have an account? <a id="wLoginLink">Log in</a></div>
-      <button class="wbtn ghost full off" id="wLeave">Leave without signing up</button>
-      <small class="wnote">Under 13? Ask a parent first. We use your email only to save your coins.</small>
+      <small class="wnote">We use your email only to save your coins.</small>
+    </div>
+    <div id="wUnder" class="off">
+      <h3>Keep playing as a guest!</h3>
+      <p>You need to be 13 or older to make an account. No problem — you can still explore the whole Square and collect coins, and they’re saved right here on this device. Ask a parent or guardian if you’d like help saving your progress.</p>
+      <button class="wbtn full" id="wUnderOk">Got it</button>
     </div>
     <div id="wUserPane" class="off">
       <p>Signed in as <b id="wWho"></b>. Your coins save automatically as you collect them.</p>
       <button class="wbtn ghost full" id="wOut">Sign out</button>
     </div>
+    <button class="wbtn ghost full off" id="wLeave" style="margin-top:8px">Leave without signing up</button>
   </div>
 </div>
 <div class="wmodal" id="repModal">
@@ -1009,9 +1021,13 @@ async function afterAuth(){await ensureProfile();const bal=await loadBalance();
   else if(W.coins>bal){try{await sb.rpc('add_coins',{delta:Math.min(W.coins-bal,500)});}catch(e){}}
   setCoinLabel();renderWallet();}
 function whoLabel(){const u=session&&session.user;if(!u)return 'Signed in';return (u.user_metadata&&u.user_metadata.username)||u.email||'Signed in';}
-function renderWallet(){const g=document.getElementById('wGuest'),u=document.getElementById('wUserPane');
-  if(session){g.classList.add('off');u.classList.remove('off');document.getElementById('wWho').textContent=whoLabel();}
-  else{u.classList.add('off');g.classList.remove('off');}}
+function ageState(){try{const v=localStorage.getItem('yps_age');return (v==='ok'||v==='under')?v:null;}catch(e){return null;}}
+function setAgeState(v){try{localStorage.setItem('yps_age',v);}catch(e){}}
+function renderWallet(){const panes=['wAge','wGuest','wUnder','wUserPane'];let showId;
+  if(session)showId='wUserPane';
+  else{const st=ageState();showId=(st==='ok')?'wGuest':((st==='under')?'wUnder':'wAge');}
+  panes.forEach(id=>{const e=document.getElementById(id);if(e)e.classList.toggle('off',id!==showId);});
+  if(session){const w=document.getElementById('wWho');if(w)w.textContent=whoLabel();}}
 function setMode(m){authMode=m;const login=m==='login';
   document.getElementById('wUsername').style.display=login?'none':'';
   document.getElementById('wCreate').textContent=login?'Log in & load my coins':'Create account & save';
@@ -1072,7 +1088,12 @@ async function initWallet(){const cfg=window.SQUARE_CONFIG||{};
   el('wLeave').onclick=()=>{window.location.href='index.html';};
   el('wLoginLink').onclick=()=>setMode(authMode==='login'?'signup':'login');
   el('wOut').onclick=async function(){try{if(sb)await sb.auth.signOut();}catch(e){}session=null;renderWallet();setCoinLabel();toast('Signed out — your coins stay saved on this device');};
-  const ex=document.querySelector('.exitbtn');if(ex)ex.addEventListener('click',function(e){if(session)return;e.preventDefault();openWallet('exit');});
+  // age gate: populate birth-year list + wire the neutral gate
+  const ysel=el('wYear');if(ysel&&ysel.options.length<=1){const y0=new Date().getFullYear();for(let yr=y0-4;yr>=y0-100;yr--){const o=document.createElement('option');o.value=yr;o.textContent=yr;ysel.appendChild(o);}}
+  el('wAgeGo').onclick=function(){const y=parseInt(el('wYear').value,10);if(!y){el('wAgeMsg').textContent='Please pick your birth year.';return;}
+    setAgeState((new Date().getFullYear()-y)>=13?'ok':'under');el('wAgeMsg').textContent='';renderWallet();};
+  el('wUnderOk').onclick=closeWallet;
+  const ex=document.querySelector('.exitbtn');if(ex)ex.addEventListener('click',function(e){if(session)return;if(ageState()==='under')return;e.preventDefault();openWallet('exit');});
   el('repX').onclick=closeReport;el('repSend').onclick=submitReport;
   el('repModal').addEventListener('click',e=>{if(e.target.id==='repModal')closeReport();});
 }
