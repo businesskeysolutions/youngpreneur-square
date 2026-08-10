@@ -340,7 +340,7 @@ function makeBiz(x,z,side,tier,data,addr){
   const aw=new THREE.Mesh(new THREE.BoxGeometry(.5,.5,d*.84),std({color:data.br?data.br.accent:(data.awn||0xc0432f),roughness:.6}));aw.position.set(side<0?w/2+.25:-w/2-.25,2.35,0);g.add(aw);
   // address number plate (real "100A" from the directory when present)
   const addrStr=data.addr||(addr+' '+curCfg.street);const plate=data.plate||addr;
-  const np=new THREE.Mesh(new THREE.PlaneGeometry(1.5,1.0),std({map:numTex(plate),emissive:0xE3C05A,emissiveIntensity:.4,transparent:true}));np.position.set(face,5.55,0);np.rotation.y=yaw;g.add(np);signMats.push(np.material);
+  const np=new THREE.Mesh(new THREE.PlaneGeometry(0.95,0.6),std({map:numTex(plate),emissive:0xE3C05A,emissiveIntensity:.35,transparent:true}));np.position.set(side<0?w/2+0.05:-w/2-0.05,2.15,d*0.36*(side<0?1:1));np.rotation.y=yaw;g.add(np);signMats.push(np.material);
   g.userData.info={kind:'biz',tier,name:data.name,status:data.status,cat:data.cat,who:data.who,addr:addrStr,shop:data.shop||'',ptier:data.tier,from:data.from,mo:data.mo,stripe:data.stripe};
   if(data.takeover){const bw=Math.min(w*0.94,9),bh=Math.min(h*0.62,15);makeAnimBillboard(g,face,yaw,h*0.5+1,bw,bh,data.ads||BROADWAY_ADS);g.userData.info.takeover=1;}
   else if((tier==='landmark'||tier==='fifth')&&data.br){
@@ -547,9 +547,10 @@ function streetWorld(s,rows){
   const accent='#'+s.color.toString(16).padStart(6,'0');
   const ads=[{brand:s.name.toUpperCase(),line:s.tier.toUpperCase()+' · '+(s.free?'FREE FOR FOUNDERS':s.from+' THEN '+s.mo),a:s.dark,b:s.dark,fg:'#efe8d6',fg2:accent},{brand:'LEASE HERE',line:'ON '+s.name.toUpperCase(),a:s.dark,b:s.dark,fg:'#efe8d6',fg2:accent}];
   const mk=nm=>({mark:(nm||'YS').replace(/[^A-Za-z ]/g,'').split(/\s+/).filter(Boolean).map(w=>w[0]).join('').slice(0,2).toUpperCase()||'YS',bg:s.dark,fg:'#efe8d6',accent:accent,tag:''});
-  const toBiz=(r)=>{const open=r.status==='open';const nm=open?'FOR LEASE':(r.tenant_name||'Leased');
-    return [s.build,{name:nm,status:open?'open':(s.free?'cornerstone':'leased'),cat:'',who:s.free?'Founder':(r.status==='liftoff'?'Liftoff ✈':'Leased'),addr:r.num+r.unit+' '+s.name,plate:r.num+r.unit,shop:r.shop_url||'',tier:s.tier,from:s.from,mo:s.mo,stripe:s.stripe,br:open?null:mk(nm)}];};
-  const L=[],R=[];list.forEach((r,i)=>{(i%2===0?L:R).push(toBiz(r));});
+  const toBiz=(r,num)=>{const open=r.status==='open';const nm=open?'FOR LEASE':(r.tenant_name||'Leased');
+    return [s.build,{name:nm,status:open?'open':(s.free?'cornerstone':'leased'),cat:'',who:s.free?'Founder':(r.status==='liftoff'?'Liftoff ✈':'Leased'),addr:num+' '+s.name,plate:''+num,shop:r.shop_url||'',tier:s.tier,from:s.from,mo:s.mo,stripe:s.stripe,br:open?null:mk(nm)}];};
+  // real-street numbering: 100.. sequential, evens on one side / odds on the other, ascending down the block
+  const L=[],R=[];list.forEach((r,i)=>{const num=100+i;(num%2===0?L:R).push(toBiz(r,num));});
   if(s.main&&L[0]){L[0]=['landmark',Object.assign({},L[0][1],{name:'THE MARQUEE',status:'landmark',takeover:1,ads:ads,who:'The Tower',tier:'The Tower',from:'$499',mo:'$499/mo',stripe:'The Tower',br:{mark:'M',bg:'#141210',fg:'#F4E3A6',accent:'#E3C05A',serif:1,tag:'the tower'}})];}
   return {key:s.key,name:s.name,street:s.name,tag:s.tier,line:s.name,lineColor:s.color,pals:s.pals,road:['#1e2228','#141820','#2a3038'],start:{x:0,z:-24},L,R,
     spectaculars:s.main?[{z:0,w:8,h:4.4,ads:ads},{z:52,w:7,h:4,ads:ads}]:[{z:6,w:6.5,h:4.4,ads:ads}],
