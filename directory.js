@@ -8,20 +8,21 @@
     function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
     const rnd=mulberry32(20230731), pick=a=>a[Math.floor(rnd()*a.length)];
 
-    // Streets = subway lines (NYC-style bullets + MTA colors)
-    // ordered premium-first so the most-visible lines lead the map
+    // Streets = subway lines. Regular street names; Broadway is the main strip (the Marquee).
+    // Colors match the walkable Square's transit map exactly so both surfaces read as one city.
     const STREETS=[
-      {name:'Fifth Avenue',   bullet:'5', color:'#FF6319', text:'#fff'},
-      {name:'Broadway',       bullet:'B', color:'#F5C518', text:'#14231A'},
-      {name:'Madison Avenue', bullet:'M', color:'#2F9E44', text:'#fff'},
-      {name:'Union Square',   bullet:'U', color:'#E8433B', text:'#fff'},
-      {name:'Motor Row',      bullet:'R', color:'#B84FC0', text:'#fff'},
-      {name:'Canal Street',   bullet:'C', color:'#3A7DD1', text:'#fff'}
+      {name:'Broadway',       bullet:'B', color:'#E3C05A', text:'#14231A'},
+      {name:'Fifth Avenue',   bullet:'5', color:'#5FAE4A', text:'#fff'},
+      {name:'Madison Avenue', bullet:'M', color:'#6A7AFF', text:'#fff'},
+      {name:'Park Avenue',    bullet:'P', color:'#3AC0D9', text:'#0b2027'},
+      {name:'Canal Street',   bullet:'C', color:'#8A94A0', text:'#14231A'},
+      {name:'Founders Way',   bullet:'F', color:'#E3242B', text:'#fff'}
     ];
     const LINE={}; STREETS.forEach(s=>LINE[s.name]=s);
-    // Map any legacy (DB) street names onto the NYC lines so live data keeps working.
-    const DBNAME={'The Runway':'Broadway','First Class Row':'Fifth Avenue','Ascend Avenue':'Madison Avenue',
-      'Takeoff Lane':'Canal Street','The Hangar':'Motor Row','Founders Way':'Union Square'};
+    // Map any legacy (DB) street names onto the street lines so live data keeps working
+    // whether or not the database rename has run yet. Matches the walkable Square's mapping.
+    const DBNAME={'The Runway':'Broadway','Ascend Avenue':'Fifth Avenue','First Class Row':'Madison Avenue',
+      'Takeoff Lane':'Park Avenue','The Hangar':'Canal Street','Founders Way':'Founders Way'};
     const toLine=n=>DBNAME[n]||n;
 
     const CATS=['Food & Drink','Retail','Services','Tech','Beauty','Fitness','Auto','Creative','Home','Finance'];
@@ -45,8 +46,9 @@
 
     let spaces=[];
     STREETS.forEach(function(st){
+      const base=100+STREETS.indexOf(st)*100;
       for(let i=0;i<30;i++){
-        const number=100+Math.floor(i/2)*2, unit=(i%2===0)?'A':'B', r=rnd();
+        const number=base+i, unit='', r=rnd();
         let status='available', tenant='', category='', shop='';
         if(r<0.09) status='donated'; else if(r<0.42) status='leased';
         if(status==='leased'){ category=pick(CATS); tenant=pick(FIRST)+' '+pick(SUF[category]); }
@@ -60,7 +62,7 @@
 
     function pillLabel(s){ return s==='available'?'Available':s==='leased'?'Leased':'Cornerstone'; }
     function esc(t){ return String(t||'').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
-    function addr(sp){ return sp.number+sp.unit; }
+    function addr(sp){ return ''+sp.number; }
     function statusClass(s){ return s==='available'?'open':(s==='leased'?'leased':'corner'); }
 
     // ---------- the subway map ----------
@@ -98,8 +100,7 @@
       const visitHref = sp.shop ? esc(sp.shop) : '';
       const act = occ ? (sp.shop?'<a href="'+visitHref+'" target="_blank" rel="noopener">Visit ↗</a>':'<span class="muted">Leased</span>')
                       : '<a href="lease.html#join">Lease</a>';
-      return '<div class="dir-row"><div class="dir-addr"><span class="num">'+sp.number+' '+toLine(sp.street)+'</span><br>'+
-        '<span class="unit">Unit '+sp.unit+'</span></div><div class="dir-ten">'+ten+'</div>'+
+      return '<div class="dir-row"><div class="dir-addr"><span class="num">'+sp.number+' '+toLine(sp.street)+'</span></div><div class="dir-ten">'+ten+'</div>'+
         '<span class="dir-pill '+sp.status+'">'+pillLabel(sp.status)+'</span><div class="dir-act">'+act+'</div></div>';
     }
 
@@ -113,7 +114,7 @@
         if(fs && ln!==fs) return false;
         if(fc && sp.category!==fc) return false;
         if(fst && sp.status!==fst) return false;
-        if(q){ const hay=(sp.number+sp.unit+' '+sp.number+' '+ln+' unit '+sp.unit+' '+sp.tenant+' '+sp.category).toLowerCase();
+        if(q){ const hay=(sp.number+' '+ln+' '+sp.tenant+' '+sp.category).toLowerCase();
           if(hay.indexOf(q)<0) return false; }
         return true;
       });
@@ -169,7 +170,7 @@
         .then(function(res){
           if(res.error || !res.data || !res.data.length){ if(res.error) console.warn('Directory: live load failed, keeping demo data.', res.error.message); return; }
           spaces = res.data.map(function(r){
-            return { number:r.num, unit:r.unit, street:r.street, status:DBMAP[r.status]||'available',
+            return { number:r.num, unit:'', street:r.street, status:DBMAP[r.status]||'available',
                      tenant:r.tenant_name||'', category:r.category||'', shop:r.shop_url||'' };
           });
           apply();
