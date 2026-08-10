@@ -1,54 +1,47 @@
 /* ============================================================
-   Build Your Block — realism layer (v2)
-   Turns each single-story shopfront into a Square-style BUILDING:
-   upper floors with lit windows + cornice, richer storefront,
-   warm night glow. Additive over game.js styles; keeps layout
-   and per-shop colors (--faceC / --roofA / --signC).
+   Build Your Block — realism layer (v3)
+   Gives each single-story shop a 3D look to echo the walkable
+   Square: a lit front face + a shaded right side wall + a top
+   face, so it reads as a dimensional building, not a flat panel.
+   Additive over game.js styles; keeps layout + per-shop colors
+   (--faceC / --roofA / --signC).
    ============================================================ */
 
-/* window-glow colors for upper floors (inherited by the ::before) */
-body.day     .bg-city .bg-shopwrap{ --winCol: rgba(150,192,236,.92); }
-body:not(.day) .bg-city .bg-shopwrap{ --winCol: rgba(255,206,120,.78); }
-
 /* Ground each building with a soft contact shadow */
-.bg-city .bg-b{ filter: drop-shadow(0 8px 9px rgba(0,0,0,.28)); }
+.bg-city .bg-b{ filter: drop-shadow(6px 9px 7px rgba(0,0,0,.30)); }
 
-/* ---- UPPER FLOORS: injected above the awning so the shop reads as a building ---- */
+/* ---- 3D EXTRUSION: side wall + top face on the whole shop ---- */
+.bg-city .bg-shopwrap{ position: relative; }
+
+/* right side wall (in shadow) — makes the box read as 3D */
+.bg-city .bg-shopwrap::after{
+  content:""; position:absolute; z-index:-1;
+  top:2px; bottom:0; right:-11px; width:12px;
+  background-color: var(--faceC);
+  background-image: linear-gradient(rgba(0,0,0,.42), rgba(0,0,0,.55));
+  transform: skewY(-40deg); transform-origin: left top;
+  border-radius: 0 2px 0 0;
+}
+/* top face (lit) — the roof of the box */
 .bg-city .bg-shopwrap::before{
-  content:""; display:block; height:80px; position:relative; z-index:0;
-  margin:0 1px; border-radius:8px 8px 0 0;
-  background:
-    /* cornice cap */
-    linear-gradient(180deg, #efe6d2 0 3px, rgba(0,0,0,.22) 3px 6px, transparent 6px),
-    /* horizontal facade bands (front) that cut the columns into window rows */
-    linear-gradient(180deg,
-      var(--faceC) 0 16px,
-      transparent 16px 30px,
-      var(--faceC) 30px 41px,
-      transparent 41px 55px,
-      var(--faceC) 55px 80px),
-    /* vertical lit-window columns (behind) */
-    repeating-linear-gradient(90deg,
-      var(--faceC) 0 12px,
-      var(--winCol) 12px 28px,
-      var(--faceC) 28px 40px),
-    var(--faceC);
-  box-shadow:
-    inset 0 2px 0 rgba(255,255,255,.20),
-    inset 0 -10px 16px rgba(0,0,0,.20),
-    0 3px 5px rgba(0,0,0,.22);
+  content:""; position:absolute; z-index:-1;
+  top:-10px; left:0; right:0; height:12px;
+  background-color: var(--roofA, var(--faceC));
+  background-image: linear-gradient(rgba(255,255,255,.35), rgba(0,0,0,.10));
+  transform: skewX(-42deg); transform-origin: bottom left;
+  border-radius: 4px 4px 0 0;
 }
 
-/* ---- Storefront body: top highlight + bottom shading = depth ---- */
+/* ---- Storefront body: front face lit from top-left ---- */
 .bg-city .bg-body2{
   background:
-    linear-gradient(180deg, rgba(255,255,255,.14) 0%, rgba(255,255,255,.02) 30%, rgba(0,0,0,.10) 72%, rgba(0,0,0,.22) 100%),
+    linear-gradient(120deg, rgba(255,255,255,.16) 0%, rgba(255,255,255,.03) 34%, rgba(0,0,0,.12) 74%, rgba(0,0,0,.24) 100%),
     var(--faceC) !important;
   box-shadow:
     inset 0 2px 0 rgba(255,255,255,.16),
-    inset 0 -10px 16px rgba(0,0,0,.22),
+    inset -8px 0 12px rgba(0,0,0,.16),
     0 3px 0 rgba(0,0,0,.22) !important;
-  border-radius: 0 0 5px 5px !important;
+  border-radius: 0 0 4px 4px !important;
   position: relative;
 }
 .bg-city .bg-body2::after{ /* stoop / foundation */
@@ -58,11 +51,11 @@ body:not(.day) .bg-city .bg-shopwrap{ --winCol: rgba(255,206,120,.78); }
 
 /* ---- Awning: fabric sheen, rounded, drop shadow, scalloped valance ---- */
 .bg-city .bg-roof{
-  position: relative; height: 16px !important;
+  position: relative; height: 15px !important;
   background:
-    linear-gradient(180deg, rgba(255,255,255,.32), rgba(255,255,255,0) 45%, rgba(0,0,0,.12)),
+    linear-gradient(115deg, rgba(255,255,255,.34), rgba(255,255,255,0) 45%, rgba(0,0,0,.14)),
     repeating-linear-gradient(90deg, var(--roofA) 0 13px, #f7f1e2 13px 26px) !important;
-  border-radius: 10px 10px 2px 2px !important;
+  border-radius: 7px 7px 2px 2px !important;
   box-shadow: 0 4px 7px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.35) !important;
   overflow: visible !important;
 }
@@ -77,8 +70,8 @@ body:not(.day) .bg-city .bg-shopwrap{ --winCol: rgba(255,206,120,.78); }
 
 /* ---- Sign: backlit metal panel; keep the glowing name ---- */
 .bg-city .bg-sign{
-  background: linear-gradient(180deg,#1a221b 0%, #0b100c 100%) !important;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.07), inset 0 -2px 6px rgba(0,0,0,.5), 0 2px 4px rgba(0,0,0,.3) !important;
+  background: linear-gradient(115deg,#1c241d 0%, #0b100c 100%) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.07), inset -6px 0 8px rgba(0,0,0,.4), 0 2px 4px rgba(0,0,0,.3) !important;
 }
 
 /* ---- Window: real glass — frame, gradient, interior shade, reflection ---- */
@@ -103,12 +96,12 @@ body:not(.day) .bg-city .bg-shopwrap{ --winCol: rgba(255,206,120,.78); }
   position: relative;
   background: linear-gradient(180deg,#4b3120 0%, #35210f 55%, #241609 100%) !important;
   box-shadow: inset 0 0 0 2px rgba(0,0,0,.45), inset 0 0 0 3px rgba(255,255,255,.06) !important;
-  border-radius: 5px 5px 0 0 !important;
+  border-radius: 4px 4px 0 0 !important;
 }
 .bg-city .bg-door2::before{ content:""; position:absolute; left:3px; right:3px; top:4px; bottom:0; border:1px solid rgba(255,255,255,.07); border-bottom:none; border-radius:3px 3px 0 0; }
 .bg-city .bg-door2::after{ content:""; position:absolute; right:4px; top:54%; width:3px; height:7px; border-radius:2px; background:linear-gradient(#fbeeb6,#c9a84a); box-shadow:0 0 2px rgba(0,0,0,.5); }
 
-/* ---- Coin bubble: a touch more pop ---- */
+/* ---- Coin bubble ---- */
 .bg-city .bg-coin2{
   box-shadow: 0 6px 16px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.6) !important;
   text-shadow: 0 1px 0 rgba(255,255,255,.35);
@@ -130,8 +123,9 @@ body.day .bg-city::before{ /* soft clouds */
     radial-gradient(52px 20px at 80% 52%, rgba(255,255,255,.85), transparent 72%);
 }
 
-.bg-city .bg-far2{ opacity:.58 !important; filter: saturate(.85); }
+.bg-city .bg-far2{ opacity:.55 !important; filter: saturate(.85); }
 
+/* Street: sidewalk band + curb + asphalt with faint lane dashes */
 body.day .bg-road{
   height: 46px !important; border-top: none !important;
   background: linear-gradient(180deg,#cfc7b6 0,#c6bda9 11px,#9a917f 11px,#7d7565 14px,#6a655c 14px,#5b564d 46px) !important;
