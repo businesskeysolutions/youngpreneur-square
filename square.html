@@ -98,9 +98,14 @@
   .wbox input{flex:1;min-width:0;background:rgba(255,255,255,.06);border:1px solid rgba(227,192,90,.3);border-radius:9px;padding:11px;color:#F5F1E6;font-size:14px;user-select:text;-webkit-user-select:text}
   .wbtn{background:linear-gradient(180deg,#E3C05A,#B0862F);color:#14231a;border:none;border-radius:9px;padding:11px 15px;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap}
   .wbtn.ghost{background:rgba(122,208,58,.16);color:#9fe06a;border:1px solid rgba(122,208,58,.4)}
-  .wmsg{font-size:12px;color:#E3C05A;min-height:16px;margin-bottom:6px}
-  .wnote{font-size:10.5px;color:#8a978a;display:block;line-height:1.4}
-  #wUser.off{display:none}#wGuest.off{display:none}
+  .wmsg{font-size:12px;color:#E3C05A;min-height:16px;margin:8px 0 4px}
+  .wnote{font-size:10.5px;color:#8a978a;display:block;line-height:1.4;margin-top:8px}
+  .wform{display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
+  .wbtn.full{width:100%}
+  .wtoggle{font-size:12px;color:#9AA79A;text-align:center;margin:2px 0 8px}
+  .wtoggle a{color:#E3C05A;cursor:pointer;text-decoration:underline}
+  .off{display:none}
+  #wUserPane.off{display:none}#wGuest.off{display:none}
 </style>
 </head>
 <body>
@@ -128,18 +133,24 @@
 <div class="wmodal" id="wmodal">
   <div class="wbox">
     <button class="wx" id="wx">✕</button>
-    <div class="wtop"><span class="ycoin big"></span><div><div class="wbal" id="wbal">0</div><small>Y-coins collected</small></div></div>
+    <div class="wtop"><span class="ycoin big"></span><div><div class="wbal" id="wbal">0</div><small><span id="wcap">today's coins</span> · Y-coins</small></div></div>
     <div id="wGuest">
-      <h3>Save your coins</h3>
-      <p>You're playing as a guest — collect all you like. To keep your coins across visits and cash them in for prize entries, create a free account.</p>
-      <div class="wrow" id="wStep1"><input id="wEmail" type="email" inputmode="email" autocomplete="email" placeholder="you@email.com"><button class="wbtn" id="wSend">Send code</button></div>
-      <div class="wrow off" id="wStep2"><input id="wCode" inputmode="numeric" autocomplete="one-time-code" placeholder="6-digit code"><button class="wbtn" id="wVerify">Verify</button></div>
+      <h3 id="wTitle">Save your progress</h3>
+      <p id="wIntro">Make a free account to keep your coins across devices and enter for prizes. Your coins are already saved on this device.</p>
+      <div class="wform">
+        <input id="wUsername" placeholder="Username" autocomplete="username" maxlength="20">
+        <input id="wEmail" type="email" inputmode="email" autocomplete="email" placeholder="Email">
+        <input id="wPass" type="password" autocomplete="new-password" placeholder="Password (8+ characters)">
+      </div>
+      <button class="wbtn full" id="wCreate">Create account &amp; save</button>
       <div class="wmsg" id="wMsg"></div>
-      <small class="wnote">Under 13? Ask a parent first. We only use your email to save your coins — nothing else.</small>
+      <div class="wtoggle" id="wToggle">Have an account? <a id="wLoginLink">Log in</a></div>
+      <button class="wbtn ghost full off" id="wLeave">Leave without signing up</button>
+      <small class="wnote">Under 13? Ask a parent first. We use your email only to save your coins.</small>
     </div>
-    <div id="wUser" class="off">
+    <div id="wUserPane" class="off">
       <p>Signed in as <b id="wWho"></b>. Your coins save automatically as you collect them.</p>
-      <button class="wbtn ghost" id="wOut">Sign out</button>
+      <button class="wbtn ghost full" id="wOut">Sign out</button>
     </div>
   </div>
 </div>
@@ -916,67 +927,96 @@ function tick(now){const dt=Math.min(.05,(now-last)/1000);last=now;
 function resize(){camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);}
 addEventListener('resize',resize);resize();
 
-// ---------- WALLET + ACCOUNT (guests play; sign in to save) ----------
-let sb=null, session=null, YC=0, sessionEarned=0, pendingDelta=0, saveTimer=null;
-const visitedShops=new Set();
+// ---------- COIN WALLET (device-saved; daily caps; optional account to save across devices) ----------
+const DAILY_CAP=300, VISIT_BONUS=50, MAX_VISITS_PER_DAY=3;
+let sb=null, session=null, pendingDelta=0, saveTimer=null, authMode='signup';
+function today(){return new Date().toISOString().slice(0,10);}
+function rollDay(w){const d=today();w.coins=w.coins||0;
+  if(w.day!==d){w.day=d;w.earnedToday=0;}
+  if(w.visitDay!==d){w.visitDay=d;w.visitsToday=0;w.visited=[];}
+  w.earnedToday=w.earnedToday||0;w.visitsToday=w.visitsToday||0;w.visited=w.visited||[];return w;}
+function loadW(){let w;try{w=JSON.parse(localStorage.getItem('yps_wallet')||'{}');}catch(e){w={};}return rollDay(w);}
+let W=loadW();
+function saveW(){try{localStorage.setItem('yps_wallet',JSON.stringify(W));}catch(e){}}
 function coinsEl(){return document.getElementById('coins');}
-function setCoinLabel(){const e=coinsEl();if(e)e.textContent=YC.toLocaleString();
+function setCoinLabel(){const e=coinsEl();if(e)e.textContent=(W.coins||0).toLocaleString();
   const chip=document.getElementById('coinChip');if(chip)chip.classList.toggle('guest',!session);
-  const wb=document.getElementById('wbal');if(wb)wb.textContent=YC.toLocaleString();}
-function pulseCoin(){const chip=document.getElementById('coinChip');if(!chip)return;chip.classList.remove('pop');void chip.offsetWidth;chip.classList.add('pop');setTimeout(()=>chip.classList.remove('pop'),140);}
-function disposeCoin(c){c.traverse(n=>{if(n.geometry)n.geometry.dispose();if(n.material){(Array.isArray(n.material)?n.material:[n.material]).forEach(m=>m.dispose());}});} // NB: leaves the shared coin texture intact
+  const wb=document.getElementById('wbal');if(wb)wb.textContent=(W.coins||0).toLocaleString();
+  const cap=document.getElementById('wcap');if(cap)cap.textContent=Math.max(0,DAILY_CAP-W.earnedToday)+' more today';}
+function pulseCoin(){const chip=document.getElementById('coinChip');if(!chip)return;chip.classList.add('pop');setTimeout(()=>chip.classList.remove('pop'),150);}
+function disposeCoin(c){c.traverse(n=>{if(n.geometry)n.geometry.dispose();if(n.material){(Array.isArray(n.material)?n.material:[n.material]).forEach(m=>m.dispose());}});} // leaves the shared coin texture intact
+function addCoins(n){rollDay(W);const remain=DAILY_CAP-W.earnedToday;if(remain<=0)return 0;const add=Math.min(n,remain);
+  W.coins+=add;W.earnedToday+=add;saveW();setCoinLabel();pulseCoin();if(session)queueSave(add);return add;}
 function grabCoin(c){const v=c.userData.val;if(c.userData.ck)collectedCoins.add(c.userData.ck);
   worldGroup.remove(c);disposeCoin(c);
-  YC+=v;sessionEarned+=v;setCoinLabel();pulseCoin();
-  if(session){queueSave(v);toast('+'+v+' Y');}
-  else toast('+'+v+' Y'+((v>=25||sessionEarned>0&&sessionEarned%50<5)?' · sign in to save':''));}
+  const got=addCoins(v);
+  toast(got>0?('+'+got+' Y'+(session?'':' · saved on this device')):'Daily coin limit reached — come back tomorrow!');}
+function awardVisit(url,name){if(!url)return;rollDay(W);
+  if(W.visited.indexOf(url)>=0){toast('You already earned coins at '+(name||'this shop')+' today');return;}
+  if(W.visitsToday>=MAX_VISITS_PER_DAY){toast('Store-visit coins are maxed for today — nice hustle!');return;}
+  if(W.earnedToday>=DAILY_CAP){toast('Daily coin limit reached — come back tomorrow!');return;}
+  W.visited.push(url);W.visitsToday++;saveW();
+  const got=addCoins(VISIT_BONUS);
+  if(got>0)toast('+'+got+' Y for visiting '+(name||'a real shop'));}
 function queueSave(delta){pendingDelta+=delta;clearTimeout(saveTimer);saveTimer=setTimeout(flushSave,900);}
 async function flushSave(){if(!session||!sb||pendingDelta<=0)return;const d=pendingDelta;pendingDelta=0;
-  try{const r=await sb.rpc('add_coins',{delta:d});if(r.error){pendingDelta+=d;return;}if(typeof r.data==='number'){YC=r.data;setCoinLabel();}}catch(e){pendingDelta+=d;}}
-function awardVisit(url,name){if(!url||visitedShops.has(url))return;visitedShops.add(url);
-  YC+=100;sessionEarned+=100;setCoinLabel();pulseCoin();
-  toast('+100 Y for visiting '+(name||'a real shop')+(session?'':' · sign in to save'));
-  if(session)queueSave(100);}
-async function loadBalance(){try{const r=await sb.from('player_coins').select('coins').eq('user_id',session.user.id).maybeSingle();if(r.error||!r.data)return 0;return r.data.coins||0;}catch(e){return 0;}}
-async function onSignedIn(s){session=s;let bal=await loadBalance();
-  if(sessionEarned>0){try{const r=await sb.rpc('add_coins',{delta:sessionEarned});if(!r.error&&typeof r.data==='number'){YC=r.data;}else{YC=bal+sessionEarned;}}catch(e){YC=bal+sessionEarned;}}
-  else YC=bal;
+  try{const r=await sb.rpc('add_coins',{delta:d});if(r.error)return;if(typeof r.data==='number'&&r.data>W.coins){W.coins=r.data;saveW();setCoinLabel();}}catch(e){}}
+async function loadBalance(){try{const r=await sb.from('player_coins').select('coins').eq('user_id',session.user.id).maybeSingle();if(r.error||!r.data)return null;return r.data.coins;}catch(e){return null;}}
+async function afterAuth(){const bal=await loadBalance();
+  if(bal===null){if(W.coins>0){try{await sb.rpc('add_coins',{delta:Math.min(W.coins,500)});}catch(e){}}}
+  else if(bal>W.coins){W.coins=bal;saveW();}
+  else if(W.coins>bal){try{await sb.rpc('add_coins',{delta:Math.min(W.coins-bal,500)});}catch(e){}}
   setCoinLabel();renderWallet();}
-function renderWallet(){const g=document.getElementById('wGuest'),u=document.getElementById('wUser');
-  if(session){g.classList.add('off');u.classList.remove('off');document.getElementById('wWho').textContent=(session.user&&session.user.email)||'your account';}
+function whoLabel(){const u=session&&session.user;if(!u)return 'Signed in';return (u.user_metadata&&u.user_metadata.username)||u.email||'Signed in';}
+function renderWallet(){const g=document.getElementById('wGuest'),u=document.getElementById('wUserPane');
+  if(session){g.classList.add('off');u.classList.remove('off');document.getElementById('wWho').textContent=whoLabel();}
   else{u.classList.add('off');g.classList.remove('off');}}
-function openWallet(){renderWallet();document.getElementById('wmodal').classList.add('on');}
+function setMode(m){authMode=m;const login=m==='login';
+  document.getElementById('wUsername').style.display=login?'none':'';
+  document.getElementById('wCreate').textContent=login?'Log in & load my coins':'Create account & save';
+  document.getElementById('wTitle').textContent=login?'Welcome back':'Save your progress';
+  document.getElementById('wToggle').innerHTML=login?'New here? <a id="wLoginLink">Create an account</a>':'Have an account? <a id="wLoginLink">Log in</a>';
+  document.getElementById('wLoginLink').onclick=()=>setMode(login?'signup':'login');
+  document.getElementById('wMsg').textContent='';}
+function openWallet(ctx){renderWallet();setMode('signup');
+  const leave=document.getElementById('wLeave');
+  if(ctx==='exit'){leave.classList.remove('off');document.getElementById('wIntro').textContent='Before you go — make a free account to keep your '+(W.coins||0).toLocaleString()+' coins across devices and enter for prizes. They are already saved on this device.';}
+  else{leave.classList.add('off');document.getElementById('wIntro').textContent='Make a free account to keep your coins across devices and enter for prizes. Your coins are already saved on this device.';}
+  document.getElementById('wmodal').classList.add('on');}
 function closeWallet(){document.getElementById('wmodal').classList.remove('on');}
+async function doAuth(){const el=id=>document.getElementById(id);
+  const email=(el('wEmail').value||'').trim(),pass=el('wPass').value||'',user=(el('wUsername').value||'').trim();
+  if(!sb){el('wMsg').textContent='Accounts are not connected yet — your coins are still saved on this device.';return;}
+  if(!/.+@.+\..+/.test(email)){el('wMsg').textContent='Enter a valid email.';return;}
+  if(pass.length<8){el('wMsg').textContent='Password needs at least 8 characters.';return;}
+  if(authMode==='signup'&&!user){el('wMsg').textContent='Pick a username.';return;}
+  const btn=el('wCreate');btn.disabled=true;el('wMsg').textContent=authMode==='login'?'Logging in...':'Creating your account...';
+  try{let r;
+    if(authMode==='login')r=await sb.auth.signInWithPassword({email:email,password:pass});
+    else r=await sb.auth.signUp({email:email,password:pass,options:{data:{username:user}}});
+    if(r.error){el('wMsg').textContent=r.error.message;}
+    else if(r.data&&r.data.session){session=r.data.session;await afterAuth();el('wMsg').textContent='';toast('Signed in — '+(W.coins||0).toLocaleString()+' Y on your account');setTimeout(closeWallet,800);}
+    else{el('wMsg').textContent='Almost there — check your email to confirm, then log in.';}
+  }catch(e){el('wMsg').textContent='Something went wrong. Please try again.';}
+  btn.disabled=false;}
 async function initWallet(){const cfg=window.SQUARE_CONFIG||{};
   try{
     if(window.SQ_DB&&window.SQ_DB.auth)sb=window.SQ_DB;
     else if(window.supabase&&cfg.supabaseUrl&&cfg.supabaseAnonKey)sb=window.supabase.createClient(cfg.supabaseUrl,cfg.supabaseAnonKey);
-    if(sb){
-    const r=await sb.auth.getSession();
-    if(r.data&&r.data.session){session=r.data.session;YC=await loadBalance();}
-    sb.auth.onAuthStateChange((_e,s)=>{if(!s||!s.user){session=null;renderWallet();setCoinLabel();}});
-  }}catch(e){}
-  setCoinLabel();
-  // wire modal controls
+    if(sb){const r=await sb.auth.getSession();
+      if(r.data&&r.data.session){session=r.data.session;await afterAuth();}
+      sb.auth.onAuthStateChange((_e,s)=>{if(!s||!s.user)session=null;renderWallet();setCoinLabel();});}
+  }catch(e){}
+  setCoinLabel();renderWallet();
   const el=id=>document.getElementById(id);
-  el('coinChip').onclick=openWallet;el('wx').onclick=closeWallet;
+  el('coinChip').onclick=()=>openWallet('chip');
+  el('wx').onclick=closeWallet;
   el('wmodal').addEventListener('click',e=>{if(e.target.id==='wmodal')closeWallet();});
-  el('wSend').onclick=async function(){const email=(el('wEmail').value||'').trim();if(!/.+@.+\..+/.test(email)){el('wMsg').textContent='Enter a valid email.';return;}
-    if(!sb){el('wMsg').textContent='Sign-in isn’t connected yet.';return;}
-    this.disabled=true;el('wMsg').textContent='Sending code…';
-    try{const r=await sb.auth.signInWithOtp({email:email,options:{shouldCreateUser:true}});
-      if(r.error){el('wMsg').textContent=r.error.message;}else{el('wStep1').classList.add('off');el('wStep2').classList.remove('off');el('wMsg').textContent='Check your email for a 6-digit code.';}}
-    catch(e){el('wMsg').textContent='Could not send the code.';}
-    this.disabled=false;};
-  el('wVerify').onclick=async function(){const email=(el('wEmail').value||'').trim(),token=(el('wCode').value||'').trim();
-    if(!token){el('wMsg').textContent='Enter the code from your email.';return;}
-    this.disabled=true;el('wMsg').textContent='Verifying…';
-    try{const r=await sb.auth.verifyOtp({email:email,token:token,type:'email'});
-      if(r.error){el('wMsg').textContent=r.error.message;}
-      else{await onSignedIn(r.data.session);el('wMsg').textContent='';toast('Signed in — '+YC.toLocaleString()+' Y saved to your account');setTimeout(closeWallet,700);}}
-    catch(e){el('wMsg').textContent='That code didn’t work.';}
-    this.disabled=false;};
-  el('wOut').onclick=async function(){try{await sb.auth.signOut();}catch(e){}session=null;renderWallet();setCoinLabel();toast('Signed out — coins now save only for this visit');};
+  el('wCreate').onclick=doAuth;
+  el('wLeave').onclick=()=>{window.location.href='index.html';};
+  el('wLoginLink').onclick=()=>setMode(authMode==='login'?'signup':'login');
+  el('wOut').onclick=async function(){try{if(sb)await sb.auth.signOut();}catch(e){}session=null;renderWallet();setCoinLabel();toast('Signed out — your coins stay saved on this device');};
+  const ex=document.querySelector('.exitbtn');if(ex)ex.addEventListener('click',function(e){if(session)return;e.preventDefault();openWallet('exit');});
 }
 
 async function initCity(){
