@@ -81,6 +81,26 @@
   .legend i{width:16px;height:5px;border-radius:3px;display:inline-block}
   .toast{position:fixed;left:50%;bottom:120px;transform:translateX(-50%);z-index:26;background:rgba(8,11,9,.86);border:1px solid rgba(227,192,90,.35);color:#F5F1E6;font-size:12px;padding:10px 16px;border-radius:20px;opacity:0;transition:opacity .3s;pointer-events:none}
   .toast.on{opacity:1}
+  .chip{cursor:pointer;transition:transform .12s ease}
+  .chip.guest{border-color:rgba(227,192,90,.5)}
+  .chip.pop{transform:scale(1.16)}
+  .wmodal{position:fixed;inset:0;z-index:40;display:none;align-items:center;justify-content:center;background:rgba(4,6,9,.66);backdrop-filter:blur(4px);padding:18px}
+  .wmodal.on{display:flex}
+  .wbox{position:relative;width:100%;max-width:392px;background:linear-gradient(160deg,#14201a,#0b130e);border:1px solid rgba(227,192,90,.4);border-radius:18px;padding:22px;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+  .wbox .wx{position:absolute;top:12px;right:14px;background:none;border:none;color:#9AA79A;font-size:20px;cursor:pointer}
+  .wtop{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+  .ycoin.big{width:42px;height:42px}.ycoin.big::after{font-size:24px}
+  .wbal{font-family:Georgia,serif;font-weight:800;font-size:30px;line-height:1}
+  .wtop small{font-size:11px;color:#9AA79A}
+  .wbox h3{font-family:Georgia,serif;font-size:19px;margin-bottom:6px}
+  .wbox p{font-size:13px;color:#cdd6cd;line-height:1.5;margin-bottom:12px}
+  .wrow{display:flex;gap:8px;margin-bottom:10px}.wrow.off{display:none}
+  .wbox input{flex:1;min-width:0;background:rgba(255,255,255,.06);border:1px solid rgba(227,192,90,.3);border-radius:9px;padding:11px;color:#F5F1E6;font-size:14px;user-select:text;-webkit-user-select:text}
+  .wbtn{background:linear-gradient(180deg,#E3C05A,#B0862F);color:#14231a;border:none;border-radius:9px;padding:11px 15px;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap}
+  .wbtn.ghost{background:rgba(122,208,58,.16);color:#9fe06a;border:1px solid rgba(122,208,58,.4)}
+  .wmsg{font-size:12px;color:#E3C05A;min-height:16px;margin-bottom:6px}
+  .wnote{font-size:10.5px;color:#8a978a;display:block;line-height:1.4}
+  #wUser.off{display:none}#wGuest.off{display:none}
 </style>
 </head>
 <body>
@@ -90,7 +110,7 @@
   <div class="badge"><span class="ava" id="ava">🧑🏽‍💼</span><div><b>Jordan</b><br><small id="wlabel">Broadway</small></div></div>
   <button class="mapbtn" id="mapbtn">🗺 City</button>
   <button class="mapbtn" id="ovbtn">⤢ Overview</button>
-  <div class="chip"><span class="ycoin"></span><span class="v" id="coins">1,240</span></div>
+  <div class="chip" id="coinChip"><span class="ycoin"></span><span class="v" id="coins">0</span></div>
   <div class="dn"><button data-m="day">☀️</button><button data-m="dusk">🌆</button><button data-m="night" class="on">🌙</button></div>
   <button class="dn hidebtn" id="uiHide" title="Hide menu">▲</button>
 </div>
@@ -105,7 +125,26 @@
   <div class="stage" id="mapStage"></div>
 </div>
 <div class="load" id="load">Building the City…</div>
+<div class="wmodal" id="wmodal">
+  <div class="wbox">
+    <button class="wx" id="wx">✕</button>
+    <div class="wtop"><span class="ycoin big"></span><div><div class="wbal" id="wbal">0</div><small>Y-coins collected</small></div></div>
+    <div id="wGuest">
+      <h3>Save your coins</h3>
+      <p>You're playing as a guest — collect all you like. To keep your coins across visits and cash them in for prize entries, create a free account.</p>
+      <div class="wrow" id="wStep1"><input id="wEmail" type="email" inputmode="email" autocomplete="email" placeholder="you@email.com"><button class="wbtn" id="wSend">Send code</button></div>
+      <div class="wrow off" id="wStep2"><input id="wCode" inputmode="numeric" autocomplete="one-time-code" placeholder="6-digit code"><button class="wbtn" id="wVerify">Verify</button></div>
+      <div class="wmsg" id="wMsg"></div>
+      <small class="wnote">Under 13? Ask a parent first. We only use your email to save your coins — nothing else.</small>
+    </div>
+    <div id="wUser" class="off">
+      <p>Signed in as <b id="wWho"></b>. Your coins save automatically as you collect them.</p>
+      <button class="wbtn ghost" id="wOut">Sign out</button>
+    </div>
+  </div>
+</div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
 <script>/**
  * @license
@@ -207,7 +246,8 @@ function streetSign(x,z,main,cross){const g=new THREE.Group();
   if(cross) blade(cross,4.0, Math.PI/2, {x:0,z:-2.05}, 7.0); // cross street: perpendicular, extends off the other side
   g.position.set(x,0,z);worldGroup.add(g);}
 const ORD=['1 ST','2 ND','3 RD','4 TH','5 TH','6 TH','7 TH','8 TH'];
-const winMats=[],signMats=[],lampBulbs=[],lampLights=[],interact=[],anims=[],vehicles=[],peds=[];
+const winMats=[],signMats=[],lampBulbs=[],lampLights=[],interact=[],anims=[],vehicles=[],peds=[],coins=[];
+const collectedCoins=new Set();   // coin keys grabbed this session (so re-entering a street doesn't refill)
 const ROAD_HALF=4.4, SW_H=0.22, CW=[-16,2,20,38];  // road half-width, sidewalk height, crosswalk z-centers
 let worldGroup=new THREE.Group();scene.add(worldGroup);
 const TIER={landmark:{h:30,w:11,glow:1,x:10.2},fifth:{h:22,w:9,glow:.8,x:10.6},broadway:{h:14,w:7.5,glow:.45,x:11.7},canal:{h:8.5,w:6.5,glow:.2,x:13}};
@@ -276,6 +316,29 @@ function makeGantry(z,w,h,ads){const g=new THREE.Group();
   makeAnimBillboard(g,0,Math.PI,10.4,w,h,ads);   // faces -z, toward oncoming pedestrians
   g.position.set(0,0,z);worldGroup.add(g);return g;}
 
+// ---------- COIN HUNT ----------
+function coinFaceTex(){const c=document.createElement('canvas');c.width=128;c.height=128;const x=c.getContext('2d');
+  const g=x.createRadialGradient(52,44,6,64,64,64);g.addColorStop(0,'#fff7d8');g.addColorStop(.4,'#F4E3A6');g.addColorStop(.75,'#DEB652');g.addColorStop(1,'#A97d2f');
+  x.fillStyle=g;x.beginPath();x.arc(64,64,60,0,7);x.fill();
+  x.strokeStyle='#8a6a1f';x.lineWidth=5;x.beginPath();x.arc(64,64,54,0,7);x.stroke();
+  x.fillStyle='#8a6a1f';x.font='800 76px Georgia';x.textAlign='center';x.textBaseline='middle';x.fillText('Y',64,70);
+  return new THREE.CanvasTexture(c);}
+let COIN_TEX=null;
+function makeCoin(x,z,val,big){if(!COIN_TEX)COIN_TEX=coinFaceTex();const g=new THREE.Group();
+  const R=big?0.62:0.4, th=big?0.14:0.1;
+  const edge=std({color:0xD9B24E,emissive:0xE3C05A,emissiveIntensity:.55,metalness:.6,roughness:.35});
+  const disc=new THREE.Mesh(new THREE.CylinderGeometry(R,R,th,22),edge);disc.rotation.x=Math.PI/2;g.add(disc);
+  const fm=std({map:COIN_TEX,emissiveMap:COIN_TEX,emissive:0xffffff,emissiveIntensity:.75,transparent:true});
+  [th/2+0.01,-th/2-0.01].forEach((zz,i)=>{const f=new THREE.Mesh(new THREE.CircleGeometry(R*0.98,22),fm);f.position.z=zz;if(i)f.rotation.y=Math.PI;g.add(f);});
+  if(big){const gl=new THREE.PointLight(0xE3C05A,.7,8,2);gl.position.y=0;g.add(gl);lampLights.push(gl);}
+  const by=big?1.7:1.15;g.position.set(x,by,z);g.userData={val:val,big:!!big,base:by,ph:Math.random()*6.28};
+  worldGroup.add(g);coins.push(g);return g;}
+function spawnCoins(cfg){const key=cfg.key;let idx=0;
+  // a trail of gold Y coins zig-zagging down the street (walk the block to grab them)
+  for(let z=-14;z<148;z+=11){const side=(idx%2?1:-1);const x=side*(2.2+((idx*37)%5)*0.9);
+    const ck=key+'_'+idx;if(!collectedCoins.has(ck)){const c=makeCoin(x,z,5,false);c.userData.ck=ck;}idx++;}
+  // a couple of big "Founder" coins worth more, near the middle and by the Marquee
+  [[0,74,25],[0,150,50]].forEach((b,i)=>{const ck=key+'_big'+i;if(!collectedCoins.has(ck)){const c=makeCoin(b[0],b[1],b[2],true);c.userData.ck=ck;}});}
 // classic theatre-marquee nameplate texture (gold border + bulb rows + serif name)
 function marqueeTex(name){const c=document.createElement('canvas');c.width=1024;c.height=248;const x=c.getContext('2d');
   x.fillStyle='#15100a';rRect(x,0,0,1024,248,8);x.fill();
@@ -617,7 +680,7 @@ function streetWorld(s,rows){
 }
 function disposeObj(o){o.traverse(n=>{if(n.geometry)n.geometry.dispose();if(n.material){(Array.isArray(n.material)?n.material:[n.material]).forEach(m=>{if(m.map)m.map.dispose();if(m.emissiveMap)m.emissiveMap.dispose();m.dispose();});}});}
 function clearWorld(){disposeObj(worldGroup);scene.remove(worldGroup);worldGroup=new THREE.Group();scene.add(worldGroup);
-  winMats.length=0;signMats.length=0;lampBulbs.length=0;lampLights.length=0;interact.length=0;anims.length=0;vehicles.length=0;peds.length=0;}
+  winMats.length=0;signMats.length=0;lampBulbs.length=0;lampLights.length=0;interact.length=0;anims.length=0;vehicles.length=0;peds.length=0;coins.length=0;COIN_TEX=null;}
 function buildWorld(cfg){curCfg=cfg;curPals=cfg.pals;clearWorld();
   groundMat.map=roadTex(cfg.road[0],cfg.road[1],cfg.road[2]);groundMat.needsUpdate=true;
   const scrL=new Set([2,7,12]),scrR=new Set([4,10]); // 3-5 small ad screens spread down the block
@@ -635,6 +698,7 @@ function buildWorld(cfg){curCfg=cfg;curPals=cfg.pals;clearWorld();
   // (the big overhead street screen + street traffic were removed — the Marquee at the end of the street is the focus; smaller ad screens now live on the buildings)
   (cfg.entrances||[]).forEach(e=>makeEntrance(e));
   makeEndmark(cfg);
+  spawnCoins(cfg);
   player.position.set(cfg.start.x,Math.abs(cfg.start.x)>=ROAD_HALF?SW_H:0,cfg.start.z);camYaw=Math.PI;lookTilt=0;
   document.getElementById('wlabel').textContent=cfg.name+(cfg.tag?' · '+cfg.tag:'');
   apply(mode);updateCam();}
@@ -779,7 +843,9 @@ function openCard(info){let html='';
   else if(info.status==='open'){const free=info.from==='Free';html='<button class="cclose">✕</button><div class="cbadge">✦ For lease · '+(info.ptier||'')+'</div><h3>'+info.addr+'</h3><div class="cwho">'+(free?'Free for young founders':(info.ptier+' — from '+info.from+', then '+info.mo))+'</div><p>'+(free?'A free Founders Way storefront for a young founder — get on the map and point it at your shop.':'Lease this address and link it straight to your own shop.')+'</p><div class="cact"><a class="go" href="'+leaseLink(info.stripe)+'">'+(free?'Claim it free':'Lease this spot')+'</a><a class="alt" href="pricing.html">See pricing</a></div>';}
   else{const badge=info.status==='cornerstone'?'★ Founder · free':(info.who==='Liftoff ✈'?'✈ Liftoff':'✦ Leased');const shop=(info.shop&&info.shop.length)?info.shop:'directory.html';html='<button class="cclose">✕</button><div class="cbadge">'+badge+' · '+(info.ptier||'')+'</div><h3>'+info.name+'</h3><div class="cwho">'+info.addr+'</div><p>'+(info.status==='cornerstone'?"A young founder's storefront on Founders Way (free) — it links out to their own shop.":"A leased storefront — it links straight to the business's own shop.")+'</p><div class="cact"><a class="go" href="'+shop+'"'+(info.shop?' target="_blank" rel="noopener"':'')+'>Visit the shop ↗</a><a class="alt" href="directory.html">Directory</a></div>';}
   card.innerHTML=html;card.classList.add('open');card.querySelector('.cclose').onclick=()=>card.classList.remove('open');
-  const rb=document.getElementById('rideBtn');if(rb)rb.onclick=()=>travelTo(info.to,info.line,info.color);}
+  const rb=document.getElementById('rideBtn');if(rb)rb.onclick=()=>travelTo(info.to,info.line,info.color);
+  // coin hunt: visiting a real leased shop earns bonus Y-coins (drives traffic to actual tenants)
+  if((info.status==='leased'||info.status==='cornerstone')&&info.shop){const gb=card.querySelector('.cact .go');if(gb)gb.addEventListener('click',()=>awardVisit(info.shop,info.name));}}
 
 // ---- city map ----
 function buildMap(){const stage=document.getElementById('mapStage');
@@ -828,6 +894,10 @@ function tick(now){const dt=Math.min(.05,(now-last)/1000);last=now;
     v.speed=sp;v.g.position.z+=v.dir*sp*dt;
     const az=v.g.position.z;let ax=v.x;if(az>132&&az<204){const t=Math.max(0,1-Math.abs(az-168)/36);ax=v.x+(v.x>=0?1:-1)*t*8.5;}v.g.position.x=ax;
     if(v.g.position.z>204)v.g.position.z=-44;else if(v.g.position.z<-44)v.g.position.z=204;}
+  // coins: spin + bob, and collect when the player walks over them
+  for(let i=coins.length-1;i>=0;i--){const c=coins[i];c.rotation.z+=dt*(c.userData.big?1.7:2.4);c.position.y=c.userData.base+Math.sin(ts*2+c.userData.ph)*0.12;
+    const dx=c.position.x-player.position.x,dz=c.position.z-player.position.z;
+    if(dx*dx+dz*dz<(c.userData.big?2.2:1.5)){coins.splice(i,1);grabCoin(c);}}
   const iv=inputVec();
   // movement is relative to the ACTIVE camera (street or overview) so left=left / right=right / forward=into the view
   const _cd=new THREE.Vector3();camera.getWorldDirection(_cd);const fwd=new THREE.Vector3(_cd.x,0,_cd.z);
@@ -846,7 +916,71 @@ function tick(now){const dt=Math.min(.05,(now-last)/1000);last=now;
 function resize(){camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);}
 addEventListener('resize',resize);resize();
 
+// ---------- WALLET + ACCOUNT (guests play; sign in to save) ----------
+let sb=null, session=null, YC=0, sessionEarned=0, pendingDelta=0, saveTimer=null;
+const visitedShops=new Set();
+function coinsEl(){return document.getElementById('coins');}
+function setCoinLabel(){const e=coinsEl();if(e)e.textContent=YC.toLocaleString();
+  const chip=document.getElementById('coinChip');if(chip)chip.classList.toggle('guest',!session);
+  const wb=document.getElementById('wbal');if(wb)wb.textContent=YC.toLocaleString();}
+function pulseCoin(){const chip=document.getElementById('coinChip');if(!chip)return;chip.classList.remove('pop');void chip.offsetWidth;chip.classList.add('pop');setTimeout(()=>chip.classList.remove('pop'),140);}
+function disposeCoin(c){c.traverse(n=>{if(n.geometry)n.geometry.dispose();if(n.material){(Array.isArray(n.material)?n.material:[n.material]).forEach(m=>m.dispose());}});} // NB: leaves the shared coin texture intact
+function grabCoin(c){const v=c.userData.val;if(c.userData.ck)collectedCoins.add(c.userData.ck);
+  worldGroup.remove(c);disposeCoin(c);
+  YC+=v;sessionEarned+=v;setCoinLabel();pulseCoin();
+  if(session){queueSave(v);toast('+'+v+' Y');}
+  else toast('+'+v+' Y'+((v>=25||sessionEarned>0&&sessionEarned%50<5)?' · sign in to save':''));}
+function queueSave(delta){pendingDelta+=delta;clearTimeout(saveTimer);saveTimer=setTimeout(flushSave,900);}
+async function flushSave(){if(!session||!sb||pendingDelta<=0)return;const d=pendingDelta;pendingDelta=0;
+  try{const r=await sb.rpc('add_coins',{delta:d});if(r.error){pendingDelta+=d;return;}if(typeof r.data==='number'){YC=r.data;setCoinLabel();}}catch(e){pendingDelta+=d;}}
+function awardVisit(url,name){if(!url||visitedShops.has(url))return;visitedShops.add(url);
+  YC+=100;sessionEarned+=100;setCoinLabel();pulseCoin();
+  toast('+100 Y for visiting '+(name||'a real shop')+(session?'':' · sign in to save'));
+  if(session)queueSave(100);}
+async function loadBalance(){try{const r=await sb.from('player_coins').select('coins').eq('user_id',session.user.id).maybeSingle();if(r.error||!r.data)return 0;return r.data.coins||0;}catch(e){return 0;}}
+async function onSignedIn(s){session=s;let bal=await loadBalance();
+  if(sessionEarned>0){try{const r=await sb.rpc('add_coins',{delta:sessionEarned});if(!r.error&&typeof r.data==='number'){YC=r.data;}else{YC=bal+sessionEarned;}}catch(e){YC=bal+sessionEarned;}}
+  else YC=bal;
+  setCoinLabel();renderWallet();}
+function renderWallet(){const g=document.getElementById('wGuest'),u=document.getElementById('wUser');
+  if(session){g.classList.add('off');u.classList.remove('off');document.getElementById('wWho').textContent=(session.user&&session.user.email)||'your account';}
+  else{u.classList.add('off');g.classList.remove('off');}}
+function openWallet(){renderWallet();document.getElementById('wmodal').classList.add('on');}
+function closeWallet(){document.getElementById('wmodal').classList.remove('on');}
+async function initWallet(){const cfg=window.SQUARE_CONFIG||{};
+  try{
+    if(window.SQ_DB&&window.SQ_DB.auth)sb=window.SQ_DB;
+    else if(window.supabase&&cfg.supabaseUrl&&cfg.supabaseAnonKey)sb=window.supabase.createClient(cfg.supabaseUrl,cfg.supabaseAnonKey);
+    if(sb){
+    const r=await sb.auth.getSession();
+    if(r.data&&r.data.session){session=r.data.session;YC=await loadBalance();}
+    sb.auth.onAuthStateChange((_e,s)=>{if(!s||!s.user){session=null;renderWallet();setCoinLabel();}});
+  }}catch(e){}
+  setCoinLabel();
+  // wire modal controls
+  const el=id=>document.getElementById(id);
+  el('coinChip').onclick=openWallet;el('wx').onclick=closeWallet;
+  el('wmodal').addEventListener('click',e=>{if(e.target.id==='wmodal')closeWallet();});
+  el('wSend').onclick=async function(){const email=(el('wEmail').value||'').trim();if(!/.+@.+\..+/.test(email)){el('wMsg').textContent='Enter a valid email.';return;}
+    if(!sb){el('wMsg').textContent='Sign-in isn’t connected yet.';return;}
+    this.disabled=true;el('wMsg').textContent='Sending code…';
+    try{const r=await sb.auth.signInWithOtp({email:email,options:{shouldCreateUser:true}});
+      if(r.error){el('wMsg').textContent=r.error.message;}else{el('wStep1').classList.add('off');el('wStep2').classList.remove('off');el('wMsg').textContent='Check your email for a 6-digit code.';}}
+    catch(e){el('wMsg').textContent='Could not send the code.';}
+    this.disabled=false;};
+  el('wVerify').onclick=async function(){const email=(el('wEmail').value||'').trim(),token=(el('wCode').value||'').trim();
+    if(!token){el('wMsg').textContent='Enter the code from your email.';return;}
+    this.disabled=true;el('wMsg').textContent='Verifying…';
+    try{const r=await sb.auth.verifyOtp({email:email,token:token,type:'email'});
+      if(r.error){el('wMsg').textContent=r.error.message;}
+      else{await onSignedIn(r.data.session);el('wMsg').textContent='';toast('Signed in — '+YC.toLocaleString()+' Y saved to your account');setTimeout(closeWallet,700);}}
+    catch(e){el('wMsg').textContent='That code didn’t work.';}
+    this.disabled=false;};
+  el('wOut').onclick=async function(){try{await sb.auth.signOut();}catch(e){}session=null;renderWallet();setCoinLabel();toast('Signed out — coins now save only for this visit');};
+}
+
 async function initCity(){
+  await initWallet();
   const rows=await loadSpaces();
   Object.keys(WORLDS).forEach(k=>delete WORLDS[k]);
   STREETS.forEach(s=>{WORLDS[s.key]=streetWorld(s,rows);});
