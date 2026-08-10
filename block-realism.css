@@ -1,14 +1,45 @@
 /* ============================================================
-   Build Your Block — realism layer
-   Additive visual upgrade over game.js's injected styles.
-   Keeps all layout, sizes, and per-shop color variables
-   (--faceC / --roofA / --signC). Purely presentational.
+   Build Your Block — realism layer (v2)
+   Turns each single-story shopfront into a Square-style BUILDING:
+   upper floors with lit windows + cornice, richer storefront,
+   warm night glow. Additive over game.js styles; keeps layout
+   and per-shop colors (--faceC / --roofA / --signC).
    ============================================================ */
 
-/* Ground each building with a soft contact shadow */
-.bg-city .bg-b{ filter: drop-shadow(0 7px 8px rgba(0,0,0,.26)); }
+/* window-glow colors for upper floors (inherited by the ::before) */
+body.day     .bg-city .bg-shopwrap{ --winCol: rgba(150,192,236,.92); }
+body:not(.day) .bg-city .bg-shopwrap{ --winCol: rgba(255,206,120,.78); }
 
-/* ---- Storefront body: top highlight + bottom shading = real depth ---- */
+/* Ground each building with a soft contact shadow */
+.bg-city .bg-b{ filter: drop-shadow(0 8px 9px rgba(0,0,0,.28)); }
+
+/* ---- UPPER FLOORS: injected above the awning so the shop reads as a building ---- */
+.bg-city .bg-shopwrap::before{
+  content:""; display:block; height:80px; position:relative; z-index:0;
+  margin:0 1px; border-radius:8px 8px 0 0;
+  background:
+    /* cornice cap */
+    linear-gradient(180deg, #efe6d2 0 3px, rgba(0,0,0,.22) 3px 6px, transparent 6px),
+    /* horizontal facade bands (front) that cut the columns into window rows */
+    linear-gradient(180deg,
+      var(--faceC) 0 16px,
+      transparent 16px 30px,
+      var(--faceC) 30px 41px,
+      transparent 41px 55px,
+      var(--faceC) 55px 80px),
+    /* vertical lit-window columns (behind) */
+    repeating-linear-gradient(90deg,
+      var(--faceC) 0 12px,
+      var(--winCol) 12px 28px,
+      var(--faceC) 28px 40px),
+    var(--faceC);
+  box-shadow:
+    inset 0 2px 0 rgba(255,255,255,.20),
+    inset 0 -10px 16px rgba(0,0,0,.20),
+    0 3px 5px rgba(0,0,0,.22);
+}
+
+/* ---- Storefront body: top highlight + bottom shading = depth ---- */
 .bg-city .bg-body2{
   background:
     linear-gradient(180deg, rgba(255,255,255,.14) 0%, rgba(255,255,255,.02) 30%, rgba(0,0,0,.10) 72%, rgba(0,0,0,.22) 100%),
@@ -20,17 +51,14 @@
   border-radius: 0 0 5px 5px !important;
   position: relative;
 }
-/* a slim foundation / stoop under the shop */
-.bg-city .bg-body2::after{
+.bg-city .bg-body2::after{ /* stoop / foundation */
   content:""; position:absolute; left:-3px; right:-3px; bottom:-3px; height:5px;
-  background: linear-gradient(#3a352c,#241f18);
-  border-radius: 0 0 3px 3px; z-index:-1;
+  background: linear-gradient(#3a352c,#241f18); border-radius:0 0 3px 3px; z-index:-1;
 }
 
 /* ---- Awning: fabric sheen, rounded, drop shadow, scalloped valance ---- */
 .bg-city .bg-roof{
-  position: relative;
-  height: 16px !important;
+  position: relative; height: 16px !important;
   background:
     linear-gradient(180deg, rgba(255,255,255,.32), rgba(255,255,255,0) 45%, rgba(0,0,0,.12)),
     repeating-linear-gradient(90deg, var(--roofA) 0 13px, #f7f1e2 13px 26px) !important;
@@ -38,13 +66,12 @@
   box-shadow: 0 4px 7px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.35) !important;
   overflow: visible !important;
 }
-.bg-city .bg-roof::after{
+.bg-city .bg-roof::after{ /* scalloped valance */
   content:""; position:absolute; left:0; right:0; bottom:-7px; height:9px;
   background:
     radial-gradient(circle at 50% 0%, var(--roofA) 62%, transparent 64%) repeat-x,
     radial-gradient(circle at 50% 0%, #f7f1e2 62%, transparent 64%) repeat-x;
-  background-size: 13px 9px, 13px 9px;
-  background-position: 0 0, 13px 0;
+  background-size: 13px 9px, 13px 9px; background-position: 0 0, 13px 0;
   filter: drop-shadow(0 2px 1px rgba(0,0,0,.18));
 }
 
@@ -59,19 +86,16 @@
   position: relative;
   background: linear-gradient(158deg, #eaf6ff 0%, #cfe6ff 28%, #a9cef0 58%, #7fb0e0 100%) !important;
   box-shadow:
-    inset 0 0 0 3px rgba(58,44,28,.40),
+    inset 0 0 0 3px rgba(58,44,28,.42),
     inset 0 5px 9px rgba(255,255,255,.55),
     inset 0 -12px 18px rgba(20,42,72,.30) !important;
-  border-radius: 3px !important;
-  overflow: hidden !important;
+  border-radius: 3px !important; overflow: hidden !important;
 }
-/* diagonal reflected-light streak across the glass */
-.bg-city .bg-window::before{
+.bg-city .bg-window::before{ /* glass reflection streak */
   content:""; position:absolute; top:-25%; left:-35%; width:55%; height:170%;
   background: linear-gradient(102deg, transparent 0%, rgba(255,255,255,.42) 46%, rgba(255,255,255,.68) 51%, transparent 60%);
   transform: rotate(7deg); pointer-events:none; z-index:1;
 }
-/* keep the products/wares sitting in front of the reflection */
 .bg-city .bg-window span{ position: relative; z-index:2; filter: drop-shadow(0 1px 1px rgba(0,0,0,.25)); }
 
 /* ---- Door: painted wood, recessed panel, brass handle ---- */
@@ -81,14 +105,8 @@
   box-shadow: inset 0 0 0 2px rgba(0,0,0,.45), inset 0 0 0 3px rgba(255,255,255,.06) !important;
   border-radius: 5px 5px 0 0 !important;
 }
-.bg-city .bg-door2::before{
-  content:""; position:absolute; left:3px; right:3px; top:4px; bottom:0;
-  border:1px solid rgba(255,255,255,.07); border-bottom:none; border-radius:3px 3px 0 0;
-}
-.bg-city .bg-door2::after{
-  content:""; position:absolute; right:4px; top:54%; width:3px; height:7px; border-radius:2px;
-  background: linear-gradient(#fbeeb6,#c9a84a); box-shadow: 0 0 2px rgba(0,0,0,.5);
-}
+.bg-city .bg-door2::before{ content:""; position:absolute; left:3px; right:3px; top:4px; bottom:0; border:1px solid rgba(255,255,255,.07); border-bottom:none; border-radius:3px 3px 0 0; }
+.bg-city .bg-door2::after{ content:""; position:absolute; right:4px; top:54%; width:3px; height:7px; border-radius:2px; background:linear-gradient(#fbeeb6,#c9a84a); box-shadow:0 0 2px rgba(0,0,0,.5); }
 
 /* ---- Coin bubble: a touch more pop ---- */
 .bg-city .bg-coin2{
@@ -100,12 +118,10 @@
    Environment — sky, skyline, street
    ============================================================ */
 
-/* Daytime sky: softer gradient + a warm horizon haze */
 body.day .bg-city{
   background: linear-gradient(180deg,#a9d3f4 0%, #bfd9ef 40%, #dcd6bf 72%, #cdbea0 100%) !important;
 }
-/* soft drifting clouds (day only) */
-body.day .bg-city::before{
+body.day .bg-city::before{ /* soft clouds */
   content:""; position:absolute; left:0; right:0; top:14px; height:78px; z-index:0; pointer-events:none;
   background:
     radial-gradient(42px 16px at 16% 42%, rgba(255,255,255,.9), transparent 72%),
@@ -114,40 +130,18 @@ body.day .bg-city::before{
     radial-gradient(52px 20px at 80% 52%, rgba(255,255,255,.85), transparent 72%);
 }
 
-/* Skyline: a bit more presence + a hazy base so it recedes */
-.bg-city .bg-far2{
-  opacity: .58 !important;
-  filter: saturate(.85);
-}
+.bg-city .bg-far2{ opacity:.58 !important; filter: saturate(.85); }
 
-/* Street: sidewalk band + curb + asphalt with faint lane dashes (day) */
 body.day .bg-road{
-  height: 46px !important;
-  border-top: none !important;
-  background:
-    linear-gradient(180deg,
-      #cfc7b6 0, #c6bda9 11px,           /* sidewalk */
-      #9a917f 11px, #7d7565 14px,        /* curb */
-      #6a655c 14px, #5b564d 46px) !important;  /* asphalt */
+  height: 46px !important; border-top: none !important;
+  background: linear-gradient(180deg,#cfc7b6 0,#c6bda9 11px,#9a917f 11px,#7d7565 14px,#6a655c 14px,#5b564d 46px) !important;
   box-shadow: inset 0 15px 8px -13px rgba(0,0,0,.4);
 }
-body.day .bg-road::before{
-  content:""; position:absolute; left:0; right:0; bottom:15px; height:2px;
-  background: repeating-linear-gradient(90deg, rgba(255,241,190,.55) 0 16px, transparent 16px 34px);
-}
+body.day .bg-road::before{ content:""; position:absolute; left:0; right:0; bottom:15px; height:2px; background: repeating-linear-gradient(90deg, rgba(255,241,190,.55) 0 16px, transparent 16px 34px); }
 
-/* Street (night): lit asphalt + curb + warm dashes */
 body:not(.day) .bg-road{
-  height: 46px !important;
-  border-top: none !important;
-  background:
-    linear-gradient(180deg,
-      #3a4152 0, #333a49 11px,
-      #232a36 11px, #1b212b 14px,
-      #202634 14px, #171c26 46px) !important;
+  height: 46px !important; border-top: none !important;
+  background: linear-gradient(180deg,#3a4152 0,#333a49 11px,#232a36 11px,#1b212b 14px,#202634 14px,#171c26 46px) !important;
   box-shadow: inset 0 15px 8px -13px rgba(0,0,0,.5);
 }
-body:not(.day) .bg-road::before{
-  content:""; position:absolute; left:0; right:0; bottom:15px; height:2px;
-  background: repeating-linear-gradient(90deg, rgba(255,214,120,.5) 0 16px, transparent 16px 34px);
-}
+body:not(.day) .bg-road::before{ content:""; position:absolute; left:0; right:0; bottom:15px; height:2px; background: repeating-linear-gradient(90deg, rgba(255,214,120,.5) 0 16px, transparent 16px 34px); }
