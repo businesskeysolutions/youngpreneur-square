@@ -14,6 +14,11 @@
   .badge b{font-size:12px;line-height:1}.badge small{font-size:9.5px;color:#9AA79A}
   .mapbtn{pointer-events:auto;background:rgba(8,11,9,.6);backdrop-filter:blur(8px);border:1px solid rgba(227,192,90,.3);border-radius:22px;padding:7px 11px;color:#E3C05A;font-size:12px;font-weight:700;cursor:pointer}
   .mapbtn.act{background:rgba(227,192,90,.22)}
+  .exitbtn{pointer-events:auto;background:rgba(8,11,9,.6);backdrop-filter:blur(8px);border:1px solid rgba(227,192,90,.3);border-radius:22px;padding:7px 12px;color:#F5F1E6;font-size:12px;font-weight:700;text-decoration:none;white-space:nowrap}
+  .toolbar{transition:opacity .25s ease,transform .25s ease}
+  body.hideui .toolbar{opacity:0;pointer-events:none;transform:translateY(-12px)}
+  .uishow{display:none;position:fixed;top:11px;right:13px;z-index:11;align-items:center;justify-content:center;width:38px;height:38px;border-radius:50%;background:rgba(8,11,9,.6);backdrop-filter:blur(8px);border:1px solid rgba(227,192,90,.3);color:#E3C05A;font-size:16px;cursor:pointer}
+  body.hideui .uishow{display:flex}
   .chip{margin-left:auto;pointer-events:auto;display:flex;align-items:center;gap:6px;background:rgba(8,11,9,.6);backdrop-filter:blur(8px);border:1px solid rgba(227,192,90,.3);border-radius:22px;padding:6px 12px 6px 6px}
   .ycoin{width:19px;height:19px;border-radius:50%;position:relative;background:radial-gradient(circle at 34% 30%,#fff7d8,#F4E3A6 32%,#DEB652 62%,#A97d2f);box-shadow:inset 0 1px 1px rgba(255,255,255,.7)}
   .ycoin::after{content:"Y";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:Georgia,serif;font-weight:800;font-size:11px;color:#8a6a1f}
@@ -71,15 +76,16 @@
 </head>
 <body>
 <canvas id="c"></canvas>
-<div class="toolbar">
+<div class="toolbar" id="toolbar">
+  <a class="exitbtn" href="index.html" title="Back to site">← Exit</a>
   <div class="badge"><span class="ava" id="ava">🧑🏽‍💼</span><div><b>Jordan</b><br><small id="wlabel">Broadway</small></div></div>
   <button class="mapbtn" id="mapbtn">🗺 City</button>
   <button class="mapbtn" id="ovbtn">⤢ Overview</button>
   <div class="chip"><span class="ycoin"></span><span class="v" id="coins">1,240</span></div>
   <div class="dn"><button data-m="day">☀️</button><button data-m="dusk">🌆</button><button data-m="night" class="on">🌙</button></div>
+  <button class="dn hidebtn" id="uiHide" title="Hide menu">▲</button>
 </div>
-<div class="tag">Walkable 3D City — prototype</div>
-<div class="hint">Joystick · on-screen arrows · keyboard (WASD/arrows) to walk · drag to look, drag up to see the tops · tap a building or 🚇</div>
+<button class="uishow" id="uiShow" title="Show menu">☰</button>
 <div class="stick" id="stick"><div class="knob" id="knob"></div></div>
 <div class="dpad" id="dpad"><button data-d="up">▲</button><div class="row"><button data-d="left">◀</button><button data-d="down">▼</button><button data-d="right">▶</button></div></div>
 <div class="card" id="card"></div>
@@ -509,7 +515,6 @@ function buildWorld(cfg){curCfg=cfg;curPals=cfg.pals;clearWorld();
   (cfg.entrances||[]).forEach(e=>makeEntrance(e));
   player.position.set(cfg.start.x,Math.abs(cfg.start.x)>=ROAD_HALF?SW_H:0,cfg.start.z);camYaw=Math.PI;lookTilt=0;
   document.getElementById('wlabel').textContent=cfg.line?cfg.name+' · '+cfg.line+' line':cfg.name;
-  document.querySelector('.tag').textContent=(cfg.key==='broadway'?'Broadway — the hub':cfg.name+' district')+' · prototype';
   apply(mode);updateCam();}
 
 // ---- player (realistic low-poly character, all-ages picker) ----
@@ -558,7 +563,14 @@ function apply(m){mode=m;const c=S[m];
   lampLights.forEach(l=>l.intensity=Math.max(c.lamps,.3));
   stars.material.opacity=m==='night'?.85:(m==='dusk'?.4:0);moon.visible=m!=='day';
   document.querySelectorAll('.dn button').forEach(b=>b.classList.toggle('on',b.dataset.m===m));}
-document.querySelectorAll('.dn button').forEach(b=>b.onclick=()=>apply(b.dataset.m));
+// auto day/night from the real time of day (manual buttons override)
+let userSetMode=false;
+function autoMode(){const h=new Date().getHours();return (h>=7&&h<17)?'day':(((h>=17&&h<20)||(h>=5&&h<7))?'dusk':'night');}
+document.querySelectorAll('.dn button').forEach(b=>b.onclick=()=>{userSetMode=true;apply(b.dataset.m);});
+setInterval(()=>{if(!userSetMode)apply(autoMode());},300000);
+// hide / show the top menu for a full view
+document.getElementById('uiHide').onclick=()=>document.body.classList.add('hideui');
+document.getElementById('uiShow').onclick=()=>document.body.classList.remove('hideui');
 
 // ---- camera (yaw + tilt up) ----
 let camYaw=Math.PI,camDist=13,camH=8.2,lookTilt=0,overview=false;
@@ -680,7 +692,7 @@ function tick(now){const dt=Math.min(.05,(now-last)/1000);last=now;
 function resize(){camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);}
 addEventListener('resize',resize);resize();
 
-buildWorld(WORLDS.broadway);apply('night');
+buildWorld(WORLDS.broadway);apply(autoMode());
 document.getElementById('load').style.display='none';
 requestAnimationFrame(tick);
 </script>
