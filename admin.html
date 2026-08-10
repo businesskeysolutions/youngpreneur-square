@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Square Admin — Business Review</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:"Work Sans",system-ui,sans-serif;background:#0a0f0c;color:#F5F1E6;line-height:1.5;padding:0}
+  a{color:#E3C05A}
+  .wrap{max-width:1100px;margin:0 auto;padding:18px}
+  header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;border-bottom:1px solid rgba(227,192,90,.25);padding:14px 0;margin-bottom:16px}
+  header h1{font-family:Georgia,serif;font-size:20px}
+  .pill{font-size:11px;padding:3px 9px;border-radius:20px;background:rgba(227,192,90,.15);border:1px solid rgba(227,192,90,.35);color:#E3C05A}
+  .muted{color:#9AA79A;font-size:12px}
+  .card{background:linear-gradient(160deg,#12201a,#0b130e);border:1px solid rgba(227,192,90,.3);border-radius:14px;padding:20px;max-width:400px;margin:40px auto}
+  .card h2{font-family:Georgia,serif;font-size:18px;margin-bottom:6px}
+  .card p{font-size:13px;color:#cdd6cd;margin-bottom:14px}
+  input,select{width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(227,192,90,.3);border-radius:8px;padding:10px;color:#F5F1E6;font-size:14px;margin-bottom:10px}
+  button{cursor:pointer;font-weight:700;border:none;border-radius:8px;font-size:13px;padding:9px 13px}
+  .btn{background:linear-gradient(180deg,#E3C05A,#B0862F);color:#14231a}
+  .btn.full{width:100%;padding:11px}
+  .btn.ghost{background:rgba(122,208,58,.14);color:#9fe06a;border:1px solid rgba(122,208,58,.4)}
+  .btn.warn{background:rgba(224,80,60,.16);color:#ff9a86;border:1px solid rgba(224,80,60,.4)}
+  .btn.mini{padding:6px 10px;font-size:12px}
+  .msg{font-size:12px;color:#E3C05A;min-height:16px;margin-top:6px}
+  .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+  .toolbar .grow{flex:1}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:9px 8px;border-bottom:1px solid rgba(255,255,255,.07);vertical-align:top}
+  th{color:#9AA79A;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.03em}
+  tr.pending{background:rgba(224,180,60,.06)}
+  .st{font-size:11px;padding:2px 8px;border-radius:12px;white-space:nowrap}
+  .st.approved{background:rgba(122,208,58,.16);color:#9fe06a}
+  .st.pending{background:rgba(224,180,60,.16);color:#f0c869}
+  .st.rejected{background:rgba(224,80,60,.16);color:#ff9a86}
+  .rowbtns{display:flex;gap:6px;flex-wrap:wrap}
+  .edit{display:none;margin-top:6px}
+  .edit input{margin-bottom:5px;font-size:12px;padding:7px}
+  .addr{font-weight:700}
+  .lnk{word-break:break-all;font-size:12px}
+  .count{font-size:12px;color:#9AA79A;margin-left:6px}
+  .hidden{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Square Admin</h1><span class="pill">Business Review</span>
+    <div class="grow" style="flex:1"></div>
+    <span class="muted" id="whoami"></span>
+    <button class="btn mini ghost hidden" id="signout">Sign out</button>
+  </header>
+
+  <div class="card" id="loginCard">
+    <h2>Owner sign in</h2>
+    <p>Sign in with the account you made on the Square. Only accounts on the admin list can review businesses.</p>
+    <input id="email" type="email" placeholder="Email" autocomplete="email">
+    <input id="pass" type="password" placeholder="Password" autocomplete="current-password">
+    <button class="btn full" id="loginBtn">Sign in</button>
+    <div class="msg" id="loginMsg"></div>
+  </div>
+
+  <div id="notAdmin" class="card hidden">
+    <h2>You're signed in, but not an admin yet</h2>
+    <p>To grant yourself admin access, run this once in your Supabase SQL editor, then reload:</p>
+    <input id="grantSql" readonly>
+    <button class="btn full mini" id="copyGrant">Copy the SQL</button>
+    <div class="msg" id="notAdminMsg"></div>
+  </div>
+
+  <div id="panel" class="hidden">
+    <div class="toolbar">
+      <select id="filter" style="width:auto;margin:0">
+        <option value="pending">Pending review</option>
+        <option value="all">All</option>
+        <option value="approved">Approved</option>
+        <option value="rejected">Rejected</option>
+        <option value="occupied">Occupied (has a tenant)</option>
+      </select>
+      <input id="search" placeholder="Search name / street / link" style="margin:0" class="grow">
+      <button class="btn mini" id="refresh">Refresh</button>
+      <span class="count" id="count"></span>
+    </div>
+    <table>
+      <thead><tr><th>Address</th><th>Business</th><th>Link</th><th>Status</th><th>Review</th><th>Actions</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <p class="muted" style="margin-top:14px">Approving a business makes its name and link visible on the Square and in the directory. Rejecting or hiding keeps the spot showing as “For lease” to the public. Empty spots don’t need review.</p>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script>
+(function(){
+  const cfg=window.SQUARE_CONFIG||{};
+  let sb=null;
+  if(window.SQ_DB&&window.SQ_DB.auth)sb=window.SQ_DB;
+  else if(window.supabase&&cfg.supabaseUrl&&cfg.supabaseAnonKey)sb=window.supabase.createClient(cfg.supabaseUrl,cfg.supabaseAnonKey);
+  const el=id=>document.getElementById(id);
+  const show=(id,on)=>el(id).classList.toggle('hidden',!on);
+  let ALL=[];
+
+  async function boot(){
+    if(!sb){el('loginMsg').textContent='Supabase is not configured on this page.';return;}
+    const {data}=await sb.auth.getSession();
+    if(data&&data.session){await onSession(data.session);}
+  }
+  async function onSession(session){
+    const u=session.user;
+    el('whoami').textContent=(u.email||'signed in');
+    show('signout',true);show('loginCard',false);
+    // am I an admin?
+    let admin=false;
+    try{const r=await sb.rpc('is_admin');if(!r.error)admin=!!r.data;}catch(e){}
+    if(admin){show('notAdmin',false);show('panel',true);load();}
+    else{
+      show('panel',false);show('notAdmin',true);
+      el('grantSql').value="insert into admins (user_id) values ('"+u.id+"') on conflict do nothing;";
+    }
+  }
+  el('loginBtn').onclick=async function(){
+    const email=(el('email').value||'').trim(),pass=el('pass').value||'';
+    if(!sb){el('loginMsg').textContent='Not configured.';return;}
+    this.disabled=true;el('loginMsg').textContent='Signing in...';
+    try{const r=await sb.auth.signInWithPassword({email:email,password:pass});
+      if(r.error){el('loginMsg').textContent=r.error.message;}
+      else{el('loginMsg').textContent='';await onSession(r.data.session);}}
+    catch(e){el('loginMsg').textContent='Sign-in failed.';}
+    this.disabled=false;
+  };
+  el('signout').onclick=async function(){try{await sb.auth.signOut();}catch(e){}location.reload();};
+  el('copyGrant').onclick=function(){el('grantSql').select();try{document.execCommand('copy');el('notAdminMsg').textContent='Copied — paste it into the SQL editor and run it, then reload this page.';}catch(e){el('notAdminMsg').textContent='Select the text and copy it manually.';}};
+
+  async function load(){
+    el('count').textContent='loading…';
+    const r=await sb.from('spaces').select('id,street,num,unit,status,tenant_name,category,shop_url,review_status').order('review_status',{ascending:true}).order('street',{ascending:true}).order('num',{ascending:true});
+    if(r.error){el('count').textContent='Error: '+r.error.message;return;}
+    ALL=r.data||[];render();
+  }
+  el('refresh').onclick=load;
+  el('filter').onchange=render;
+  el('search').oninput=render;
+
+  function occupied(s){return s.status&&s.status!=='open';}
+  function render(){
+    const f=el('filter').value, q=(el('search').value||'').toLowerCase().trim();
+    let list=ALL.slice();
+    if(f==='occupied') list=list.filter(occupied);
+    else if(f!=='all') list=list.filter(s=>(s.review_status||'approved')===f && (f==='approved'?true:occupied(s)||f!=='pending'));
+    if(f==='pending') list=list.filter(occupied); // only tenant spots need review
+    if(q) list=list.filter(s=>((s.tenant_name||'')+' '+(s.street||'')+' '+(s.num||'')+' '+(s.shop_url||'')+' '+(s.category||'')).toLowerCase().indexOf(q)>=0);
+    el('count').textContent=list.length+' shown';
+    const tb=el('rows');tb.innerHTML='';
+    list.forEach(function(s){
+      const rs=s.review_status||'approved';
+      const tr=document.createElement('tr');if(rs==='pending'&&occupied(s))tr.className='pending';
+      const link=s.shop_url?('<a class="lnk" href="'+esc(s.shop_url)+'" target="_blank" rel="noopener noreferrer">'+esc(s.shop_url)+' ↗</a>'):'<span class="muted">—</span>';
+      tr.innerHTML=
+        '<td class="addr">'+s.num+' '+esc(s.street)+'</td>'+
+        '<td>'+(occupied(s)?('<b>'+esc(s.tenant_name||'(no name)')+'</b><div class="muted">'+esc(s.category||'')+'</div>'):'<span class="muted">For lease</span>')+
+          '<div class="edit" id="ed_'+s.id+'"><input id="tn_'+s.id+'" placeholder="Business name" value="'+esc(s.tenant_name||'')+'"><input id="ct_'+s.id+'" placeholder="Category" value="'+esc(s.category||'')+'"><input id="su_'+s.id+'" placeholder="Shop link (https://...)" value="'+esc(s.shop_url||'')+'"><button class="btn mini" data-save="'+s.id+'">Save edits</button></div></td>'+
+        '<td><span class="st '+(occupied(s)?'approved':'')+'">'+esc(s.status||'open')+'</span></td>'+
+        '<td><span class="st '+rs+'">'+rs+'</span></td>'+
+        '<td><div class="rowbtns">'+
+          (occupied(s)?('<button class="btn mini ghost" data-act="approve" data-id="'+s.id+'">Approve</button>'+
+          '<button class="btn mini warn" data-act="reject" data-id="'+s.id+'">Reject</button>'+
+          '<button class="btn mini" data-act="hide" data-id="'+s.id+'">Hide</button>'+
+          '<button class="btn mini" data-edit="'+s.id+'">Edit</button>'):'<span class="muted">—</span>')+
+        '</div></td>';
+      tb.appendChild(tr);
+    });
+    tb.querySelectorAll('[data-act]').forEach(b=>b.onclick=()=>moderate(b.getAttribute('data-id'),b.getAttribute('data-act')));
+    tb.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>{const e=el('ed_'+b.getAttribute('data-edit'));e.style.display=e.style.display==='block'?'none':'block';});
+    tb.querySelectorAll('[data-save]').forEach(b=>b.onclick=()=>saveEdit(b.getAttribute('data-save')));
+  }
+  async function moderate(id,act){
+    const map={approve:'approved',reject:'rejected',hide:'pending'};
+    const patch={review_status:map[act],reviewed_at:new Date().toISOString()};
+    const r=await sb.from('spaces').update(patch).eq('id',id);
+    if(r.error){alert('Could not save: '+r.error.message);return;}
+    const s=ALL.find(x=>x.id===id);if(s)s.review_status=map[act];render();
+  }
+  async function saveEdit(id){
+    const patch={tenant_name:el('tn_'+id).value.trim()||null,category:el('ct_'+id).value.trim()||null,shop_url:el('su_'+id).value.trim()||null};
+    const r=await sb.from('spaces').update(patch).eq('id',id);
+    if(r.error){alert('Could not save edits: '+r.error.message);return;}
+    const s=ALL.find(x=>x.id===id);if(s)Object.assign(s,patch);render();
+  }
+  function esc(t){return String(t==null?'':t).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+  if(sb&&sb.auth&&sb.auth.onAuthStateChange)sb.auth.onAuthStateChange((_e,s)=>{if(s&&s.user)onSession(s);});
+  boot();
+})();
+</script>
+</body>
+</html>

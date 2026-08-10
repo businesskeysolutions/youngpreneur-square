@@ -163,17 +163,21 @@
     })();
 
     // If Supabase is connected, replace the demo data with the live directory.
+    // Reads the review-masked public_spaces view first (hides un-approved businesses); falls back to the base table pre-migration.
     if(window.SQ_DB){
       const DBMAP={open:'available',leased:'leased',liftoff:'donated'};
-      window.SQ_DB.from('spaces').select('street,num,unit,status,tenant_name,category,shop_url')
-        .order('street',{ascending:true}).order('num',{ascending:true}).order('unit',{ascending:true})
-        .then(function(res){
-          if(res.error || !res.data || !res.data.length){ if(res.error) console.warn('Directory: live load failed, keeping demo data.', res.error.message); return; }
-          spaces = res.data.map(function(r){
-            return { number:r.num, unit:'', street:r.street, status:DBMAP[r.status]||'available',
-                     tenant:r.tenant_name||'', category:r.category||'', shop:r.shop_url||'' };
+      function loadDir(tbl,canFallback){
+        window.SQ_DB.from(tbl).select('street,num,unit,status,tenant_name,category,shop_url')
+          .order('street',{ascending:true}).order('num',{ascending:true}).order('unit',{ascending:true})
+          .then(function(res){
+            if(res.error || !res.data || !res.data.length){ if(canFallback){ loadDir('spaces',false); return; } if(res.error) console.warn('Directory: live load failed, keeping demo data.', res.error.message); return; }
+            spaces = res.data.map(function(r){
+              return { number:r.num, unit:'', street:r.street, status:DBMAP[r.status]||'available',
+                       tenant:r.tenant_name||'', category:r.category||'', shop:r.shop_url||'' };
+            });
+            apply();
           });
-          apply();
-        });
+      }
+      loadDir('public_spaces',true);
     }
   })();

@@ -669,9 +669,14 @@ const STREETS=[
 ];
 const MAIN=STREETS[0];
 function demoSpaces(){const out=[];STREETS.forEach(s=>{for(let n=100;n<=128;n+=2)['A','B'].forEach(u=>{const roll=(n+u.charCodeAt(0))%5;out.push({street:s.name,num:n,unit:u,status:roll===0?'open':(roll===1?'liftoff':'leased'),tenant_name:roll===0?null:'Studio '+n+u,shop_url:null});});});return out;}
-async function loadSpaces(){try{const c=window.SQUARE_CONFIG;if(!c||!c.supabaseUrl)throw 0;
-  const r=await fetch(c.supabaseUrl+'/rest/v1/spaces?select=street,num,unit,status,tenant_name,shop_url&order=street,num,unit',{headers:{apikey:c.supabaseAnonKey,authorization:'Bearer '+c.supabaseAnonKey}});
-  if(!r.ok)throw 0;const rows=await r.json();return rows.length?rows:demoSpaces();}catch(e){return demoSpaces();}}
+async function loadSpaces(){const c=window.SQUARE_CONFIG;if(!c||!c.supabaseUrl)return demoSpaces();
+  const h={apikey:c.supabaseAnonKey,authorization:'Bearer '+c.supabaseAnonKey};
+  const q='?select=street,num,unit,status,tenant_name,shop_url&order=street,num,unit';
+  // read the review-masked public view first (hides un-approved businesses); fall back to the base table, then demo
+  for(const tbl of ['public_spaces','spaces']){
+    try{const r=await fetch(c.supabaseUrl+'/rest/v1/'+tbl+q,{headers:h});if(r.ok){const rows=await r.json();if(rows.length)return rows;}}catch(e){}
+  }
+  return demoSpaces();}
 function streetWorld(s,rows){
   const list=rows.filter(r=>r.street===s.db||r.street===s.name).sort((a,b)=>a.num-b.num||((a.unit||'')<(b.unit||'')?-1:1));
   const accent='#'+s.color.toString(16).padStart(6,'0');
