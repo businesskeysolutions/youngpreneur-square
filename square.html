@@ -101,6 +101,7 @@
 </div>
 <div class="load" id="load">Building the City…</div>
 
+<script src="config.js"></script>
 <script>/**
  * @license
  * Copyright 2010-2021 Three.js Authors
@@ -337,10 +338,10 @@ function makeBiz(x,z,side,tier,data,addr){
   const smat = std({map:stex,emissiveMap:stex,emissive:0xffffff,emissiveIntensity:.6,transparent:true,roughness:.5});signMats.push(smat);
   const sign=new THREE.Mesh(new THREE.PlaneGeometry(w*0.92, data.br? w*0.23 : w*0.22),smat);sign.position.set(face,3.6,0);sign.rotation.y=yaw;g.add(sign);
   const aw=new THREE.Mesh(new THREE.BoxGeometry(.5,.5,d*.84),std({color:data.br?data.br.accent:(data.awn||0xc0432f),roughness:.6}));aw.position.set(side<0?w/2+.25:-w/2-.25,2.35,0);g.add(aw);
-  // address number plate
-  const addrStr=addr+' '+curCfg.street;
-  const np=new THREE.Mesh(new THREE.PlaneGeometry(1.35,1.0),std({map:numTex(addr),emissive:0xE3C05A,emissiveIntensity:.4,transparent:true}));np.position.set(face,5.55,0);np.rotation.y=yaw;g.add(np);signMats.push(np.material);
-  g.userData.info={kind:'biz',tier,name:data.name,status:data.status,cat:data.cat,who:data.who,addr:addrStr};
+  // address number plate (real "100A" from the directory when present)
+  const addrStr=data.addr||(addr+' '+curCfg.street);const plate=data.plate||addr;
+  const np=new THREE.Mesh(new THREE.PlaneGeometry(1.5,1.0),std({map:numTex(plate),emissive:0xE3C05A,emissiveIntensity:.4,transparent:true}));np.position.set(face,5.55,0);np.rotation.y=yaw;g.add(np);signMats.push(np.material);
+  g.userData.info={kind:'biz',tier,name:data.name,status:data.status,cat:data.cat,who:data.who,addr:addrStr,shop:data.shop||'',ptier:data.tier,from:data.from,mo:data.mo,stripe:data.stripe};
   if(data.takeover){const bw=Math.min(w*0.94,9),bh=Math.min(h*0.62,15);makeAnimBillboard(g,face,yaw,h*0.5+1,bw,bh,data.ads||BROADWAY_ADS);g.userData.info.takeover=1;}
   else if((tier==='landmark'||tier==='fifth')&&data.br){
     const btex=markTex(data.br,data.name);const bmat=std({map:btex,emissiveMap:btex,emissive:0xffffff,emissiveIntensity:.7,transparent:true,side:THREE.DoubleSide});signMats.push(bmat);
@@ -526,7 +527,34 @@ _NEWD.forEach(d=>{WORLDS[d.key]=genDistrict(d.key,d.name,d.color,d.pals,d.dark);
 // even ring layout for all district nodes on the map
 const _nh=DISTRICTS.filter(d=>!d.hub);_nh.forEach((d,i)=>{const a=-Math.PI/2+i*(2*Math.PI/_nh.length);d.x=50+Math.cos(a)*37;d.y=50+Math.sin(a)*31;});
 
-let curCfg=WORLDS.broadway;
+let curCfg=null;
+// ================= 6 real streets (match the directory) + live Supabase data =================
+const STREETS=[
+ {key:'runway',    name:'The Runway',      tier:'Front Row',    from:'$199', mo:'$299/mo', stripe:'Front Row',    build:'fifth',   color:0xE3C05A, pals:GOLD_PALS,  dark:'#241a0e', main:1},
+ {key:'ascend',    name:'Ascend Avenue',   tier:'Growth',       from:'$99',  mo:'$149/mo', stripe:'Growth',       build:'broadway',color:0x5fae4a, pals:GREEN_PALS, dark:'#12240e'},
+ {key:'firstclass',name:'First Class Row', tier:'Main Strip',   from:'$49',  mo:'$89/mo',  stripe:'Main Strip',   build:'broadway',color:0x6a7aff, pals:BLUE_PALS,  dark:'#0e1430'},
+ {key:'hangar',    name:'The Hangar',      tier:'Ground Level', from:'$19',  mo:'$39/mo',  stripe:'Ground Level', build:'canal',   color:0x8a94a0, pals:BLACK_PALS, dark:'#1a1c20'},
+ {key:'takeoff',   name:'Takeoff Lane',    tier:'Ground Level', from:'$19',  mo:'$39/mo',  stripe:'Ground Level', build:'canal',   color:0x3ac0d9, pals:BLUE_PALS,  dark:'#0a2028'},
+ {key:'founders',  name:'Founders Way',    tier:'Cornerstone',  from:'Free', mo:'free',    stripe:'',             build:'canal',   color:0xd24fb0, pals:PURPLE_PALS,dark:'#2a0e24', free:1}
+];
+const MAIN=STREETS[0];
+function demoSpaces(){const out=[];STREETS.forEach(s=>{for(let n=100;n<=128;n+=2)['A','B'].forEach(u=>{const roll=(n+u.charCodeAt(0))%5;out.push({street:s.name,num:n,unit:u,status:roll===0?'open':(roll===1?'liftoff':'leased'),tenant_name:roll===0?null:'Studio '+n+u,shop_url:null});});});return out;}
+async function loadSpaces(){try{const c=window.SQUARE_CONFIG;if(!c||!c.supabaseUrl)throw 0;
+  const r=await fetch(c.supabaseUrl+'/rest/v1/spaces?select=street,num,unit,status,tenant_name,shop_url&order=street,num,unit',{headers:{apikey:c.supabaseAnonKey,authorization:'Bearer '+c.supabaseAnonKey}});
+  if(!r.ok)throw 0;const rows=await r.json();return rows.length?rows:demoSpaces();}catch(e){return demoSpaces();}}
+function streetWorld(s,rows){
+  const list=rows.filter(r=>r.street===s.name).sort((a,b)=>a.num-b.num||(a.unit<b.unit?-1:1));
+  const accent='#'+s.color.toString(16).padStart(6,'0');
+  const ads=[{brand:s.name.toUpperCase(),line:s.tier.toUpperCase()+' · '+(s.free?'FREE FOR FOUNDERS':s.from+' THEN '+s.mo),a:s.dark,b:s.dark,fg:'#efe8d6',fg2:accent},{brand:'LEASE HERE',line:'ON '+s.name.toUpperCase(),a:s.dark,b:s.dark,fg:'#efe8d6',fg2:accent}];
+  const mk=nm=>({mark:(nm||'YS').replace(/[^A-Za-z ]/g,'').split(/\s+/).filter(Boolean).map(w=>w[0]).join('').slice(0,2).toUpperCase()||'YS',bg:s.dark,fg:'#efe8d6',accent:accent,tag:''});
+  const toBiz=(r)=>{const open=r.status==='open';const nm=open?'FOR LEASE':(r.tenant_name||'Leased');
+    return [s.build,{name:nm,status:open?'open':(s.free?'cornerstone':'leased'),cat:'',who:s.free?'Founder':(r.status==='liftoff'?'Liftoff ✈':'Leased'),addr:r.num+r.unit+' '+s.name,plate:r.num+r.unit,shop:r.shop_url||'',tier:s.tier,from:s.from,mo:s.mo,stripe:s.stripe,br:open?null:mk(nm)}];};
+  const L=[],R=[];list.forEach((r,i)=>{(i%2===0?L:R).push(toBiz(r));});
+  if(s.main&&L[0]){L[0]=['landmark',Object.assign({},L[0][1],{name:'THE MARQUEE',status:'landmark',takeover:1,ads:ads,who:'The Tower',tier:'The Tower',from:'$499',mo:'$499/mo',stripe:'The Tower',br:{mark:'M',bg:'#141210',fg:'#F4E3A6',accent:'#E3C05A',serif:1,tag:'the tower'}})];}
+  return {key:s.key,name:s.name,street:s.name,tag:s.tier,line:s.name,lineColor:s.color,pals:s.pals,road:['#1e2228','#141820','#2a3038'],start:{x:0,z:-24},L,R,
+    spectaculars:s.main?[{z:0,w:8,h:4.4,ads:ads},{z:52,w:7,h:4,ads:ads}]:[{z:6,w:6.5,h:4.4,ads:ads}],
+    entrances:s.main?STREETS.filter(x=>!x.main).map((x,i)=>({x:i%2?-6.5:6.5,z:-12+i*22,line:x.name,color:x.color,cat:x.tier,tier:'standard',to:x.key})):[{x:6.5,z:-12,line:MAIN.name,color:MAIN.color,cat:'Back to '+MAIN.name,tier:'premium',to:MAIN.key}]};
+}
 function disposeObj(o){o.traverse(n=>{if(n.geometry)n.geometry.dispose();if(n.material){(Array.isArray(n.material)?n.material:[n.material]).forEach(m=>{if(m.map)m.map.dispose();if(m.emissiveMap)m.emissiveMap.dispose();m.dispose();});}});}
 function clearWorld(){disposeObj(worldGroup);scene.remove(worldGroup);worldGroup=new THREE.Group();scene.add(worldGroup);
   winMats.length=0;signMats.length=0;lampBulbs.length=0;lampLights.length=0;interact.length=0;anims.length=0;vehicles.length=0;peds.length=0;}
@@ -534,24 +562,24 @@ function buildWorld(cfg){curCfg=cfg;curPals=cfg.pals;clearWorld();
   groundMat.map=roadTex(cfg.road[0],cfg.road[1],cfg.road[2]);groundMat.needsUpdate=true;
   let z=-30,lno=1,rno=2;cfg.L.forEach((b,i)=>{const TL=TIER[b[0]];makeBiz(-TL.x,z,-1,b[0],b[1],lno);lno+=2;
     if(cfg.R[i]){const TR=TIER[cfg.R[i][0]];makeBiz(TR.x,z,1,cfg.R[i][0],cfg.R[i][1],rno);rno+=2;}z+=13;});
-  for(let zz=-36;zz<62;zz+=rr(8,12)){bgBuilding(-26-rr(0,6),zz);bgBuilding(26+rr(0,6),zz);}
+  for(let zz=-36;zz<162;zz+=rr(8,12)){bgBuilding(-26-rr(0,6),zz);bgBuilding(26+rr(0,6),zz);}
   for(let xx=-20;xx<=20;xx+=rr(7,11)) bgBuilding(xx,-70-rr(0,20));
-  for(let zz=-30;zz<52;zz+=20){streetlight(-6.2,zz);streetlight(6.2,zz);}
-  for(let zz=-24;zz<50;zz+=26){tree(-7.6,zz);tree(7.6,zz);}
+  for(let zz=-30;zz<158;zz+=20){streetlight(-6.2,zz);streetlight(6.2,zz);}
+  for(let zz=-24;zz<156;zz+=26){tree(-7.6,zz);tree(7.6,zz);}
   // raised walkable sidewalks both sides (road runs down the center for traffic)
-  [-1,1].forEach(s=>{const sw=new THREE.Mesh(new THREE.BoxGeometry(5.4,SW_H,120),std({color:0x40454b,roughness:.96}));sw.position.set(s*7.2,SW_H/2,12);sw.receiveShadow=true;worldGroup.add(sw);
-    const curb=new THREE.Mesh(new THREE.BoxGeometry(0.28,SW_H+0.14,120),std({color:0x5c6268}));curb.position.set(s*(ROAD_HALF+0.14),(SW_H+0.14)/2,12);worldGroup.add(curb);});
-  // painted zebra crosswalks
-  CW.forEach(z=>crosswalk(z));
+  [-1,1].forEach(s=>{const sw=new THREE.Mesh(new THREE.BoxGeometry(5.4,SW_H,220),std({color:0x40454b,roughness:.96}));sw.position.set(s*7.2,SW_H/2,60);sw.receiveShadow=true;worldGroup.add(sw);
+    const curb=new THREE.Mesh(new THREE.BoxGeometry(0.28,SW_H+0.14,220),std({color:0x5c6268}));curb.position.set(s*(ROAD_HALF+0.14),(SW_H+0.14)/2,60);worldGroup.add(curb);});
+  // painted zebra crosswalks down the length of the street
+  for(let z=-16;z<150;z+=22)crosswalk(z);
   // overhead gantry digital signs (readable head-on down the avenue)
   const adReel=(cfg.spectaculars&&cfg.spectaculars[0]&&cfg.spectaculars[0].ads)||BROADWAY_ADS;
   (cfg.spectaculars||[]).forEach(s=>makeGantry(s.z,s.w,s.h,s.ads));
   // traffic: taxis (animated rooftop ads) + cars (painted side ads); two lanes, spaced out
-  const traffic=[{x:2.3,dir:1,taxi:1,speed:8},{x:-2.3,dir:-1,taxi:1,speed:9},{x:2.3,dir:1,color:0x8a2f2f,speed:6.5},{x:-2.3,dir:-1,color:0x2a3a6a,speed:10},{x:2.3,dir:1,color:0x2f6a4a,speed:7.5}];
-  let vz=-40;traffic.forEach(t=>{makeVehicle(Object.assign({z:vz,ads:adReel},t));vz+=23;});
+  const traffic=[{x:2.3,dir:1,taxi:1,speed:9},{x:-2.3,dir:-1,taxi:1,speed:10},{x:2.3,dir:1,color:0x8a2f2f,speed:7},{x:-2.3,dir:-1,color:0x2a3a6a,speed:11},{x:2.3,dir:1,color:0x2f6a4a,speed:8},{x:-2.3,dir:-1,color:0x7a5a2a,speed:9},{x:2.3,dir:1,taxi:1,speed:8}];
+  let vz=-40;traffic.forEach(t=>{makeVehicle(Object.assign({z:vz,ads:adReel},t));vz+=28;});
   (cfg.entrances||[]).forEach(e=>makeEntrance(e));
   player.position.set(cfg.start.x,Math.abs(cfg.start.x)>=ROAD_HALF?SW_H:0,cfg.start.z);camYaw=Math.PI;lookTilt=0;
-  document.getElementById('wlabel').textContent=cfg.line?cfg.name+' · '+cfg.line+' line':cfg.name;
+  document.getElementById('wlabel').textContent=cfg.name+(cfg.tag?' · '+cfg.tag:'');
   apply(mode);updateCam();}
 
 // ---- player (realistic low-poly character, all-ages picker) ----
@@ -621,7 +649,7 @@ function updateCam(){const p=player.position;
   if(overview){camera.position.set(30,56,clamp(p.z,-30,55)+40);camera.lookAt(0,4,clamp(p.z,-30,55)-8);return;}
   const camY=Math.max(2.2,p.y+camH-lookTilt*4);
   let cx=p.x+Math.sin(camYaw)*camDist,cz=p.z+Math.cos(camYaw)*camDist;
-  cx=clamp(cx,-13,13);cz=clamp(cz,-31,60);
+  cx=clamp(cx,-13,13);cz=clamp(cz,-31,164);
   camera.position.set(cx,camY,cz);camera.lookAt(p.x,p.y+2.6+lookTilt*17,p.z);}
 const ovbtn=document.getElementById('ovbtn');
 ovbtn.onclick=function(){overview=!overview;this.classList.toggle('act',overview);this.textContent=overview?'⤢ Street':'⤢ Overview';};
@@ -684,12 +712,13 @@ function capTier(t){return t==='fifth'?'Fifth Avenue':t==='landmark'?'The Marque
 // in-world tiers mapped to the live pricing tiers
 const PRICING={canal:{name:'Ground Level',from:'$19',mo:'$39/mo'},broadway:{name:'Main Strip',from:'$49',mo:'$89/mo'},fifth:{name:'Growth',from:'$99',mo:'$149/mo'},landmark:{name:'The Marquee',from:'$199',mo:'$299/mo'}};
 const LEASE='lease.html#join',PRICE='pricing.html',DIR='directory.html';
+function leaseLink(k){const s=(window.SQUARE_CONFIG&&window.SQUARE_CONFIG.stripeLinks)||{};return (k&&s[k]&&(''+s[k]).length)?s[k]:'lease.html#join';}
 function openCard(info){let html='';
-  if(info.kind==='entrance'){const hex='#'+info.color.toString(16).padStart(6,'0');const back=info.to==='broadway';
-    html='<button class="cclose">✕</button><div class="cbadge" style="color:'+hex+'">🚇 '+info.line+(back?'':' Line')+' · '+(info.tier==='premium'?'Main Street entrance':'Side-street entrance')+'</div><h3>'+(back?'Back to Broadway':'Ride the '+info.line+' line')+'</h3><div class="cwho">'+info.cat+'</div><p>'+(back?'Head up the stairs and back to the main strip where every district connects.':(info.tier==='premium'?'The prime entrance, right on Main Street where everyone passes. ':'A quieter entrance on a side street. ')+'Ride down to the '+info.cat+' district and explore its own world of businesses.')+'</p><div class="cact"><a class="go" id="rideBtn">'+(back?'Ride back ↥':'Ride the line ↧')+'</a></div>';}
-  else if(info.takeover){html='<button class="cclose">✕</button><div class="cbadge">★ '+info.addr+' · Live Takeover</div><h3>'+info.name+'</h3><div class="cwho">The Marquee · flagship from $199/mo · ad slots (Now Playing) from $39</div><p>The most visible address in the district — one brand at a time, playing live on the whole building like a Times Square takeover. The premium ad spot everything else looks up to.</p><div class="cact"><a class="go" href="'+LEASE+'">Book the takeover</a><a class="alt" href="'+PRICE+'">See rates</a></div>';}
-  else if(info.status==='open'){const prem=info.tier==='fifth'||info.tier==='landmark';const pr=PRICING[info.tier]||PRICING.broadway;html='<button class="cclose">✕</button><div class="cbadge">✦ For lease · '+capTier(info.tier)+'</div><h3>'+(prem?'A prime address':'An open storefront')+'</h3><div class="cwho">'+info.addr+' · '+pr.name+' — from '+pr.from+', then '+pr.mo+'</div><p>'+(prem?'Front and center on the main street — the most visible spot there is. ':'An affordable spot to get on the map. ')+'Lease it and link it straight to your own shop.</p><div class="cact"><a class="go" href="'+LEASE+'">Lease this spot</a><a class="alt" href="'+PRICE+'">See pricing</a></div>';}
-  else{const badge=info.status==='cornerstone'?'★ Cornerstone · free for young founders':(info.status==='landmark'?'★ The Landmark':'✦ Leased');html='<button class="cclose">✕</button><div class="cbadge">'+badge+' · '+capTier(info.tier)+'</div><h3>'+info.name+'</h3><div class="cwho">'+info.addr+(info.who?' · '+info.who:'')+(info.cat?' · '+info.cat:'')+'</div><p>'+(info.status==='cornerstone'?"A young founder's storefront, funded by the mission (free Cornerstone tier). It links out to their own shop.":"A leased storefront. It links straight to the business's own shop — the Square is the landlord, never the cashier.")+'</p><div class="cact"><a class="go" href="'+DIR+'">Visit the shop ↗</a><a class="alt" href="'+DIR+'">Directory</a></div>';}
+  if(info.kind==='entrance'){const hex='#'+info.color.toString(16).padStart(6,'0');const back=/^Back/.test(info.cat||'');
+    html='<button class="cclose">✕</button><div class="cbadge" style="color:'+hex+'">🚇 '+info.line+' Line</div><h3>'+(back?info.cat:'Ride to '+info.line)+'</h3><div class="cwho">'+(back?'':info.cat)+'</div><p>'+(back?'Head back to the main strip where every line connects.':'Ride the '+info.line+' line to that street and explore its addresses.')+'</p><div class="cact"><a class="go" id="rideBtn">'+(back?'Ride back ↥':'Ride the line ↧')+'</a></div>';}
+  else if(info.takeover){html='<button class="cclose">✕</button><div class="cbadge">★ '+info.addr+' · The Tower</div><h3>The Marquee takeover</h3><div class="cwho">The Tower · '+(info.mo||'$499/mo')+' · the screen the Square opens on</div><p>The single most-seen surface in the city — one brand at a time, live on the whole building. The premium: you are buying the most visibility there is.</p><div class="cact"><a class="go" href="'+leaseLink(info.stripe||'The Tower')+'">Book the takeover</a><a class="alt" href="pricing.html">See rates</a></div>';}
+  else if(info.status==='open'){const free=info.from==='Free';html='<button class="cclose">✕</button><div class="cbadge">✦ For lease · '+(info.ptier||'')+'</div><h3>'+info.addr+'</h3><div class="cwho">'+(free?'Free for young founders':(info.ptier+' — from '+info.from+', then '+info.mo))+'</div><p>'+(free?'A free Founders Way storefront for a young founder — get on the map and point it at your shop.':'Lease this address and link it straight to your own shop.')+'</p><div class="cact"><a class="go" href="'+leaseLink(info.stripe)+'">'+(free?'Claim it free':'Lease this spot')+'</a><a class="alt" href="pricing.html">See pricing</a></div>';}
+  else{const badge=info.status==='cornerstone'?'★ Founder · free':(info.who==='Liftoff ✈'?'✈ Liftoff':'✦ Leased');const shop=(info.shop&&info.shop.length)?info.shop:'directory.html';html='<button class="cclose">✕</button><div class="cbadge">'+badge+' · '+(info.ptier||'')+'</div><h3>'+info.name+'</h3><div class="cwho">'+info.addr+'</div><p>'+(info.status==='cornerstone'?"A young founder's storefront on Founders Way (free) — it links out to their own shop.":"A leased storefront — it links straight to the business's own shop.")+'</p><div class="cact"><a class="go" href="'+shop+'"'+(info.shop?' target="_blank" rel="noopener"':'')+'>Visit the shop ↗</a><a class="alt" href="directory.html">Directory</a></div>';}
   card.innerHTML=html;card.classList.add('open');card.querySelector('.cclose').onclick=()=>card.classList.remove('open');
   const rb=document.getElementById('rideBtn');if(rb)rb.onclick=()=>travelTo(info.to,info.line,info.color);}
 
@@ -720,12 +749,12 @@ function tick(now){const dt=Math.min(.05,(now-last)/1000);last=now;
       const gap=v.dir*(o.g.position.z-v.g.position.z);if(gap>0&&gap<6.5)sp=0;else if(gap>0&&gap<11)sp=Math.min(sp,v.base*0.3);}
     if(pOnRoad){const gp=v.dir*(pZ-v.g.position.z);if(gp>-1.5&&gp<9&&Math.abs(pX-v.x)<3.4)sp=0;}
     v.speed=sp;v.g.position.z+=v.dir*sp*dt;
-    if(v.g.position.z>62)v.g.position.z=-44;else if(v.g.position.z<-44)v.g.position.z=62;}
+    if(v.g.position.z>160)v.g.position.z=-44;else if(v.g.position.z<-44)v.g.position.z=160;}
   const iv=inputVec();
   const fwd=new THREE.Vector3(Math.sin(camYaw+Math.PI),0,Math.cos(camYaw+Math.PI));const right=new THREE.Vector3(-fwd.z,0,fwd.x);
   const mv=fwd.multiplyScalar(-iv.y).add(right.multiplyScalar(iv.x));
   if(mv.lengthSq()>0.02){mv.normalize();
-    const nx=clamp(player.position.x+mv.x*7*dt,-9.5,9.5), nz=clamp(player.position.z+mv.z*7*dt,-40,58);
+    const nx=clamp(player.position.x+mv.x*7*dt,-9.5,9.5), nz=clamp(player.position.z+mv.z*7*dt,-40,158);
     player.position.x=nx;player.position.z=nz;player.position.y=Math.abs(nx)>=ROAD_HALF?SW_H:0;
     player.rotation.y=Math.atan2(mv.x,mv.z);wt+=dt*9;const sw=Math.sin(wt)*.5;
     player.userData.legs[0].rotation.x=sw;player.userData.legs[1].rotation.x=-sw;
@@ -735,9 +764,19 @@ function tick(now){const dt=Math.min(.05,(now-last)/1000);last=now;
 function resize(){camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);}
 addEventListener('resize',resize);resize();
 
-buildWorld(WORLDS.broadway);apply(autoMode());
-document.getElementById('load').style.display='none';
-requestAnimationFrame(tick);
+async function initCity(){
+  const rows=await loadSpaces();
+  Object.keys(WORLDS).forEach(k=>delete WORLDS[k]);
+  STREETS.forEach(s=>{WORLDS[s.key]=streetWorld(s,rows);});
+  DISTRICTS.length=0;
+  DISTRICTS.push({key:MAIN.key,name:MAIN.name.toUpperCase(),cat:'main strip',color:'#'+MAIN.color.toString(16).padStart(6,'0'),hub:1,built:1,x:50,y:50});
+  const side=STREETS.filter(s=>!s.main);
+  side.forEach((s,i)=>{const a=-Math.PI/2+i*(2*Math.PI/side.length);DISTRICTS.push({key:s.key,name:s.name.toUpperCase(),cat:s.tier,color:'#'+s.color.toString(16).padStart(6,'0'),built:1,x:50+Math.cos(a)*34,y:50+Math.sin(a)*30});});
+  buildWorld(WORLDS[MAIN.key]);apply(autoMode());
+  document.getElementById('load').style.display='none';
+  requestAnimationFrame(tick);
+}
+initCity();
 </script>
 </body>
 </html>
