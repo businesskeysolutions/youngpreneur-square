@@ -74,6 +74,11 @@
   .node .soon{font-size:8px;color:#6a7686;letter-spacing:.06em}
   .node.live .lbl{text-shadow:0 0 10px currentColor}
   .stn{position:absolute;transform:translate(-50%,-50%);font-size:14px;filter:drop-shadow(0 0 5px #000)}
+  .sdot{position:absolute;transform:translate(-50%,-50%);width:11px;height:11px;border-radius:50%;background:#0b1220;border:2.5px solid #fff;box-shadow:0 0 5px rgba(0,0,0,.7);z-index:2}
+  .map .node{z-index:3}
+  .legend{position:absolute;left:12px;right:12px;bottom:6px;display:flex;flex-wrap:wrap;gap:7px 15px;justify-content:center;font-size:10.5px;color:#cfd8dd}
+  .legend span{display:flex;align-items:center;gap:6px;font-weight:600}
+  .legend i{width:16px;height:5px;border-radius:3px;display:inline-block}
   .toast{position:fixed;left:50%;bottom:120px;transform:translateX(-50%);z-index:26;background:rgba(8,11,9,.86);border:1px solid rgba(227,192,90,.35);color:#F5F1E6;font-size:12px;padding:10px 16px;border-radius:20px;opacity:0;transition:opacity .3s;pointer-events:none}
   .toast.on{opacity:1}
 </style>
@@ -529,13 +534,14 @@ const _nh=DISTRICTS.filter(d=>!d.hub);_nh.forEach((d,i)=>{const a=-Math.PI/2+i*(
 
 let curCfg=null;
 // ================= 6 real streets (match the directory) + live Supabase data =================
+// regular street names; Broadway is the main strip (the Marquee). db = current name in the directory table (matched before/after the rename). base = each street's own address block so all 180 are unique.
 const STREETS=[
- {key:'runway',    name:'The Runway',      tier:'Front Row',    from:'$199', mo:'$299/mo', stripe:'Front Row',    build:'fifth',   color:0xE3C05A, pals:GOLD_PALS,  dark:'#241a0e', main:1},
- {key:'ascend',    name:'Ascend Avenue',   tier:'Growth',       from:'$99',  mo:'$149/mo', stripe:'Growth',       build:'broadway',color:0x5fae4a, pals:GREEN_PALS, dark:'#12240e'},
- {key:'firstclass',name:'First Class Row', tier:'Main Strip',   from:'$49',  mo:'$89/mo',  stripe:'Main Strip',   build:'broadway',color:0x6a7aff, pals:BLUE_PALS,  dark:'#0e1430'},
- {key:'hangar',    name:'The Hangar',      tier:'Ground Level', from:'$19',  mo:'$39/mo',  stripe:'Ground Level', build:'canal',   color:0x8a94a0, pals:BLACK_PALS, dark:'#1a1c20'},
- {key:'takeoff',   name:'Takeoff Lane',    tier:'Ground Level', from:'$19',  mo:'$39/mo',  stripe:'Ground Level', build:'canal',   color:0x3ac0d9, pals:BLUE_PALS,  dark:'#0a2028'},
- {key:'founders',  name:'Founders Way',    tier:'Cornerstone',  from:'Free', mo:'free',    stripe:'',             build:'canal',   color:0xd24fb0, pals:PURPLE_PALS,dark:'#2a0e24', free:1}
+ {key:'broadway',db:'The Runway',      name:'Broadway',       base:100, tier:'Front Row',    from:'$199', mo:'$299/mo', stripe:'Front Row',    build:'fifth',   color:0xE3C05A, pals:GOLD_PALS,  dark:'#241a0e', main:1},
+ {key:'fifth',   db:'Ascend Avenue',   name:'Fifth Avenue',   base:200, tier:'Growth',       from:'$99',  mo:'$149/mo', stripe:'Growth',       build:'broadway',color:0x5fae4a, pals:GREEN_PALS, dark:'#12240e'},
+ {key:'madison', db:'First Class Row', name:'Madison Avenue', base:300, tier:'Main Strip',   from:'$49',  mo:'$89/mo',  stripe:'Main Strip',   build:'broadway',color:0x6a7aff, pals:BLUE_PALS,  dark:'#0e1430'},
+ {key:'park',    db:'Takeoff Lane',    name:'Park Avenue',    base:400, tier:'Ground Level', from:'$19',  mo:'$39/mo',  stripe:'Ground Level', build:'canal',   color:0x3ac0d9, pals:BLUE_PALS,  dark:'#0a2028'},
+ {key:'canal',   db:'The Hangar',      name:'Canal Street',   base:500, tier:'Ground Level', from:'$19',  mo:'$39/mo',  stripe:'Ground Level', build:'canal',   color:0x8a94a0, pals:BLACK_PALS, dark:'#1a1c20'},
+ {key:'founders',db:'Founders Way',    name:'Founders Way',   base:600, tier:'Cornerstone',  from:'Free', mo:'free',    stripe:'',             build:'canal',   color:0xd24fb0, pals:PURPLE_PALS,dark:'#2a0e24', free:1}
 ];
 const MAIN=STREETS[0];
 function demoSpaces(){const out=[];STREETS.forEach(s=>{for(let n=100;n<=128;n+=2)['A','B'].forEach(u=>{const roll=(n+u.charCodeAt(0))%5;out.push({street:s.name,num:n,unit:u,status:roll===0?'open':(roll===1?'liftoff':'leased'),tenant_name:roll===0?null:'Studio '+n+u,shop_url:null});});});return out;}
@@ -543,14 +549,14 @@ async function loadSpaces(){try{const c=window.SQUARE_CONFIG;if(!c||!c.supabaseU
   const r=await fetch(c.supabaseUrl+'/rest/v1/spaces?select=street,num,unit,status,tenant_name,shop_url&order=street,num,unit',{headers:{apikey:c.supabaseAnonKey,authorization:'Bearer '+c.supabaseAnonKey}});
   if(!r.ok)throw 0;const rows=await r.json();return rows.length?rows:demoSpaces();}catch(e){return demoSpaces();}}
 function streetWorld(s,rows){
-  const list=rows.filter(r=>r.street===s.name).sort((a,b)=>a.num-b.num||(a.unit<b.unit?-1:1));
+  const list=rows.filter(r=>r.street===s.db||r.street===s.name).sort((a,b)=>a.num-b.num||((a.unit||'')<(b.unit||'')?-1:1));
   const accent='#'+s.color.toString(16).padStart(6,'0');
   const ads=[{brand:s.name.toUpperCase(),line:s.tier.toUpperCase()+' · '+(s.free?'FREE FOR FOUNDERS':s.from+' THEN '+s.mo),a:s.dark,b:s.dark,fg:'#efe8d6',fg2:accent},{brand:'LEASE HERE',line:'ON '+s.name.toUpperCase(),a:s.dark,b:s.dark,fg:'#efe8d6',fg2:accent}];
   const mk=nm=>({mark:(nm||'YS').replace(/[^A-Za-z ]/g,'').split(/\s+/).filter(Boolean).map(w=>w[0]).join('').slice(0,2).toUpperCase()||'YS',bg:s.dark,fg:'#efe8d6',accent:accent,tag:''});
   const toBiz=(r,num)=>{const open=r.status==='open';const nm=open?'FOR LEASE':(r.tenant_name||'Leased');
     return [s.build,{name:nm,status:open?'open':(s.free?'cornerstone':'leased'),cat:'',who:s.free?'Founder':(r.status==='liftoff'?'Liftoff ✈':'Leased'),addr:num+' '+s.name,plate:''+num,shop:r.shop_url||'',tier:s.tier,from:s.from,mo:s.mo,stripe:s.stripe,br:open?null:mk(nm)}];};
   // real-street numbering: 100.. sequential, evens on one side / odds on the other, ascending down the block
-  const L=[],R=[];list.forEach((r,i)=>{const num=100+i;(num%2===0?L:R).push(toBiz(r,num));});
+  const L=[],R=[];list.forEach((r,i)=>{const num=(s.base||100)+i;(num%2===0?L:R).push(toBiz(r,num));});
   if(s.main&&L[0]){L[0]=['landmark',Object.assign({},L[0][1],{name:'THE MARQUEE',status:'landmark',takeover:1,ads:ads,who:'The Tower',tier:'The Tower',from:'$499',mo:'$499/mo',stripe:'The Tower',br:{mark:'M',bg:'#141210',fg:'#F4E3A6',accent:'#E3C05A',serif:1,tag:'the tower'}})];}
   return {key:s.key,name:s.name,street:s.name,tag:s.tier,line:s.name,lineColor:s.color,pals:s.pals,road:['#1e2228','#141820','#2a3038'],start:{x:0,z:-24},L,R,
     spectaculars:s.main?[{z:0,w:8,h:4.4,ads:ads},{z:52,w:7,h:4,ads:ads}]:[{z:6,w:6.5,h:4.4,ads:ads}],
@@ -725,13 +731,17 @@ function openCard(info){let html='';
 
 // ---- city map ----
 function buildMap(){const stage=document.getElementById('mapStage');const hub=DISTRICTS.find(d=>d.hub);
-  let svg='<svg viewBox="0 0 100 100" preserveAspectRatio="none">';
-  DISTRICTS.filter(d=>!d.hub).forEach(d=>{svg+='<line x1="'+hub.x+'" y1="'+hub.y+'" x2="'+d.x+'" y2="'+d.y+'" stroke="'+d.color+'" stroke-width="'+(d.built?0.9:0.5)+'" stroke-dasharray="'+(d.built?'':'1.6 1.6')+'" opacity="'+(d.built?0.95:0.4)+'"/>';});
+  let svg='<svg viewBox="0 0 100 100" preserveAspectRatio="none" style="overflow:visible">';
+  // thick colored transit lines (pixel-consistent width) + a white casing under each
+  DISTRICTS.filter(d=>!d.hub).forEach(d=>{const L='x1="'+hub.x+'" y1="'+hub.y+'" x2="'+d.x+'" y2="'+d.y+'"';
+    svg+='<line '+L+' stroke="#0a0f18" stroke-width="10" stroke-linecap="round" vector-effect="non-scaling-stroke"/>';
+    svg+='<line '+L+' stroke="'+d.color+'" stroke-width="6" stroke-linecap="round" vector-effect="non-scaling-stroke" opacity="'+(d.built?1:0.4)+'" '+(d.built?'':'stroke-dasharray="5 6"')+'/>';});
   svg+='</svg>';
-  let nodes='';DISTRICTS.forEach(d=>{nodes+='<div class="node '+(d.hub?'hub ':'')+(d.built?'live':'')+'" data-k="'+d.key+'" data-n="'+d.name+'" data-c="'+d.color+'" style="left:'+d.x+'%;top:'+d.y+'%;color:'+d.color+'"><div class="dot" style="background:'+d.color+'"></div><div class="lbl">'+d.name+'</div><div class="cat">'+d.cat+'</div>'+(d.built?'':'<div class="soon">SOON</div>')+'</div>';});
-  // subway entry markers on the ridable (built) lines
-  DISTRICTS.filter(d=>!d.hub&&d.built).forEach(d=>{const mx=hub.x+(d.x-hub.x)*0.32,my=hub.y+(d.y-hub.y)*0.32;nodes+='<div class="stn" style="left:'+mx+'%;top:'+my+'%">🚇</div>';});
-  stage.innerHTML=svg+nodes;
+  // intermediate station stops along each built line
+  let dots='';DISTRICTS.filter(d=>!d.hub&&d.built).forEach(d=>{[0.36,0.68].forEach(f=>{const mx=hub.x+(d.x-hub.x)*f,my=hub.y+(d.y-hub.y)*f;dots+='<div class="sdot" style="left:'+mx+'%;top:'+my+'%"></div>';});});
+  let nodes='';DISTRICTS.forEach(d=>{nodes+='<div class="node '+(d.hub?'hub ':'')+(d.built?'live':'')+'" data-k="'+d.key+'" data-n="'+d.name+'" style="left:'+d.x+'%;top:'+d.y+'%;color:'+d.color+'"><div class="dot" style="background:'+d.color+'"></div><div class="lbl">'+d.name+'</div><div class="cat">'+(d.cat||'')+'</div></div>';});
+  let leg='<div class="legend">';DISTRICTS.filter(d=>!d.hub).forEach(d=>{leg+='<span><i style="background:'+d.color+'"></i>'+d.name+'</span>';});leg+='</div>';
+  stage.innerHTML=svg+dots+nodes+leg;
   stage.querySelectorAll('.node').forEach(n=>n.onclick=()=>{const k=n.dataset.k;document.getElementById('map').classList.remove('on');
     if(k===curCfg.key){toast('You’re already here');return;}travelTo(k,n.dataset.n);});}
 document.getElementById('mapbtn').onclick=()=>{buildMap();document.getElementById('map').classList.add('on');};
