@@ -979,7 +979,9 @@ function queueSave(delta){pendingDelta+=delta;clearTimeout(saveTimer);saveTimer=
 async function flushSave(){if(!session||!sb||pendingDelta<=0)return;const d=pendingDelta;pendingDelta=0;
   try{const r=await sb.rpc('add_coins',{delta:d});if(r.error)return;if(typeof r.data==='number'&&r.data>W.coins){W.coins=r.data;saveW();setCoinLabel();}}catch(e){}}
 async function loadBalance(){try{const r=await sb.from('player_coins').select('coins').eq('user_id',session.user.id).maybeSingle();if(r.error||!r.data)return null;return r.data.coins;}catch(e){return null;}}
-async function afterAuth(){const bal=await loadBalance();
+async function ensureProfile(){try{const md=(session&&session.user&&session.user.user_metadata)||{};const uname=(md.username||'').trim();
+  if(uname&&contentOk(uname)){await sb.from('profiles').upsert({user_id:session.user.id,username:uname},{onConflict:'user_id'});}}catch(e){}}
+async function afterAuth(){await ensureProfile();const bal=await loadBalance();
   if(bal===null){if(W.coins>0){try{await sb.rpc('add_coins',{delta:Math.min(W.coins,500)});}catch(e){}}}
   else if(bal>W.coins){W.coins=bal;saveW();}
   else if(W.coins>bal){try{await sb.rpc('add_coins',{delta:Math.min(W.coins-bal,500)});}catch(e){}}
