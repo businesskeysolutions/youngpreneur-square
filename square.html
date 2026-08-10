@@ -701,9 +701,9 @@ function fitH(){document.documentElement.style.setProperty('--vh',innerHeight+'p
 addEventListener('resize',fitH);addEventListener('orientationchange',fitH);fitH();
 
 // ---- camera (yaw + tilt up) ----
-let camYaw=Math.PI,camDist=13,camH=8.2,lookTilt=0,overview=false;
+let camYaw=Math.PI,camDist=13,camH=8.2,lookTilt=0,overview=false,ovPan=0;
 function updateCam(){const p=player.position;
-  if(overview){const ovc=clamp(p.z,-10,140);const a=-camYaw+performance.now()/1000*0.10;const R=78;
+  if(overview){const ovc=clamp(p.z,-10,140);const a=-camYaw+ovPan;const R=78;
     camera.position.set(Math.sin(a)*R,86,ovc+Math.cos(a)*R);camera.lookAt(0,7,ovc);return;}
   const camY=Math.max(2.2,p.y+camH-lookTilt*4);
   let cx=p.x+Math.sin(camYaw)*camDist,cz=p.z+Math.cos(camYaw)*camDist;
@@ -829,8 +829,12 @@ function tick(now){const dt=Math.min(.05,(now-last)/1000);last=now;
     const az=v.g.position.z;let ax=v.x;if(az>132&&az<204){const t=Math.max(0,1-Math.abs(az-168)/36);ax=v.x+(v.x>=0?1:-1)*t*8.5;}v.g.position.x=ax;
     if(v.g.position.z>204)v.g.position.z=-44;else if(v.g.position.z<-44)v.g.position.z=204;}
   const iv=inputVec();
-  const fwd=new THREE.Vector3(Math.sin(camYaw+Math.PI),0,Math.cos(camYaw+Math.PI));const right=new THREE.Vector3(-fwd.z,0,fwd.x);
+  // movement is relative to the ACTIVE camera (street or overview) so left=left / right=right / forward=into the view
+  const _cd=new THREE.Vector3();camera.getWorldDirection(_cd);const fwd=new THREE.Vector3(_cd.x,0,_cd.z);
+  if(fwd.lengthSq()<1e-4)fwd.set(Math.sin(camYaw+Math.PI),0,Math.cos(camYaw+Math.PI));fwd.normalize();
+  const right=new THREE.Vector3(-fwd.z,0,fwd.x);
   const mv=fwd.multiplyScalar(-iv.y).add(right.multiplyScalar(iv.x));
+  if(overview&&mv.lengthSq()<=0.02)ovPan+=dt*0.10;   // gently auto-pan only while the player is idle
   if(mv.lengthSq()>0.02){mv.normalize();
     const nx=clamp(player.position.x+mv.x*7*dt,-9.5,9.5), nz=clamp(player.position.z+mv.z*7*dt,-40,158);
     player.position.x=nx;player.position.z=nz;player.position.y=Math.abs(nx)>=ROAD_HALF?SW_H:0;
