@@ -275,6 +275,22 @@ function makeGantry(z,w,h,ads){const g=new THREE.Group();
   makeAnimBillboard(g,0,Math.PI,10.4,w,h,ads);   // faces -z, toward oncoming pedestrians
   g.position.set(0,0,z);worldGroup.add(g);return g;}
 
+// standalone landmark screen building at the END of the street — the centrepiece (Broadway = the Marquee); road forks around it
+function makeEndmark(cfg){const lm=cfg.landmark;if(!lm)return;const zEnd=168,w=13,d=9,h=32;const g=new THREE.Group();
+  const tp=texPair(LAND_PAL);const mat=std({map:tp.map,emissiveMap:tp.emis,emissive:0xffcf7a,emissiveIntensity:S[mode].emis,roughness:.85});winMats.push(mat);
+  const body=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);body.position.y=h/2;body.castShadow=true;g.add(body);
+  const corn=new THREE.Mesh(new THREE.BoxGeometry(w+.7,.9,d+.7),std({color:LAND_PAL.trim}));corn.position.y=h+.45;g.add(corn);
+  const spire=new THREE.Mesh(new THREE.CylinderGeometry(.14,.34,9,8),std({color:0xE3C05A,emissive:0xE3C05A,emissiveIntensity:.6}));spire.position.y=h+4.9;g.add(spire);
+  const tip=new THREE.Mesh(new THREE.SphereGeometry(.38,10,10),std({color:0xff5a4a,emissive:0xff3a2a,emissiveIntensity:1}));tip.position.y=h+9.5;g.add(tip);lampBulbs.push(tip);
+  const base=new THREE.Mesh(new THREE.BoxGeometry(w+9,1,d+7),std({color:0x14120e,roughness:.9}));base.position.set(0,.5,0);g.add(base);
+  const scr=new THREE.Group();scr.position.set(0,0,-d/2-0.12);makeAnimBillboard(scr,0,Math.PI,h*0.5,w*0.86,h*0.5,lm.ads);g.add(scr);
+  g.position.set(0,0,zEnd);
+  g.userData.info={kind:'biz',takeover:1,name:lm.name,addr:lm.name,status:'landmark',tier:'fifth',ptier:lm.tier,from:lm.from,mo:lm.mo,stripe:lm.stripe,who:lm.tier};
+  worldGroup.add(g);interact.push(g);
+  // fork the road out around the plinth + a roundabout ring in front
+  [-1,1].forEach(sx=>{const rd=new THREE.Mesh(new THREE.PlaneGeometry(5.5,50),std({map:groundMat.map,roughness:.95}));rd.rotation.x=-Math.PI/2;rd.rotation.z=sx*0.42;rd.position.set(sx*8,0.03,zEnd-15);rd.receiveShadow=true;worldGroup.add(rd);});
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(9,0.55,8,40),std({color:0x2a2f36,roughness:.9}));ring.rotation.x=-Math.PI/2;ring.position.set(0,0.06,zEnd);worldGroup.add(ring);}
+
 // sidewalk-side small ad on a taxi/car
 function carAdTex(ad){const c=document.createElement('canvas');c.width=160;c.height=64;const x=c.getContext('2d');
   const g=x.createLinearGradient(0,0,160,64);g.addColorStop(0,ad.a);g.addColorStop(1,ad.b);x.fillStyle=g;x.fillRect(0,0,160,64);
@@ -557,9 +573,12 @@ function streetWorld(s,rows){
     return [s.build,{name:nm,status:open?'open':(s.free?'cornerstone':'leased'),cat:'',who:s.free?'Founder':(r.status==='liftoff'?'Liftoff ✈':'Leased'),addr:num+' '+s.name,plate:''+num,shop:r.shop_url||'',tier:s.tier,from:s.from,mo:s.mo,stripe:s.stripe,br:open?null:mk(nm)}];};
   // real-street numbering: 100.. sequential, evens on one side / odds on the other, ascending down the block
   const L=[],R=[];list.forEach((r,i)=>{const num=(s.base||100)+i;(num%2===0?L:R).push(toBiz(r,num));});
-  if(s.main&&L[0]){L[0]=['landmark',Object.assign({},L[0][1],{name:'THE MARQUEE',status:'landmark',takeover:1,ads:ads,who:'The Tower',tier:'The Tower',from:'$499',mo:'$499/mo',stripe:'The Tower',br:{mark:'M',bg:'#141210',fg:'#F4E3A6',accent:'#E3C05A',serif:1,tag:'the tower'}})];}
-  return {key:s.key,name:s.name,street:s.name,tag:s.tier,line:s.name,lineColor:s.color,pals:s.pals,road:['#1e2228','#141820','#2a3038'],start:{x:0,z:-24},L,R,
-    spectaculars:s.main?[{z:0,w:8,h:4.4,ads:ads},{z:52,w:7,h:4,ads:ads}]:[{z:6,w:6.5,h:4.4,ads:ads}],
+  // the district's big screen is now a standalone landmark building at the END of the street (Broadway = the Marquee)
+  const landmark = s.main
+    ? {marquee:1,ads:ads,name:'THE MARQUEE',tier:'The Tower',from:'$499',mo:'$499/mo',stripe:'The Tower'}
+    : {ads:ads,name:s.name.toUpperCase()+' SCREEN',tier:s.name+' billboard',from:'$149',mo:'$149/mo',stripe:'Front Row'};
+  return {key:s.key,name:s.name,street:s.name,tag:s.tier,line:s.name,lineColor:s.color,pals:s.pals,road:['#1e2228','#141820','#2a3038'],start:{x:0,z:-24},L,R,landmark,
+    spectaculars:s.main?[{z:0,w:8,h:4.4,ads:ads}]:[{z:6,w:6.5,h:4.4,ads:ads}],
     entrances:s.main?STREETS.filter(x=>!x.main).map((x,i)=>({x:i%2?-6.5:6.5,z:-12+i*22,line:x.name,color:x.color,cat:x.tier,tier:'standard',to:x.key})):[{x:6.5,z:-12,line:MAIN.name,color:MAIN.color,cat:'Back to '+MAIN.name,tier:'premium',to:MAIN.key}]};
 }
 function disposeObj(o){o.traverse(n=>{if(n.geometry)n.geometry.dispose();if(n.material){(Array.isArray(n.material)?n.material:[n.material]).forEach(m=>{if(m.map)m.map.dispose();if(m.emissiveMap)m.emissiveMap.dispose();m.dispose();});}});}
@@ -585,6 +604,7 @@ function buildWorld(cfg){curCfg=cfg;curPals=cfg.pals;clearWorld();
   const traffic=[{x:2.3,dir:1,taxi:1,speed:9},{x:-2.3,dir:-1,taxi:1,speed:10},{x:2.3,dir:1,color:0x8a2f2f,speed:7},{x:-2.3,dir:-1,color:0x2a3a6a,speed:11},{x:2.3,dir:1,color:0x2f6a4a,speed:8},{x:-2.3,dir:-1,color:0x7a5a2a,speed:9},{x:2.3,dir:1,taxi:1,speed:8}];
   let vz=-40;traffic.forEach(t=>{makeVehicle(Object.assign({z:vz,ads:adReel},t));vz+=28;});
   (cfg.entrances||[]).forEach(e=>makeEntrance(e));
+  makeEndmark(cfg);
   player.position.set(cfg.start.x,Math.abs(cfg.start.x)>=ROAD_HALF?SW_H:0,cfg.start.z);camYaw=Math.PI;lookTilt=0;
   document.getElementById('wlabel').textContent=cfg.name+(cfg.tag?' · '+cfg.tag:'');
   apply(mode);updateCam();}
@@ -723,7 +743,7 @@ function leaseLink(k){const s=(window.SQUARE_CONFIG&&window.SQUARE_CONFIG.stripe
 function openCard(info){let html='';
   if(info.kind==='entrance'){const hex='#'+info.color.toString(16).padStart(6,'0');const back=/^Back/.test(info.cat||'');
     html='<button class="cclose">✕</button><div class="cbadge" style="color:'+hex+'">🚇 '+info.line+' Line</div><h3>'+(back?info.cat:'Ride to '+info.line)+'</h3><div class="cwho">'+(back?'':info.cat)+'</div><p>'+(back?'Head back to the main strip where every line connects.':'Ride the '+info.line+' line to that street and explore its addresses.')+'</p><div class="cact"><a class="go" id="rideBtn">'+(back?'Ride back ↥':'Ride the line ↧')+'</a></div>';}
-  else if(info.takeover){html='<button class="cclose">✕</button><div class="cbadge">★ '+info.addr+' · The Tower</div><h3>The Marquee takeover</h3><div class="cwho">The Tower · '+(info.mo||'$499/mo')+' · the screen the Square opens on</div><p>The single most-seen surface in the city — one brand at a time, live on the whole building. The premium: you are buying the most visibility there is.</p><div class="cact"><a class="go" href="'+leaseLink(info.stripe||'The Tower')+'">Book the takeover</a><a class="alt" href="pricing.html">See rates</a></div>';}
+  else if(info.takeover){const marq=info.name==='THE MARQUEE';html='<button class="cclose">✕</button><div class="cbadge">★ '+(info.ptier||'The Tower')+'</div><h3>'+(marq?'The Marquee takeover':info.name)+'</h3><div class="cwho">'+(info.ptier||'The Tower')+' · '+(info.mo||'$499/mo')+' · '+(marq?'the screen the Square opens on':'the screen at the end of the street')+'</div><p>The most-seen surface in the district — one brand at a time, live on the whole building. The premium: you are buying the most visibility there is.</p><div class="cact"><a class="go" href="'+leaseLink(info.stripe)+'">Book the screen</a><a class="alt" href="pricing.html">See rates</a></div>';}
   else if(info.status==='open'){const free=info.from==='Free';html='<button class="cclose">✕</button><div class="cbadge">✦ For lease · '+(info.ptier||'')+'</div><h3>'+info.addr+'</h3><div class="cwho">'+(free?'Free for young founders':(info.ptier+' — from '+info.from+', then '+info.mo))+'</div><p>'+(free?'A free Founders Way storefront for a young founder — get on the map and point it at your shop.':'Lease this address and link it straight to your own shop.')+'</p><div class="cact"><a class="go" href="'+leaseLink(info.stripe)+'">'+(free?'Claim it free':'Lease this spot')+'</a><a class="alt" href="pricing.html">See pricing</a></div>';}
   else{const badge=info.status==='cornerstone'?'★ Founder · free':(info.who==='Liftoff ✈'?'✈ Liftoff':'✦ Leased');const shop=(info.shop&&info.shop.length)?info.shop:'directory.html';html='<button class="cclose">✕</button><div class="cbadge">'+badge+' · '+(info.ptier||'')+'</div><h3>'+info.name+'</h3><div class="cwho">'+info.addr+'</div><p>'+(info.status==='cornerstone'?"A young founder's storefront on Founders Way (free) — it links out to their own shop.":"A leased storefront — it links straight to the business's own shop.")+'</p><div class="cact"><a class="go" href="'+shop+'"'+(info.shop?' target="_blank" rel="noopener"':'')+'>Visit the shop ↗</a><a class="alt" href="directory.html">Directory</a></div>';}
   card.innerHTML=html;card.classList.add('open');card.querySelector('.cclose').onclick=()=>card.classList.remove('open');
@@ -760,7 +780,8 @@ function tick(now){const dt=Math.min(.05,(now-last)/1000);last=now;
       const gap=v.dir*(o.g.position.z-v.g.position.z);if(gap>0&&gap<6.5)sp=0;else if(gap>0&&gap<11)sp=Math.min(sp,v.base*0.3);}
     if(pOnRoad){const gp=v.dir*(pZ-v.g.position.z);if(gp>-1.5&&gp<9&&Math.abs(pX-v.x)<3.4)sp=0;}
     v.speed=sp;v.g.position.z+=v.dir*sp*dt;
-    if(v.g.position.z>160)v.g.position.z=-44;else if(v.g.position.z<-44)v.g.position.z=160;}
+    const az=v.g.position.z;let ax=v.x;if(az>132&&az<204){const t=Math.max(0,1-Math.abs(az-168)/36);ax=v.x+(v.x>=0?1:-1)*t*8.5;}v.g.position.x=ax;
+    if(v.g.position.z>204)v.g.position.z=-44;else if(v.g.position.z<-44)v.g.position.z=204;}
   const iv=inputVec();
   const fwd=new THREE.Vector3(Math.sin(camYaw+Math.PI),0,Math.cos(camYaw+Math.PI));const right=new THREE.Vector3(-fwd.z,0,fwd.x);
   const mv=fwd.multiplyScalar(-iv.y).add(right.multiplyScalar(iv.x));
