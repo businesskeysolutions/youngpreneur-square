@@ -95,7 +95,10 @@
   .wbox h3{font-family:Georgia,serif;font-size:19px;margin-bottom:6px}
   .wbox p{font-size:13px;color:#cdd6cd;line-height:1.5;margin-bottom:12px}
   .wrow{display:flex;gap:8px;margin-bottom:10px}.wrow.off{display:none}
-  .wbox input{flex:1;min-width:0;background:rgba(255,255,255,.06);border:1px solid rgba(227,192,90,.3);border-radius:9px;padding:11px;color:#F5F1E6;font-size:14px;user-select:text;-webkit-user-select:text}
+  .wbox input,.wbox select{flex:1;width:100%;min-width:0;background:rgba(255,255,255,.06);border:1px solid rgba(227,192,90,.3);border-radius:9px;padding:11px;color:#F5F1E6;font-size:14px;user-select:text;-webkit-user-select:text;margin-bottom:10px}
+  .wbox select{background:#12201a}
+  .crep{margin-top:12px;text-align:center}
+  .crep a{color:#8fa0ad;font-size:12px;cursor:pointer;text-decoration:underline}
   .wbtn{background:linear-gradient(180deg,#E3C05A,#B0862F);color:#14231a;border:none;border-radius:9px;padding:11px 15px;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap}
   .wbtn.ghost{background:rgba(122,208,58,.16);color:#9fe06a;border:1px solid rgba(122,208,58,.4)}
   .wmsg{font-size:12px;color:#E3C05A;min-height:16px;margin:8px 0 4px}
@@ -152,6 +155,23 @@
       <p>Signed in as <b id="wWho"></b>. Your coins save automatically as you collect them.</p>
       <button class="wbtn ghost full" id="wOut">Sign out</button>
     </div>
+  </div>
+</div>
+<div class="wmodal" id="repModal">
+  <div class="wbox">
+    <button class="wx" id="repX">✕</button>
+    <h3 style="font-family:Georgia,serif;font-size:19px;margin-bottom:6px">Report this spot</h3>
+    <p class="muted" id="repWho" style="font-size:12px;color:#9AA79A;margin-bottom:12px"></p>
+    <select id="repReason">
+      <option value="Inappropriate name or picture">Inappropriate name or picture</option>
+      <option value="Bad, scary, or broken link">Bad, scary, or broken link</option>
+      <option value="Not a real business">Not a real business</option>
+      <option value="Something else">Something else</option>
+    </select>
+    <input id="repDetail" placeholder="Anything else? (optional)" maxlength="300">
+    <button class="wbtn full" id="repSend">Send report</button>
+    <div class="wmsg" id="repMsg"></div>
+    <small class="wnote">Thanks for helping keep the Square safe — a grown-up reviews every report.</small>
   </div>
 </div>
 
@@ -861,7 +881,9 @@ function openCard(info){let html='';
   card.innerHTML=html;card.classList.add('open');card.querySelector('.cclose').onclick=()=>card.classList.remove('open');
   const rb=document.getElementById('rideBtn');if(rb)rb.onclick=()=>travelTo(info.to,info.line,info.color);
   // coin hunt: visiting a real leased shop earns bonus Y-coins (drives traffic to actual tenants)
-  if((info.status==='leased'||info.status==='cornerstone')&&info.shop){const gb=card.querySelector('.cact .go');if(gb)gb.addEventListener('click',()=>awardVisit(info.shop,info.name));}}
+  if((info.status==='leased'||info.status==='cornerstone')&&info.shop){const gb=card.querySelector('.cact .go');if(gb)gb.addEventListener('click',()=>awardVisit(info.shop,info.name));}
+  // reporting: any visitor can flag a storefront/screen (not the subway entrances)
+  if(info.kind!=='entrance'){const cr=document.createElement('div');cr.className='crep';const a=document.createElement('a');a.textContent='⚑ Report this spot';a.onclick=()=>openReport(info);cr.appendChild(a);card.appendChild(cr);}}
 
 // ---- city map ----
 function buildMap(){const stage=document.getElementById('mapStage');
@@ -1003,6 +1025,20 @@ function openWallet(ctx){renderWallet();setMode('signup');
   else{leave.classList.add('off');document.getElementById('wIntro').textContent='Make a free account to keep your coins across devices and enter for prizes. Your coins are already saved on this device.';}
   document.getElementById('wmodal').classList.add('on');}
 function closeWallet(){document.getElementById('wmodal').classList.remove('on');}
+// ---- reporting (any visitor, incl. guests, can flag a spot) ----
+let repInfo=null;
+function openReport(info){repInfo=info;const w=document.getElementById('repWho');
+  w.textContent=(info.addr||info.name||'This spot')+((info.name&&info.status!=='open')?' · '+info.name:'');
+  document.getElementById('repMsg').textContent='';document.getElementById('repDetail').value='';document.getElementById('repModal').classList.add('on');}
+function closeReport(){document.getElementById('repModal').classList.remove('on');}
+async function submitReport(){if(!repInfo)return;const reason=document.getElementById('repReason').value,detail=(document.getElementById('repDetail').value||'').slice(0,300);
+  const btn=document.getElementById('repSend');btn.disabled=true;document.getElementById('repMsg').textContent='Sending…';
+  if(!sb){document.getElementById('repMsg').textContent='Can’t send right now — try again later.';btn.disabled=false;return;}
+  try{const r=await sb.from('reports').insert({addr:repInfo.addr||'',tenant:repInfo.name||'',link:repInfo.shop||'',reason:reason,detail:detail,status:'new'});
+    if(r.error){document.getElementById('repMsg').textContent='Couldn’t send — please try again.';}
+    else{document.getElementById('repMsg').textContent='';toast('Thanks — a grown-up will review it.');closeReport();}}
+  catch(e){document.getElementById('repMsg').textContent='Couldn’t send.';}
+  btn.disabled=false;}
 async function doAuth(){const el=id=>document.getElementById(id);
   const email=(el('wEmail').value||'').trim(),pass=el('wPass').value||'',user=(el('wUsername').value||'').trim();
   if(!sb){el('wMsg').textContent='Accounts are not connected yet — your coins are still saved on this device.';return;}
@@ -1037,6 +1073,8 @@ async function initWallet(){const cfg=window.SQUARE_CONFIG||{};
   el('wLoginLink').onclick=()=>setMode(authMode==='login'?'signup':'login');
   el('wOut').onclick=async function(){try{if(sb)await sb.auth.signOut();}catch(e){}session=null;renderWallet();setCoinLabel();toast('Signed out — your coins stay saved on this device');};
   const ex=document.querySelector('.exitbtn');if(ex)ex.addEventListener('click',function(e){if(session)return;e.preventDefault();openWallet('exit');});
+  el('repX').onclick=closeReport;el('repSend').onclick=submitReport;
+  el('repModal').addEventListener('click',e=>{if(e.target.id==='repModal')closeReport();});
 }
 
 async function initCity(){

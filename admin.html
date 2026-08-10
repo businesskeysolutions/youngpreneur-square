@@ -48,6 +48,8 @@
 <div class="wrap">
   <header>
     <h1>Square Admin</h1><span class="pill">Business Review</span>
+    <button class="btn mini hidden" id="navBiz">Businesses</button>
+    <button class="btn mini ghost hidden" id="navRep">Reports <span id="repCount"></span></button>
     <div class="grow" style="flex:1"></div>
     <span class="muted" id="whoami"></span>
     <button class="btn mini ghost hidden" id="signout">Sign out</button>
@@ -89,6 +91,24 @@
     </table>
     <p class="muted" style="margin-top:14px">Approving a business makes its name and link visible on the Square and in the directory. Rejecting or hiding keeps the spot showing as “For lease” to the public. Empty spots don’t need review.</p>
   </div>
+
+  <div id="repPanel" class="hidden">
+    <div class="toolbar">
+      <select id="repFilter" style="width:auto;margin:0">
+        <option value="new">New</option>
+        <option value="all">All</option>
+        <option value="reviewed">Reviewed</option>
+        <option value="dismissed">Dismissed</option>
+      </select>
+      <button class="btn mini" id="repRefresh">Refresh</button>
+      <span class="count" id="repShown"></span>
+    </div>
+    <table>
+      <thead><tr><th>When</th><th>Spot</th><th>Reason</th><th>Details</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody id="repRows"></tbody>
+    </table>
+    <p class="muted" style="margin-top:14px">Reports come from anyone on the Square, including guests. Use the business search on the Businesses tab to find and act on a reported spot, then mark the report Reviewed or Dismissed.</p>
+  </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -128,7 +148,7 @@
     // am I an admin?
     let admin=false;
     try{const r=await sb.rpc('is_admin');if(!r.error)admin=!!r.data;}catch(e){}
-    if(admin){show('notAdmin',false);show('panel',true);load();}
+    if(admin){show('notAdmin',false);show('navBiz',true);show('navRep',true);showView('biz');load();loadReports();}
     else{
       show('panel',false);show('notAdmin',true);
       el('grantSql').value="insert into admins (user_id) values ('"+u.id+"') on conflict do nothing;";
@@ -206,6 +226,52 @@
     const s=ALL.find(x=>x.id===id);if(s)Object.assign(s,patch);render();
   }
   function esc(t){return String(t==null?'':t).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+  // ---- views + reports queue ----
+  function showView(v){show('panel',v==='biz');show('repPanel',v==='rep');
+    el('navBiz').classList.toggle('ghost',v!=='biz');el('navRep').classList.toggle('ghost',v!=='rep');}
+  el('navBiz').onclick=()=>showView('biz');
+  el('navRep').onclick=()=>{showView('rep');loadReports();};
+  let REPORTS=[];
+  async function loadReports(){
+    const r=await sb.from('reports').select('id,addr,tenant,link,reason,detail,status,created_at').order('created_at',{ascending:false});
+    if(r.error){el('repShown').textContent='';el('repCount').textContent='';return;}
+    REPORTS=r.data||[];
+    const nNew=REPORTS.filter(x=>(x.status||'new')==='new').length;
+    el('repCount').textContent=nNew?('('+nNew+')'):'';
+    renderReports();
+  }
+  el('repRefresh').onclick=loadReports;
+  el('repFilter').onchange=renderReports;
+  function renderReports(){
+    const f=el('repFilter').value;
+    let list=REPORTS.slice();
+    if(f!=='all') list=list.filter(x=>(x.status||'new')===f);
+    el('repShown').textContent=list.length+' shown';
+    const tb=el('repRows');tb.innerHTML='';
+    list.forEach(function(x){
+      const st=x.status||'new';const when=(x.created_at||'').replace('T',' ').slice(0,16);
+      const link=x.link?('<a class="lnk" href="'+esc(x.link)+'" target="_blank" rel="noopener noreferrer">link ↗</a>'):'';
+      const tr=document.createElement('tr');if(st==='new')tr.className='pending';
+      tr.innerHTML=
+        '<td class="muted">'+esc(when)+'</td>'+
+        '<td><b>'+esc(x.addr||'—')+'</b><div class="muted">'+esc(x.tenant||'')+'</div>'+link+'</td>'+
+        '<td>'+esc(x.reason||'')+'</td>'+
+        '<td>'+esc(x.detail||'')+'</td>'+
+        '<td><span class="st '+(st==='new'?'pending':(st==='dismissed'?'':'approved'))+'">'+esc(st)+'</span></td>'+
+        '<td><div class="rowbtns">'+(st!=='reviewed'?'<button class="btn mini ghost" data-rep="reviewed" data-id="'+x.id+'">Reviewed</button>':'')+
+          (st!=='dismissed'?'<button class="btn mini" data-rep="dismissed" data-id="'+x.id+'">Dismiss</button>':'')+'</div></td>';
+      tb.appendChild(tr);
+    });
+    tb.querySelectorAll('[data-rep]').forEach(b=>b.onclick=()=>resolveReport(b.getAttribute('data-id'),b.getAttribute('data-rep')));
+  }
+  async function resolveReport(id,status){
+    const r=await sb.from('reports').update({status:status}).eq('id',id);
+    if(r.error){alert('Could not update: '+r.error.message);return;}
+    const x=REPORTS.find(z=>z.id===id);if(x)x.status=status;
+    const nNew=REPORTS.filter(z=>(z.status||'new')==='new').length;el('repCount').textContent=nNew?('('+nNew+')'):'';
+    renderReports();
+  }
 
   if(sb&&sb.auth&&sb.auth.onAuthStateChange)sb.auth.onAuthStateChange((_e,s)=>{if(s&&s.user)onSession(s);});
   boot();

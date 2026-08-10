@@ -100,8 +100,9 @@
       const visitHref = sp.shop ? esc(sp.shop) : '';
       const act = occ ? (sp.shop?'<a href="'+visitHref+'" target="_blank" rel="noopener">Visit ↗</a>':'<span class="muted">Leased</span>')
                       : '<a href="lease.html#join">Lease</a>';
+      const rep = occ ? '<a class="dir-rep" href="#" style="display:block;font-size:11px;color:#8fa0ad;margin-top:4px;text-decoration:underline" data-addr="'+esc(sp.number+' '+toLine(sp.street))+'" data-nm="'+esc(sp.tenant)+'" data-link="'+esc(sp.shop||'')+'">⚑ Report</a>' : '';
       return '<div class="dir-row"><div class="dir-addr"><span class="num">'+sp.number+' '+toLine(sp.street)+'</span></div><div class="dir-ten">'+ten+'</div>'+
-        '<span class="dir-pill '+sp.status+'">'+pillLabel(sp.status)+'</span><div class="dir-act">'+act+'</div></div>';
+        '<span class="dir-pill '+sp.status+'">'+pillLabel(sp.status)+'</span><div class="dir-act">'+act+rep+'</div></div>';
     }
 
     function apply(){
@@ -126,6 +127,33 @@
     }
     [searchEl,streetEl,catEl,statusEl].forEach(el=>el.addEventListener('input',apply));
     apply();   // render the demo data instantly
+
+    // ---- reporting: any visitor can flag a listing straight to the admin queue ----
+    (function(){
+      const m=document.createElement('div');m.id='dirRep';
+      m.style.cssText='position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;background:rgba(4,6,9,.66);padding:18px';
+      m.innerHTML='<div style="width:100%;max-width:380px;background:#12201a;border:1px solid rgba(227,192,90,.4);border-radius:16px;padding:20px;color:#F5F1E6;font-family:system-ui,sans-serif">'+
+        '<h3 style="font-family:Georgia,serif;margin-bottom:6px">Report this listing</h3>'+
+        '<p id="drWho" style="font-size:12px;color:#9AA79A;margin-bottom:12px"></p>'+
+        '<select id="drReason" style="width:100%;padding:10px;border-radius:8px;background:#0e1a14;color:#F5F1E6;border:1px solid rgba(227,192,90,.3);margin-bottom:10px"><option>Inappropriate name or picture</option><option>Bad, scary, or broken link</option><option>Not a real business</option><option>Something else</option></select>'+
+        '<input id="drDetail" maxlength="300" placeholder="Anything else? (optional)" style="width:100%;padding:10px;border-radius:8px;background:rgba(255,255,255,.06);color:#F5F1E6;border:1px solid rgba(227,192,90,.3);margin-bottom:10px">'+
+        '<div style="display:flex;gap:8px"><button id="drSend" style="flex:1;padding:10px;border:none;border-radius:8px;background:linear-gradient(180deg,#E3C05A,#B0862F);color:#14231a;font-weight:700;cursor:pointer">Send report</button>'+
+        '<button id="drCancel" style="padding:10px 14px;border:1px solid rgba(255,255,255,.2);border-radius:8px;background:transparent;color:#cdd6cd;cursor:pointer">Cancel</button></div>'+
+        '<div id="drMsg" style="font-size:12px;color:#E3C05A;min-height:16px;margin-top:8px"></div></div>';
+      document.body.appendChild(m);
+      let cur=null;
+      function openR(d){cur=d;document.getElementById('drWho').textContent=d.addr+(d.nm?(' · '+d.nm):'');document.getElementById('drMsg').textContent='';document.getElementById('drDetail').value='';m.style.display='flex';}
+      function closeR(){m.style.display='none';}
+      m.addEventListener('click',e=>{if(e.target===m)closeR();});
+      document.getElementById('drCancel').onclick=closeR;
+      document.getElementById('drSend').onclick=async function(){if(!cur)return;const btn=this;btn.disabled=true;const msg=document.getElementById('drMsg');msg.textContent='Sending…';
+        if(!window.SQ_DB){msg.textContent='Can’t send right now.';btn.disabled=false;return;}
+        try{const r=await window.SQ_DB.from('reports').insert({addr:cur.addr,tenant:cur.nm,link:cur.link,reason:document.getElementById('drReason').value,detail:(document.getElementById('drDetail').value||'').slice(0,300),status:'new'});
+          if(r.error){msg.textContent='Couldn’t send — try again.';}else{msg.textContent='Thanks — a grown-up will review it.';setTimeout(closeR,900);}}
+        catch(e){msg.textContent='Couldn’t send.';}
+        btn.disabled=false;};
+      listEl.addEventListener('click',function(e){const a=e.target.closest&&e.target.closest('.dir-rep');if(!a)return;e.preventDefault();openR({addr:a.getAttribute('data-addr'),nm:a.getAttribute('data-nm'),link:a.getAttribute('data-link')});});
+    })();
 
     // ride a line: open the rideable subway overlay for that street's stops
     if(mapEl){ mapEl.addEventListener('click', function(e){
