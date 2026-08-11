@@ -15,6 +15,22 @@ const LS='yps_block_v1';
 const CFG={ratePerMin:1.5, upgradeBase:140};
 const LOT_COST=[0,180,650,1800,4200];
 const NLOTS=5;
+/* ---- city / districts: the never-ending expansion ---- */
+const LOTS_PER=5;              // base lots in a district
+const DGAP=46;                 // world-X distance between district centers (block + cross-street)
+const DTHEMES=[
+  {name:'Founders Row',   accent:'#E3242B'},
+  {name:'Sunrise Market', accent:'#E6A020'},
+  {name:'Harbor Walk',    accent:'#37A6C9'},
+  {name:'Maple Heights',  accent:'#2f9e57'},
+  {name:'Neon Alley',     accent:'#8a5aff'},
+  {name:'Gold Coast',     accent:'#C9A84A'}
+];
+function districtName(i){const b=DTHEMES[i%DTHEMES.length].name;const cyc=Math.floor(i/DTHEMES.length);return cyc?b+' '+(cyc+1):b;}
+function districtAccent(i){return DTHEMES[i%DTHEMES.length].accent;}
+function districtLots(i){return LOTS_PER+Math.min(3,Math.floor(i/2));} // 5,5,6,6,7,7,8,8...
+function lotCostFor(di,li){let base;if(li<LOT_COST.length)base=LOT_COST[li];else base=LOT_COST[LOT_COST.length-1]+(li-LOT_COST.length+1)*3200;return Math.round(base*Math.pow(1.9,di));}
+function districtOpenCost(di){return Math.round(1500*Math.pow(2.3,di-1));} // di>=1
 const TYPES={
   bakery:  {emoji:'🧁',name:'Bakery',   earn:1.00,lvlReq:1, pal:{fac:'#8a5560',win:'#ffe0ea',trim:'#5a3a44'}, awn:0xE3242B, sign:'#f6dcef'},
   lemonade:{emoji:'🍋',name:'Lemonade', earn:0.90,lvlReq:1, pal:{fac:'#9a8a3a',win:'#fff4b0',trim:'#6a5a1e'}, awn:0xE6C020, sign:'#241a06'},
@@ -46,17 +62,27 @@ function yStr(){const d=new Date(Date.now()-864e5);return d.getFullYear()+'-'+(d
 function uuid(){return 'xxxxxxxx'.replace(/x/g,()=>((Math.random()*16)|0).toString(16))+'-'+Date.now().toString(16);}
 
 /* ---------------- state ---------------- */
-function fresh(){return {v:2,coins:120,xp:0,level:1,streak:0,lastDay:'',tut:0,
-  visited:{day:'',refs:{}},tokens:{},pid:uuid(),pname:'',
-  lots:[{built:true,unlocked:true,type:'bakery',name:'Bakery',lvl:1,stock:0,t:Date.now(),cond:100,broke:false,rev:0,exp:0},
-        {built:false,unlocked:false},{built:false,unlocked:false},{built:false,unlocked:false},{built:false,unlocked:false}]};}
+function makeLot(){return {built:false,unlocked:false};}
+function makeDistrict(i,seed){const n=districtLots(i);const lots=[];for(let k=0;k<n;k++){
+  if(seed&&i===0&&k===0)lots.push({built:true,unlocked:true,type:'bakery',name:'Bakery',lvl:1,stock:0,t:Date.now(),cond:100,broke:false,rev:0,exp:0});
+  else lots.push(makeLot());}
+  return {id:i,lots:lots};}
+function fresh(){return {v:3,coins:120,xp:0,level:1,streak:0,lastDay:'',tut:0,
+  visited:{day:'',refs:{}},tokens:{},pid:uuid(),pname:'',district:0,
+  districts:[makeDistrict(0,true)]};}
 let S=fresh();
-function load(){try{const raw=localStorage.getItem(LS);if(raw){const o=JSON.parse(raw);if(o&&o.lots){S=Object.assign(fresh(),o);}}}catch(e){}
-  while(S.lots.length<NLOTS)S.lots.push({built:false,unlocked:false});
-  // backfill new business fields on older saves
-  S.lots.forEach(l=>{if(l.built){if(l.cond==null)l.cond=100;l.broke=!!l.broke;l.rev=l.rev||0;l.exp=l.exp||0;}});
-  // offline accrual + wear (cap wear to 1h so returning players aren't punished)
-  const now=Date.now();S.lots.forEach(l=>{if(l.built){l.t=l.t||now;const el=Math.max(0,(now-l.t)/1000);
+function eachLot(fn){S.districts.forEach((D,di)=>D.lots.forEach((l,li)=>fn(l,di,li,D)));}
+function load(){try{const raw=localStorage.getItem(LS);if(raw){const o=JSON.parse(raw);if(o){
+    if(o.lots&&!o.districts){o.districts=[{id:0,lots:o.lots}];o.district=0;delete o.lots;} // migrate v2 -> v3
+    if(o.districts)S=Object.assign(fresh(),o);
+  }}}catch(e){}
+  if(!S.districts||!S.districts.length)S.districts=[makeDistrict(0,true)];
+  if(typeof S.district!=='number'||S.district<0||S.district>=S.districts.length)S.district=0;
+  // ensure lot counts + backfill business fields
+  S.districts.forEach((D,di)=>{const need=districtLots(di);while(D.lots.length<need)D.lots.push(makeLot());
+    D.lots.forEach(l=>{if(l.built){if(l.cond==null)l.cond=100;l.broke=!!l.broke;l.rev=l.rev||0;l.exp=l.exp||0;}});});
+  // offline accrual + wear across the whole city (cap wear to 1h)
+  const now=Date.now();eachLot(l=>{if(l.built){l.t=l.t||now;const el=Math.max(0,(now-l.t)/1000);
     if(!l.broke)l.cond=Math.max(0,condOf(l)-COND_DECAY*Math.min(el,3600));
     l.stock=Math.min(storageCap(l),(l.stock||0)+ratePerSec(l)*el);l.t=now;}});}
 let saveT=null;
@@ -116,43 +142,59 @@ function buildScene(){
   sun=new THREE.DirectionalLight(0xfff2d6,1);sun.position.set(24,44,26);sun.castShadow=true;
   sun.shadow.mapSize.set(1024,1024);sun.shadow.camera.left=-30;sun.shadow.camera.right=30;sun.shadow.camera.top=30;sun.shadow.camera.bottom=-30;sun.shadow.camera.far=160;scene.add(sun);
   worldGroup=new THREE.Group();scene.add(worldGroup);
-  buildGround();
-  layoutPlots();
+  buildCity();
   applyMode(autoMode());
-  camAngle=0.5; updateCam();
+  camAngle=0.4; focusX=districtX(S.district); focusXTarget=focusX; updateCam();
 }
 let starPts,moon;
-function buildGround(){
-  // sidewalk / block base
-  const baseW=NLOTS*5+6;
-  // large ground plane so there is no black void in front of / around the block
-  const ground=new THREE.Mesh(new THREE.PlaneGeometry(240,240),std({color:0x20242c,roughness:1}));
-  ground.rotation.x=-Math.PI/2;ground.position.set(0,-0.62,40);ground.receiveShadow=true;worldGroup.add(ground);
-  const walk=new THREE.Mesh(new THREE.BoxGeometry(baseW,1,10),std({color:0x6f6a60,roughness:.96}));walk.position.set(0,-0.5,0);walk.receiveShadow=true;worldGroup.add(walk);
-  const curb=new THREE.Mesh(new THREE.BoxGeometry(baseW,0.5,0.6),std({color:0x8a8478}));curb.position.set(0,-0.25,5.2);worldGroup.add(curb);
-  const road=new THREE.Mesh(new THREE.BoxGeometry(baseW+20,0.4,16),std({color:0x2a2f36,roughness:.98}));road.position.set(0,-0.55,14);road.receiveShadow=true;worldGroup.add(road);
-  // dashes
-  for(let x=-baseW/2;x<baseW/2;x+=4){const d=new THREE.Mesh(new THREE.BoxGeometry(2,0.02,0.3),std({color:0xE3C05A,emissive:0xE3C05A,emissiveIntensity:.4}));d.position.set(x+1,-0.34,14);worldGroup.add(d);emisMats.push(d.material);}
-  // a couple of streetlamps
-  [-baseW/2+2,baseW/2-2].forEach(x=>{const pole=new THREE.Mesh(new THREE.CylinderGeometry(.12,.16,7,8),std({color:0x2a3038}));pole.position.set(x,3,4.4);worldGroup.add(pole);
-    const glo=new THREE.Mesh(new THREE.SphereGeometry(.4,10,10),std({color:0xfff2c0,emissive:0xffdf8a,emissiveIntensity:1}));glo.position.set(x,6.6,4.4);worldGroup.add(glo);emisMats.push(glo.material);
-    const L=new THREE.PointLight(0xffd98a,.0,16,2);L.position.set(x,6.4,4.4);worldGroup.add(L);lamps.push(L);});
+function districtX(i){return i*DGAP;}
+function plotXd(k,nl){return (k-(nl-1)/2)*5;}
+let cityGroup;
+function buildCity(){
+  if(cityGroup){worldGroup.remove(cityGroup);clearGroup(cityGroup);}
+  cityGroup=new THREE.Group();worldGroup.add(cityGroup);
+  plots.length=0;clickable.length=0;emisMats.length=0;
+  const n=S.districts.length, spanW=(n-1)*DGAP;
+  // one big ground plane spanning the whole city
+  const ground=new THREE.Mesh(new THREE.PlaneGeometry(spanW+320,320),std({color:0x20242c,roughness:1}));
+  ground.rotation.x=-Math.PI/2;ground.position.set(spanW/2,-0.62,40);ground.receiveShadow=true;cityGroup.add(ground);
+  // continuous avenue running past every district
+  const road=new THREE.Mesh(new THREE.BoxGeometry(spanW+DGAP+24,0.4,16),std({color:0x2a2f36,roughness:.98}));road.position.set(spanW/2,-0.55,14);road.receiveShadow=true;cityGroup.add(road);
+  for(let x=-12;x<spanW+12;x+=4){const d=new THREE.Mesh(new THREE.BoxGeometry(2,0.02,0.3),std({color:0xE3C05A,emissive:0xE3C05A,emissiveIntensity:.4}));d.position.set(x,-0.34,14);cityGroup.add(d);emisMats.push(d.material);}
+  for(let i=0;i<n;i++) buildDistrict(i);
 }
-function plotX(i){return (i-(NLOTS-1)/2)*5;}
-
-function layoutPlots(){
-  for(let i=0;i<NLOTS;i++){
-    const g=new THREE.Group();g.position.set(plotX(i),0,0);worldGroup.add(g);
-    const rec={group:g,i:i,building:null,coin:null,coinTex:null,base:null};
-    plots.push(rec);
-    renderPlot(rec);
+function buildDistrict(i){
+  const dg=new THREE.Group();dg.position.set(districtX(i),0,0);cityGroup.add(dg);
+  const D=S.districts[i], nl=D.lots.length, baseW=nl*5+6;
+  const walk=new THREE.Mesh(new THREE.BoxGeometry(baseW,1,10),std({color:0x6f6a60,roughness:.96}));walk.position.set(0,-0.5,0);walk.receiveShadow=true;dg.add(walk);
+  const curb=new THREE.Mesh(new THREE.BoxGeometry(baseW,0.5,0.6),std({color:0x8a8478}));curb.position.set(0,-0.25,5.2);dg.add(curb);
+  // cross-street on the right edge to separate districts
+  if(i<S.districts.length-1){const cs=new THREE.Mesh(new THREE.BoxGeometry(DGAP-baseW+2,0.38,10),std({color:0x2a2f36,roughness:.98}));cs.position.set(baseW/2+(DGAP-baseW)/2,-0.56,0);dg.add(cs);}
+  // district nameplate
+  const sgn=districtSign(i);sgn.position.set(-baseW/2+1.6,3.4,3.0);dg.add(sgn);
+  // streetlamp globes (emissive only — no dynamic lights, so the city scales)
+  [-baseW/2+2,baseW/2-2].forEach(x=>{const pole=new THREE.Mesh(new THREE.CylinderGeometry(.12,.16,7,8),std({color:0x2a3038}));pole.position.set(x,3,4.4);dg.add(pole);
+    const glo=new THREE.Mesh(new THREE.SphereGeometry(.4,10,10),std({color:0xfff2c0,emissive:0xffdf8a,emissiveIntensity:1}));glo.position.set(x,6.6,4.4);dg.add(glo);emisMats.push(glo.material);});
+  for(let k=0;k<nl;k++){
+    const g=new THREE.Group();g.position.set(plotXd(k,nl),0,0);dg.add(g);
+    const rec={group:g,d:i,i:k,building:null,coin:null,coinBaseY:8};
+    plots.push(rec);renderPlot(rec);
   }
 }
+function districtSign(i){const c=document.createElement('canvas');c.width=256;c.height=96;const x=c.getContext('2d');
+  x.fillStyle='#0c120e';rr(x,4,4,248,88,12);x.fill();x.strokeStyle=districtAccent(i);x.lineWidth=6;rr(x,4,4,248,88,12);x.stroke();
+  x.textAlign='center';x.fillStyle=districtAccent(i);x.font='700 14px "Work Sans",Arial';x.fillText('DISTRICT '+(i+1),128,30);
+  x.fillStyle='#f6efdd';x.font='800 25px Georgia';x.fillText(districtName(i),128,64);
+  const t=new THREE.CanvasTexture(c);const m=std({map:t,emissiveMap:t,emissive:0xffffff,emissiveIntensity:.5,transparent:true});emisMats.push(m);
+  const grp=new THREE.Group();
+  const post=new THREE.Mesh(new THREE.CylinderGeometry(.1,.1,3.4,6),std({color:0x2a3038}));post.position.y=-1.3;grp.add(post);
+  grp.add(new THREE.Mesh(new THREE.PlaneGeometry(3.5,1.31),m));
+  return grp;}
 function clearGroup(g){for(let k=g.children.length-1;k>=0;k--){const o=g.children[k];g.remove(o);o.traverse&&o.traverse(n=>{if(n.geometry)n.geometry.dispose();if(n.material){(Array.isArray(n.material)?n.material:[n.material]).forEach(m=>m.dispose&&m.dispose());}});}}
+function lotOf(rec){return S.districts[rec.d].lots[rec.i];}
 function renderPlot(rec){
   const g=rec.group;clearGroup(g);
-  // remove this plot's clickables/emis references by rebuilding arrays lazily (kept simple: not pruning globals)
-  const lot=S.lots[rec.i];
+  const lot=lotOf(rec);
   const pad=new THREE.Mesh(new THREE.BoxGeometry(4.4,0.2,5),std({color:0x54504a,roughness:.95}));pad.position.y=0.1;pad.receiveShadow=true;g.add(pad);
   if(lot.built){ buildShop(rec,lot); }
   else { buildLot(rec,lot); }
@@ -175,8 +217,6 @@ function buildShop(rec,lot){
   const win=new THREE.Mesh(new THREE.PlaneGeometry(w*0.5,1.4),std({map:makeGlass(),emissive:0x9fd0ff,emissiveIntensity:.35}));win.position.set(-w*0.18,1.5,d/2+0.13);g.add(win);
   const door=new THREE.Mesh(new THREE.BoxGeometry(0.9,1.8,0.15),std({color:0x2a1a10}));door.position.set(w*0.28,1.1,d/2+0.12);g.add(door);
   const prod=new THREE.Mesh(new THREE.PlaneGeometry(0.7,0.7),std({map:emojiTex(t.emoji),transparent:true}));prod.position.set(-w*0.18,1.5,d/2+0.15);g.add(prod);
-  // warm point light at the storefront for night glow
-  const L=new THREE.PointLight(0xffd98a,0,7,2);L.position.set(0,2.6,d/2+1);g.add(L);lamps.push(L);
   body.userData={rec}; base.userData={rec}; sign.userData={rec};
   clickable.push(body,base,sign);
   rec.building=g;
@@ -187,34 +227,36 @@ function buildShop(rec,lot){
 }
 function buildLot(rec,lot){
   const g=rec.group;const idx=rec.i;
-  const next=nextUnlockIndex();
+  const next=nextUnlockIndex(rec.d);
   const isNext=(idx===next);
-  // dashed fence posts
   const col=isNext?0xE3C05A:0x5a6a5a;
   for(let s=-1;s<=1;s+=2){const p=new THREE.Mesh(new THREE.CylinderGeometry(.08,.08,1.2,6),std({color:col,emissive:isNext?0xE3C05A:0x000000,emissiveIntensity:isNext?.4:0}));p.position.set(s*1.8,0.7,d0);g.add(p);}
-  const sign=makeLotSign(idx,isNext);sign.position.set(0,1.9,d0);g.add(sign);
+  const sign=makeLotSign(lotCostFor(rec.d,idx),isNext);sign.position.set(0,1.9,d0);g.add(sign);
   sign.userData={rec,lot:true,isNext};clickable.push(sign);
-  // clickable pad
   const pad=g.children.find(c=>c.geometry&&c.geometry.type==='BoxGeometry');
   if(pad){pad.userData={rec,lot:true,isNext};clickable.push(pad);}
   rec.building=null;rec.coin=null;
 }
 const d0=2.4;
-function makeLotSign(idx,isNext){const c=document.createElement('canvas');c.width=256;c.height=128;const x=c.getContext('2d');
+function makeLotSign(cost,isNext){const c=document.createElement('canvas');c.width=256;c.height=128;const x=c.getContext('2d');
   x.fillStyle=isNext?'#14231a':'#0e1512';rr(x,4,4,248,120,14);x.fill();x.strokeStyle=isNext?'#E3C05A':'#4a5a4a';x.lineWidth=5;rr(x,4,4,248,120,14);x.stroke();
   x.textAlign='center';x.fillStyle=isNext?'#E3C05A':'#7a8a7a';
-  if(isNext){x.font='800 30px Georgia';x.fillText('OPEN LOT',128,44);x.font='800 40px Georgia';x.fillStyle='#f6efdd';x.fillText('Y '+LOT_COST[idx],128,92);}
-  else{x.font='800 30px Georgia';x.fillText('LOCKED',128,58);x.font='700 20px "Work Sans",Arial';x.fillText('reach the lot before it',128,92);}
+  if(isNext){x.font='800 30px Georgia';x.fillText('OPEN LOT',128,44);x.font='800 40px Georgia';x.fillStyle='#f6efdd';x.fillText(cost>0?('Y '+cost):'FREE',128,92);}
+  else{x.font='800 30px Georgia';x.fillText('LOCKED',128,58);x.font='700 20px "Work Sans",Arial';x.fillText('open the lot before it',128,92);}
   const t=new THREE.CanvasTexture(c);const m=std({map:t,emissiveMap:t,emissive:0xffffff,emissiveIntensity:.5,transparent:true});emisMats.push(m);
   return new THREE.Mesh(new THREE.PlaneGeometry(3,1.5),m);}
-function nextUnlockIndex(){for(let i=0;i<NLOTS;i++){if(!S.lots[i].built)return i;}return -1;}
+function nextUnlockIndex(d){const lots=S.districts[d].lots;for(let i=0;i<lots.length;i++){if(!lots[i].built)return i;}return -1;}
 function makeGlass(){const c=document.createElement('canvas');c.width=32;c.height=32;const x=c.getContext('2d');const g=x.createLinearGradient(0,0,32,32);g.addColorStop(0,'#d6ecff');g.addColorStop(1,'#8fb8e6');x.fillStyle=g;x.fillRect(0,0,32,32);return new THREE.CanvasTexture(c);}
 const emojiCache={};
 function emojiTex(e){if(emojiCache[e])return emojiCache[e];const c=document.createElement('canvas');c.width=64;c.height=64;const x=c.getContext('2d');x.font='48px serif';x.textAlign='center';x.textBaseline='middle';x.fillText(e,32,36);const t=new THREE.CanvasTexture(c);emojiCache[e]=t;return t;}
 
-/* ---------------- camera + modes ---------------- */
-let camAngle=0.5, camDist=20, camH=11;
-function updateCam(){const cz=6;camera.position.set(Math.sin(camAngle)*camDist, camH, Math.cos(camAngle)*camDist + cz);camera.lookAt(0,3.2,0);}
+/* ---------------- camera + modes + travel ---------------- */
+let camAngle=0.4, camDist=22, camH=12, focusX=0, focusXTarget=0, traveling=false;
+function updateCam(){const cz=6, fx=focusX;
+  camera.position.set(fx+Math.sin(camAngle)*camDist, camH, Math.cos(camAngle)*camDist + cz);
+  camera.lookAt(fx,3.2,0);
+  if(sky)sky.position.x=fx; if(starPts)starPts.position.x=fx; if(moon)moon.position.x=fx-70;}
+function travelTo(i){if(i<0||i>=S.districts.length)return;S.district=i;focusXTarget=districtX(i);traveling=true;updateDistrictUI();saveSoon();}
 function autoMode(){const h=new Date().getHours();return (h>=7&&h<17)?'day':((h>=17&&h<20)||(h>=5&&h<7)?'dusk':'night');}
 function applyMode(m){mode=m;const c=S3[m];
   sky.material.map=skyTex(c.sky[0],c.sky[1]);sky.material.needsUpdate=true;
@@ -237,6 +279,9 @@ function buildUI(){
      '<div class="bg3-lvl"><div class="bg3-lvlrow"><span id="bg3lvl">Lvl 1</span><span id="bg3xp">0/50 XP</span></div><div class="bg3-bar"><i id="bg3xpbar"></i></div></div>'+
      '<button class="bg3-icon" id="bg3fs" title="Fullscreen">⤢</button>'+
    '</div>'+
+   '<div class="bg3-travel"><button class="bg3-nav" id="bg3prev" title="Previous district">‹</button>'+
+     '<div class="bg3-dname" id="bg3dname">Founders Row</div>'+
+     '<button class="bg3-nav" id="bg3next" title="Next district">›</button></div>'+
    '<div class="bg3-toast" id="bg3toast"></div>'+
    '<div class="bg3-modal" id="bg3modal"><div class="bg3-box"><button class="bg3-x" id="bg3x">✕</button><div id="bg3modalbody"></div></div></div>';
   host.innerHTML='';host.appendChild(wrap);
@@ -244,12 +289,31 @@ function buildUI(){
   ui.coins=wrap.querySelector('#bg3coins b');ui.streak=wrap.querySelector('#bg3streak b');
   ui.lvl=wrap.querySelector('#bg3lvl');ui.xp=wrap.querySelector('#bg3xp');ui.xpbar=wrap.querySelector('#bg3xpbar');
   ui.toast=wrap.querySelector('#bg3toast');ui.modal=wrap.querySelector('#bg3modal');ui.modalbody=wrap.querySelector('#bg3modalbody');
+  ui.dname=wrap.querySelector('#bg3dname');ui.prev=wrap.querySelector('#bg3prev');ui.next=wrap.querySelector('#bg3next');
   ui.canvaswrap.appendChild(cv);
   wrap.querySelector('#bg3x').onclick=closeModal;
   ui.modal.addEventListener('click',e=>{if(e.target===ui.modal)closeModal();});
   wrap.querySelector('#bg3fs').onclick=toggleFs;
-  injectCSS();
+  ui.prev.onclick=()=>{if(S.district>0)travelTo(S.district-1);};
+  ui.next.onclick=()=>{const last=S.districts.length-1;
+    if(S.district<last){travelTo(S.district+1);}
+    else if(S.districts[last].lots.every(l=>l.built)){openUnlockDistrict();}
+    else {toast('Fill this district with shops first, then expand the city');}};
+  injectCSS();updateDistrictUI();
 }
+function updateDistrictUI(){if(!ui.dname)return;
+  ui.dname.textContent=districtName(S.district)+' · District '+(S.district+1);
+  ui.prev.disabled=S.district<=0;
+  const last=S.districts.length-1;
+  if(S.district<last){ui.next.textContent='›';ui.next.classList.remove('plus');ui.next.title='Next district';}
+  else {ui.next.textContent='＋';ui.next.classList.add('plus');ui.next.title='Expand the city';}
+}
+function openUnlockDistrict(){const di=S.districts.length;const cost=districtOpenCost(di);const nm=districtName(di);
+  openModal('<h3>🏙️ Expand the city</h3><p>Open a brand-new district, <b>'+nm+'</b> — a fresh block with '+districtLots(di)+' lots to build on. Your other shops keep earning while you grow.</p>'+
+    '<div class="bg3-stat" style="border-bottom:none"><span>Unlock cost</span><b>Y '+cost+'</b></div>'+
+    '<button class="bg3-btn" id="bg3newd" '+(S.coins>=cost?'':'disabled')+'>'+(S.coins>=cost?('Unlock '+nm+' · Y '+cost):('Need Y '+cost))+'</button>');
+  const b=ui.modalbody.querySelector('#bg3newd');if(b)b.onclick=()=>{if(S.coins<cost)return;S.coins-=cost;S.districts.push(makeDistrict(di,false));
+    buildCity();applyMode(mode);travelTo(di);toast('Unlocked '+nm+'! Traveling there…');closeModal();refreshUI();saveSoon();};}
 function injectCSS(){ if(document.getElementById('bg3css'))return;const s=document.createElement('style');s.id='bg3css';s.textContent=`
 .bg3-root{position:relative;width:100%;height:min(72vh,600px);min-height:420px;border-radius:16px;overflow:hidden;background:#0b1220;box-shadow:0 20px 50px rgba(0,0,0,.4);font-family:"Work Sans",system-ui,sans-serif;color:#F5F1E6;-webkit-user-select:none;user-select:none}
 .bg3-root.fs{position:fixed;inset:0;height:100dvh;width:100vw;z-index:9999;border-radius:0}
@@ -264,8 +328,13 @@ function injectCSS(){ if(document.getElementById('bg3css'))return;const s=docume
 .bg3-bar{height:6px;background:rgba(255,255,255,.12);border-radius:6px;margin-top:3px;overflow:hidden}
 .bg3-bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#7ad03a,#4fae2a);border-radius:6px;transition:width .3s}
 .bg3-icon{pointer-events:auto;background:rgba(8,11,14,.62);border:1px solid rgba(227,192,90,.3);color:#F5F1E6;border-radius:12px;width:34px;height:34px;font-size:16px;cursor:pointer}
-.bg3-toast{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);background:rgba(8,11,9,.86);border:1px solid rgba(227,192,90,.35);color:#F5F1E6;font-size:13px;padding:9px 16px;border-radius:20px;opacity:0;transition:opacity .3s,transform .3s;z-index:8;pointer-events:none;white-space:nowrap}
+.bg3-toast{position:absolute;left:50%;bottom:62px;transform:translateX(-50%);background:rgba(8,11,9,.86);border:1px solid rgba(227,192,90,.35);color:#F5F1E6;font-size:13px;padding:9px 16px;border-radius:20px;opacity:0;transition:opacity .3s,transform .3s;z-index:8;pointer-events:none;white-space:nowrap}
 .bg3-toast.on{opacity:1;transform:translateX(-50%) translateY(-4px)}
+.bg3-travel{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:6px;z-index:6;background:rgba(8,11,14,.66);backdrop-filter:blur(6px);border:1px solid rgba(227,192,90,.3);border-radius:22px;padding:5px 8px}
+.bg3-nav{background:rgba(255,255,255,.08);border:none;color:#F5F1E6;width:30px;height:30px;border-radius:50%;font-size:18px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.bg3-nav.plus{color:#E3C05A;font-weight:800}
+.bg3-nav:disabled{opacity:.3;cursor:not-allowed}
+.bg3-dname{font-size:12.5px;font-weight:800;min-width:168px;text-align:center;color:#F5F1E6}
 .bg3-modal{position:absolute;inset:0;z-index:10;display:none;align-items:center;justify-content:center;background:rgba(4,6,9,.6);backdrop-filter:blur(3px);padding:16px}
 .bg3-modal.on{display:flex}
 .bg3-box{position:relative;width:100%;max-width:420px;background:linear-gradient(160deg,#14201a,#0b130e);border:1px solid rgba(227,192,90,.4);border-radius:16px;padding:20px}
@@ -307,20 +376,21 @@ function bindInput(){
 }
 function tap(cx,cy){const r=cv.getBoundingClientRect();const ndc=new THREE.Vector2(((cx-r.left)/r.width)*2-1,-((cy-r.top)/r.height)*2+1);
   ray.setFromCamera(ndc,camera);const hits=ray.intersectObjects(clickable,false);if(!hits.length)return;
-  const obj=hits[0].object;let o=obj;while(o&&!(o.userData&&o.userData.rec))o=o.parent;if(!o)return;const rec=o.userData.rec;const lot=S.lots[rec.i];
+  const obj=hits[0].object;let o=obj;while(o&&!(o.userData&&o.userData.rec))o=o.parent;if(!o)return;const rec=o.userData.rec;const lot=lotOf(rec);
   ensureDaily();
+  if(rec.d!==S.district) travelTo(rec.d); // clicked a shop in another district — go there
   if(!lot.built){ openBuild(rec); return; }
   // tap the coin bubble to quick-collect; tap the building to open its dashboard
   if(rec.coin && obj===rec.coin && !lot.broke && Math.floor(lot.stock||0)>=1){ collect(rec); return; }
   openStore(rec);
 }
-function collect(rec){const lot=S.lots[rec.i];const amt=Math.floor(lot.stock||0);if(amt<1)return;
+function collect(rec){const lot=lotOf(rec);const amt=Math.floor(lot.stock||0);if(amt<1)return;
   lot.stock-=amt;S.coins+=amt;gainXP(amt);flyCoin(rec);toast('+'+amt+' Y');refreshUI();saveSoon();updateCoin(rec);}
 function flyCoin(rec){ if(rec.coin){rec.coin.scale.set(3.1,1.6,1);setTimeout(()=>{if(rec.coin)rec.coin.scale.set(2.6,1.32,1);},120);} }
 function gainXP(n){S.xp+=n;let lvlup=false;while(S.xp>=LEVEL_XP(S.level)){S.xp-=LEVEL_XP(S.level);S.level++;lvlup=true;}if(lvlup){toast('Level up! Lvl '+S.level);}}
-function openBuild(rec){const idx=rec.i;const next=nextUnlockIndex();
+function openBuild(rec){const idx=rec.i;const next=nextUnlockIndex(rec.d);
   if(idx!==next){openModal('<h3>Locked lot</h3><p>Open the earlier lot first — lots unlock left to right.</p>');return;}
-  const cost=LOT_COST[idx];
+  const cost=lotCostFor(rec.d,idx);
   let cells='';TYPE_ORDER.forEach(k=>{const t=TYPES[k];const locked=t.lvlReq>S.level;
     cells+='<div class="bg3-cell'+(locked?' lock':'')+'" data-k="'+k+'"><div class="e">'+t.emoji+'</div><div class="n">'+t.name+(locked?'<br>Lvl '+t.lvlReq:'')+'</div></div>';});
   openModal('<h3>Open a new shop</h3><p>Costs <b>Y '+cost+'</b> to open this lot. Pick what to build:</p><div class="bg3-grid">'+cells+'</div><div class="bg3-toast2" id="bg3sel" style="font-size:12px;color:#E3C05A;min-height:16px;margin-top:8px"></div><button class="bg3-btn" id="bg3build" disabled>Choose a shop</button>');
@@ -328,10 +398,10 @@ function openBuild(rec){const idx=rec.i;const next=nextUnlockIndex();
   ui.modalbody.querySelectorAll('.bg3-cell').forEach(c=>c.onclick=()=>{if(c.classList.contains('lock'))return;sel=c.getAttribute('data-k');
     ui.modalbody.querySelectorAll('.bg3-cell').forEach(x=>x.style.outline='');c.style.outline='2px solid #E3C05A';
     const can=S.coins>=cost;btn.disabled=!can;btn.textContent=can?('Build '+TYPES[sel].name+' · Y '+cost):('Need Y '+cost);});
-  btn.onclick=()=>{if(!sel||S.coins<cost)return;S.coins-=cost;const t=TYPES[sel];lotBuild(idx,sel);toast('Opened '+t.name+'!');closeModal();refreshUI();saveSoon();};
+  btn.onclick=()=>{if(!sel||S.coins<cost)return;S.coins-=cost;const t=TYPES[sel];lotBuild(rec,sel);toast('Opened '+t.name+'!');closeModal();refreshUI();saveSoon();updateDistrictUI();};
 }
-function lotBuild(idx,type){const lot=S.lots[idx];lot.built=true;lot.unlocked=true;lot.type=type;lot.name=TYPES[type].name;lot.lvl=1;lot.stock=0;lot.t=Date.now();lot.cond=100;lot.broke=false;lot.rev=0;lot.exp=0;renderPlot(plots[idx]);applyMode(mode);}
-function openStore(rec){const lot=S.lots[rec.i];const t=TYPES[lot.type];
+function lotBuild(rec,type){const lot=lotOf(rec);lot.built=true;lot.unlocked=true;lot.type=type;lot.name=TYPES[type].name;lot.lvl=1;lot.stock=0;lot.t=Date.now();lot.cond=100;lot.broke=false;lot.rev=0;lot.exp=0;renderPlot(rec);applyMode(mode);}
+function openStore(rec){const lot=lotOf(rec);const t=TYPES[lot.type];
   const gMin=grossPerMin(lot)*condMult(lot);
   const supMin=gMin*SUPPLY_RATE, rentMin=(gMin>0?rentPerMin(lot):0);
   const netMin=Math.max(0,gMin-supMin-rentMin);
@@ -362,7 +432,7 @@ function openStore(rec){const lot=S.lots[rec.i];const t=TYPES[lot.type];
   const rep=ui.modalbody.querySelector('#bg3rep');if(rep)rep.onclick=()=>{if(S.coins<repC)return;S.coins-=repC;lot.exp=(lot.exp||0)+repC;lot.broke=false;lot.cond=100;toast('Repaired '+t.name+'!');updateCoin(rec);closeModal();refreshUI();saveSoon();};
   const up=ui.modalbody.querySelector('#bg3up');if(up)up.onclick=()=>{if(S.coins<upC)return;S.coins-=upC;lot.lvl++;gainXP(8);renderPlot(rec);applyMode(mode);toast('Upgraded to Lvl '+lot.lvl);closeModal();refreshUI();saveSoon();};
 }
-function updateCoin(rec){if(!rec.coin)return;const lot=S.lots[rec.i];let t,vis;
+function updateCoin(rec){if(!rec.coin)return;const lot=lotOf(rec);let t,vis;
   if(lot.broke){t=repairTex();vis=true;} else {const n=Math.floor(lot.stock||0);t=coinTex(n);vis=n>=1;}
   if(rec.coin.material.map&&rec.coin.material.map.dispose)rec.coin.material.map.dispose();
   rec.coin.material.map=t;rec.coin.material.needsUpdate=true;rec.coin.visible=vis;}
@@ -370,14 +440,14 @@ function updateCoin(rec){if(!rec.coin)return;const lot=S.lots[rec.i];let t,vis;
 /* ---------------- daily / streak ---------------- */
 function ensureDaily(){const td=todayStr();if(S.lastDay===td)return;
   if(S.lastDay===yStr())S.streak=(S.streak||0)+1;else S.streak=1;S.lastDay=td;
-  S.lots.forEach(l=>{if(l.built){l.rev=0;l.exp=0;}}); // reset daily books
+  eachLot(l=>{if(l.built){l.rev=0;l.exp=0;}}); // reset daily books city-wide
   const bonus=Math.min(120,20*S.streak);S.coins+=bonus;toast('Daily +'+bonus+' Y · streak '+S.streak);refreshUI();saveSoon();}
 
 /* ---------------- loop ---------------- */
 let last=performance.now(),coinAcc=0;
 function tick(now){const dt=Math.min(.1,(now-last)/1000);last=now;
-  // accrue + wear + random breakdowns + per-shop books
-  S.lots.forEach(l=>{ if(!l.built)return;
+  // accrue + wear + random breakdowns + per-shop books, across the whole city
+  eachLot(l=>{ if(!l.built)return;
     if(!l.broke){
       l.cond=Math.max(0,condOf(l)-COND_DECAY*dt);
       if(l.cond<COND_WARN && Math.random()<BREAK_P_PER_SEC*dt){ l.broke=true; toast('🔧 '+(l.name||'A shop')+' broke down — tap to repair'); }
@@ -388,6 +458,8 @@ function tick(now){const dt=Math.min(.1,(now-last)/1000);last=now;
     const cap=storageCap(l); l.stock=Math.min(cap,(l.stock||0)+netSec);
     l.rev=(l.rev||0)+gSec; l.exp=(l.exp||0)+supSec+rentSec; l.t=Date.now();
   });
+  // smooth travel between districts
+  if(traveling||Math.abs(focusX-focusXTarget)>0.01){focusX+=(focusXTarget-focusX)*Math.min(1,dt*3.2);if(Math.abs(focusX-focusXTarget)<0.05){focusX=focusXTarget;traveling=false;}updateCam();}
   // update coin bubbles ~2/sec + bob
   coinAcc+=dt;const ts=now/1000;
   plots.forEach(rec=>{if(rec.coin){rec.coin.position.y=(rec.coinBaseY||8)+Math.sin(ts*2+rec.i)*0.12;}});
