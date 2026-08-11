@@ -27,9 +27,20 @@ const TYPES={
 };
 const TYPE_ORDER=['bakery','lemonade','sneakers','books','flowers','pizza','coffee','games'];
 function LEVEL_XP(l){return 50*l*l;}
-function ratePerSec(l){const t=TYPES[l.type];return (CFG.ratePerMin*t.earn*(1+0.25*(l.lvl-1)))/60;}
+/* ---- light business economy: gross earning -> supplies + rent -> net profit ---- */
+const SUPPLY_RATE=0.15;                       // supplies cost = 15% of gross
+function rentPerMin(l){return 0.5+(l.lvl||1)*0.2;}   // small daily-feel rent, per minute
+const COND_DECAY=100/(38*60);                 // equipment wears from 100->0 over ~38 min of active play
+const COND_WARN=45, COND_LOW=20;              // condition thresholds
+const BREAK_P_PER_SEC=0.10/60;                // ~10%/min chance to break down once worn
+function condOf(l){return (l.cond==null?100:l.cond);}
+function condMult(l){ if(l.broke) return 0; const c=condOf(l); return c>=COND_WARN?1:(c>=COND_LOW?0.7:0.45); }
+function grossPerMin(l){const t=TYPES[l.type];return CFG.ratePerMin*t.earn*(1+0.25*((l.lvl||1)-1));}
+function netPerMin(l){const g=grossPerMin(l)*condMult(l); if(g<=0) return 0; return Math.max(0,g - g*SUPPLY_RATE - rentPerMin(l));}
+function ratePerSec(l){return netPerMin(l)/60;}         // wallet accrues NET
 function upgradeCost(l){return Math.round(CFG.upgradeBase*Math.pow(l.lvl,1.6));}
-function storageCap(l){return Math.max(40, Math.round(ratePerSec(l)*60*45)); } // ~45 min of idle storage
+function repairCost(l){return Math.round(22+(l.lvl||1)*16+(100-condOf(l))*0.6);}
+function storageCap(l){return Math.max(40, Math.round((grossPerMin(l)/60)*60*45)); } // ~45 min of idle storage (gross-based so it doesn't collapse when worn)
 function todayStr(){const d=new Date();return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();}
 function yStr(){const d=new Date(Date.now()-864e5);return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();}
 function uuid(){return 'xxxxxxxx'.replace(/x/g,()=>((Math.random()*16)|0).toString(16))+'-'+Date.now().toString(16);}
@@ -37,13 +48,17 @@ function uuid(){return 'xxxxxxxx'.replace(/x/g,()=>((Math.random()*16)|0).toStri
 /* ---------------- state ---------------- */
 function fresh(){return {v:2,coins:120,xp:0,level:1,streak:0,lastDay:'',tut:0,
   visited:{day:'',refs:{}},tokens:{},pid:uuid(),pname:'',
-  lots:[{built:true,unlocked:true,type:'bakery',name:'Bakery',lvl:1,stock:0,t:Date.now()},
+  lots:[{built:true,unlocked:true,type:'bakery',name:'Bakery',lvl:1,stock:0,t:Date.now(),cond:100,broke:false,rev:0,exp:0},
         {built:false,unlocked:false},{built:false,unlocked:false},{built:false,unlocked:false},{built:false,unlocked:false}]};}
 let S=fresh();
 function load(){try{const raw=localStorage.getItem(LS);if(raw){const o=JSON.parse(raw);if(o&&o.lots){S=Object.assign(fresh(),o);}}}catch(e){}
   while(S.lots.length<NLOTS)S.lots.push({built:false,unlocked:false});
-  // offline accrual
-  const now=Date.now();S.lots.forEach(l=>{if(l.built){l.t=l.t||now;l.stock=Math.min(storageCap(l),(l.stock||0)+ratePerSec(l)*Math.max(0,(now-l.t)/1000));l.t=now;}});}
+  // backfill new business fields on older saves
+  S.lots.forEach(l=>{if(l.built){if(l.cond==null)l.cond=100;l.broke=!!l.broke;l.rev=l.rev||0;l.exp=l.exp||0;}});
+  // offline accrual + wear (cap wear to 1h so returning players aren't punished)
+  const now=Date.now();S.lots.forEach(l=>{if(l.built){l.t=l.t||now;const el=Math.max(0,(now-l.t)/1000);
+    if(!l.broke)l.cond=Math.max(0,condOf(l)-COND_DECAY*Math.min(el,3600));
+    l.stock=Math.min(storageCap(l),(l.stock||0)+ratePerSec(l)*el);l.t=now;}});}
 let saveT=null;
 function save(){try{localStorage.setItem(LS,JSON.stringify(S));}catch(e){}}
 function saveSoon(){clearTimeout(saveT);saveT=setTimeout(save,600);}
@@ -79,6 +94,11 @@ function coinTex(n){const c=document.createElement('canvas');c.width=150;c.heigh
   x.fillStyle=g;x.beginPath();x.arc(34,32,13,0,7);x.fill();x.fillStyle='#8a6a1f';x.font='800 15px Georgia';x.textAlign='center';x.textBaseline='middle';x.fillText('Y',34,33);
   x.fillStyle='#f5f1e6';x.font='800 24px Georgia';x.textAlign='left';x.fillText(''+n,54,34);
   const t=new THREE.CanvasTexture(c);return t;}
+function repairTex(){const c=document.createElement('canvas');c.width=150;c.height=76;const x=c.getContext('2d');x.clearRect(0,0,150,76);
+  x.fillStyle='rgba(150,32,28,.92)';rr(x,6,10,138,44,22);x.fill();x.strokeStyle='rgba(255,150,130,.8)';x.lineWidth=2;rr(x,6,10,138,44,22);x.stroke();
+  x.font='27px serif';x.textAlign='left';x.textBaseline='middle';x.fillText('🔧',16,33);
+  x.fillStyle='#ffe0d8';x.font='800 22px Georgia';x.fillText('FIX',60,34);
+  return new THREE.CanvasTexture(c);}
 function rr(x,X,Y,w,h,r){x.beginPath();x.moveTo(X+r,Y);x.arcTo(X+w,Y,X+w,Y+h,r);x.arcTo(X+w,Y+h,X,Y+h,r);x.arcTo(X,Y+h,X,Y,r);x.arcTo(X,Y,X+w,Y,r);x.closePath();}
 
 function buildScene(){
@@ -260,6 +280,9 @@ function injectCSS(){ if(document.getElementById('bg3css'))return;const s=docume
 .bg3-btn{width:100%;margin-top:12px;background:linear-gradient(180deg,#E3C05A,#B0862F);color:#14231a;border:none;border-radius:10px;padding:12px;font-weight:800;font-size:14px;cursor:pointer}
 .bg3-btn:disabled{filter:grayscale(.7);opacity:.6;cursor:not-allowed}
 .bg3-stat{display:flex;justify-content:space-between;font-size:13px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.07)}
+.bg3-mini{flex:1;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:7px 5px;text-align:center}
+.bg3-mini .k{font-size:9px;color:#9AA79A;text-transform:uppercase;letter-spacing:.03em;line-height:1.2}
+.bg3-mini .v{font-size:17px;font-weight:800;margin-top:3px}
 `;document.head.appendChild(s);}
 
 function refreshUI(){
@@ -284,10 +307,12 @@ function bindInput(){
 }
 function tap(cx,cy){const r=cv.getBoundingClientRect();const ndc=new THREE.Vector2(((cx-r.left)/r.width)*2-1,-((cy-r.top)/r.height)*2+1);
   ray.setFromCamera(ndc,camera);const hits=ray.intersectObjects(clickable,false);if(!hits.length)return;
-  let o=hits[0].object;while(o&&!(o.userData&&o.userData.rec))o=o.parent;if(!o)return;const rec=o.userData.rec;const lot=S.lots[rec.i];
+  const obj=hits[0].object;let o=obj;while(o&&!(o.userData&&o.userData.rec))o=o.parent;if(!o)return;const rec=o.userData.rec;const lot=S.lots[rec.i];
   ensureDaily();
-  if(lot.built){ if(Math.floor(lot.stock||0)>=1){collect(rec);} else {openUpgrade(rec);} }
-  else { openBuild(rec); }
+  if(!lot.built){ openBuild(rec); return; }
+  // tap the coin bubble to quick-collect; tap the building to open its dashboard
+  if(rec.coin && obj===rec.coin && !lot.broke && Math.floor(lot.stock||0)>=1){ collect(rec); return; }
+  openStore(rec);
 }
 function collect(rec){const lot=S.lots[rec.i];const amt=Math.floor(lot.stock||0);if(amt<1)return;
   lot.stock-=amt;S.coins+=amt;gainXP(amt);flyCoin(rec);toast('+'+amt+' Y');refreshUI();saveSoon();updateCoin(rec);}
@@ -305,29 +330,64 @@ function openBuild(rec){const idx=rec.i;const next=nextUnlockIndex();
     const can=S.coins>=cost;btn.disabled=!can;btn.textContent=can?('Build '+TYPES[sel].name+' · Y '+cost):('Need Y '+cost);});
   btn.onclick=()=>{if(!sel||S.coins<cost)return;S.coins-=cost;const t=TYPES[sel];lotBuild(idx,sel);toast('Opened '+t.name+'!');closeModal();refreshUI();saveSoon();};
 }
-function lotBuild(idx,type){const lot=S.lots[idx];lot.built=true;lot.unlocked=true;lot.type=type;lot.name=TYPES[type].name;lot.lvl=1;lot.stock=0;lot.t=Date.now();renderPlot(plots[idx]);applyMode(mode);}
-function openUpgrade(rec){const lot=S.lots[rec.i];const t=TYPES[lot.type];const cost=upgradeCost(lot);const rate=ratePerSec(lot)*60;const nrate=(CFG.ratePerMin*t.earn*(1+0.25*(lot.lvl)))/1;
-  openModal('<h3>'+t.emoji+' '+t.name+'</h3><p>Level '+lot.lvl+'</p>'+
-    '<div class="bg3-stat"><span>Earning now</span><b>'+rate.toFixed(1)+' Y/min</b></div>'+
-    '<div class="bg3-stat"><span>After upgrade</span><b>'+nrate.toFixed(1)+' Y/min</b></div>'+
-    '<div class="bg3-stat"><span>In storage</span><b>'+Math.floor(lot.stock||0)+' Y</b></div>'+
-    '<button class="bg3-btn" id="bg3up" '+(S.coins>=cost?'':'disabled')+'>Upgrade · Y '+cost+'</button>'+
-    (Math.floor(lot.stock||0)>=1?'<button class="bg3-btn" id="bg3col" style="background:rgba(122,208,58,.18);color:#9fe06a;border:1px solid rgba(122,208,58,.4);margin-top:8px">Collect '+Math.floor(lot.stock)+' Y</button>':''));
-  const up=ui.modalbody.querySelector('#bg3up');if(up)up.onclick=()=>{if(S.coins<cost)return;S.coins-=cost;lot.lvl++;gainXP(8);renderPlot(rec);applyMode(mode);toast('Upgraded to Lvl '+lot.lvl);closeModal();refreshUI();saveSoon();};
+function lotBuild(idx,type){const lot=S.lots[idx];lot.built=true;lot.unlocked=true;lot.type=type;lot.name=TYPES[type].name;lot.lvl=1;lot.stock=0;lot.t=Date.now();lot.cond=100;lot.broke=false;lot.rev=0;lot.exp=0;renderPlot(plots[idx]);applyMode(mode);}
+function openStore(rec){const lot=S.lots[rec.i];const t=TYPES[lot.type];
+  const gMin=grossPerMin(lot)*condMult(lot);
+  const supMin=gMin*SUPPLY_RATE, rentMin=(gMin>0?rentPerMin(lot):0);
+  const netMin=Math.max(0,gMin-supMin-rentMin);
+  const cond=Math.round(condOf(lot)), upC=upgradeCost(lot), repC=repairCost(lot), stock=Math.floor(lot.stock||0);
+  const cc=lot.broke?'#ff6a5a':cond>=COND_WARN?'#7ad03a':cond>=COND_LOW?'#E3C05A':'#ff9a4a';
+  const cl=lot.broke?'BROKEN':cond>=COND_WARN?'Good':cond>=COND_LOW?'Worn':'Failing';
+  const rev=Math.round(lot.rev||0), exp=Math.round(lot.exp||0), prof=rev-exp;
+  let h='<h3>'+t.emoji+' '+t.name+' <span style="font-size:12px;color:#9AA79A;font-family:Work Sans">Lvl '+lot.lvl+'</span></h3>';
+  h+='<div style="display:flex;align-items:center;gap:8px;margin:2px 0 12px"><span style="font-size:11px;color:#9AA79A">Equipment</span><div style="flex:1;height:9px;background:rgba(255,255,255,.12);border-radius:6px;overflow:hidden"><i style="display:block;height:100%;width:'+(lot.broke?100:cond)+'%;background:'+cc+'"></i></div><b style="font-size:12px;color:'+cc+'">'+cl+'</b></div>';
+  h+='<div class="bg3-stat"><span>Earning</span><b>'+gMin.toFixed(1)+' Y/min</b></div>';
+  h+='<div class="bg3-stat"><span>– Supplies (15%)</span><b style="color:#ef8fb0">'+(supMin>0?'-'+supMin.toFixed(1):'0.0')+'</b></div>';
+  h+='<div class="bg3-stat"><span>– Rent</span><b style="color:#ef8fb0">'+(rentMin>0?'-'+rentMin.toFixed(1):'0.0')+'</b></div>';
+  h+='<div class="bg3-stat" style="border-bottom:none"><span style="color:#F5F1E6"><b>= Profit</b></span><b style="color:#7ad03a">'+netMin.toFixed(1)+' Y/min</b></div>';
+  h+='<div style="display:flex;gap:8px;margin:10px 0 2px">'+
+     '<div class="bg3-mini"><div class="k">Revenue today</div><div class="v">'+rev+'</div></div>'+
+     '<div class="bg3-mini"><div class="k">Expenses</div><div class="v" style="color:#ef8fb0">'+exp+'</div></div>'+
+     '<div class="bg3-mini"><div class="k">Profit</div><div class="v" style="color:#7ad03a">'+prof+'</div></div></div>';
+  if(lot.broke){
+    h+='<p style="color:#ff9a4a;font-size:12px;margin:10px 0 0">Equipment is broken — this shop earns nothing until you repair it.</p>';
+    h+='<button class="bg3-btn" id="bg3rep" '+(S.coins>=repC?'':'disabled')+'>🔧 Repair · Y '+repC+'</button>';
+  } else {
+    if(stock>=1) h+='<button class="bg3-btn" id="bg3col" style="background:linear-gradient(180deg,#7ad03a,#4fae2a);color:#0c1a08">Collect '+stock+' Y</button>';
+    if(cond<100) h+='<button class="bg3-btn" id="bg3rep" style="background:rgba(227,192,90,.14);color:#E3C05A;border:1px solid rgba(227,192,90,.4)" '+(S.coins>=repC?'':'disabled')+'>🔧 Tune-up · Y '+repC+'</button>';
+    h+='<button class="bg3-btn" id="bg3up" '+(S.coins>=upC?'':'disabled')+'>⬆ Upgrade · Y '+upC+'</button>';
+  }
+  openModal(h);
   const col=ui.modalbody.querySelector('#bg3col');if(col)col.onclick=()=>{collect(rec);closeModal();};
+  const rep=ui.modalbody.querySelector('#bg3rep');if(rep)rep.onclick=()=>{if(S.coins<repC)return;S.coins-=repC;lot.exp=(lot.exp||0)+repC;lot.broke=false;lot.cond=100;toast('Repaired '+t.name+'!');updateCoin(rec);closeModal();refreshUI();saveSoon();};
+  const up=ui.modalbody.querySelector('#bg3up');if(up)up.onclick=()=>{if(S.coins<upC)return;S.coins-=upC;lot.lvl++;gainXP(8);renderPlot(rec);applyMode(mode);toast('Upgraded to Lvl '+lot.lvl);closeModal();refreshUI();saveSoon();};
 }
-function updateCoin(rec){if(!rec.coin)return;const lot=S.lots[rec.i];const n=Math.floor(lot.stock||0);const t=coinTex(n);rec.coin.material.map.dispose&&rec.coin.material.map.dispose();rec.coin.material.map=t;rec.coin.material.needsUpdate=true;rec.coin.visible=n>=1;}
+function updateCoin(rec){if(!rec.coin)return;const lot=S.lots[rec.i];let t,vis;
+  if(lot.broke){t=repairTex();vis=true;} else {const n=Math.floor(lot.stock||0);t=coinTex(n);vis=n>=1;}
+  if(rec.coin.material.map&&rec.coin.material.map.dispose)rec.coin.material.map.dispose();
+  rec.coin.material.map=t;rec.coin.material.needsUpdate=true;rec.coin.visible=vis;}
 
 /* ---------------- daily / streak ---------------- */
 function ensureDaily(){const td=todayStr();if(S.lastDay===td)return;
   if(S.lastDay===yStr())S.streak=(S.streak||0)+1;else S.streak=1;S.lastDay=td;
+  S.lots.forEach(l=>{if(l.built){l.rev=0;l.exp=0;}}); // reset daily books
   const bonus=Math.min(120,20*S.streak);S.coins+=bonus;toast('Daily +'+bonus+' Y · streak '+S.streak);refreshUI();saveSoon();}
 
 /* ---------------- loop ---------------- */
 let last=performance.now(),coinAcc=0;
 function tick(now){const dt=Math.min(.1,(now-last)/1000);last=now;
-  // accrue
-  S.lots.forEach((l,i)=>{if(l.built){const cap=storageCap(l);l.stock=Math.min(cap,(l.stock||0)+ratePerSec(l)*dt);l.t=Date.now();}});
+  // accrue + wear + random breakdowns + per-shop books
+  S.lots.forEach(l=>{ if(!l.built)return;
+    if(!l.broke){
+      l.cond=Math.max(0,condOf(l)-COND_DECAY*dt);
+      if(l.cond<COND_WARN && Math.random()<BREAK_P_PER_SEC*dt){ l.broke=true; toast('🔧 '+(l.name||'A shop')+' broke down — tap to repair'); }
+    }
+    const gSec=grossPerMin(l)*condMult(l)/60*dt;   // gross this frame (0 when broke)
+    const supSec=gSec*SUPPLY_RATE, rentSec=(gSec>0?rentPerMin(l)/60*dt:0);
+    const netSec=Math.max(0,gSec-supSec-rentSec);
+    const cap=storageCap(l); l.stock=Math.min(cap,(l.stock||0)+netSec);
+    l.rev=(l.rev||0)+gSec; l.exp=(l.exp||0)+supSec+rentSec; l.t=Date.now();
+  });
   // update coin bubbles ~2/sec + bob
   coinAcc+=dt;const ts=now/1000;
   plots.forEach(rec=>{if(rec.coin){rec.coin.position.y=(rec.coinBaseY||8)+Math.sin(ts*2+rec.i)*0.12;}});
