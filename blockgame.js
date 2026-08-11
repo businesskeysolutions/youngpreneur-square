@@ -169,6 +169,7 @@ function buildScene(){
   sun=new THREE.DirectionalLight(0xfff2d6,1);sun.position.set(24,44,26);sun.castShadow=true;
   sun.shadow.mapSize.set(1024,1024);sun.shadow.camera.left=-30;sun.shadow.camera.right=30;sun.shadow.camera.top=30;sun.shadow.camera.bottom=-30;sun.shadow.camera.far=160;scene.add(sun);
   worldGroup=new THREE.Group();scene.add(worldGroup);
+  interiorGroup=new THREE.Group();interiorGroup.position.set(0,400,0);interiorGroup.visible=false;scene.add(interiorGroup);
   buildCity();
   applyMode(autoMode());
   camAngle=0.4; focusX=districtX(S.district); focusXTarget=focusX; updateCam();
@@ -316,6 +317,7 @@ function emojiTex(e){if(emojiCache[e])return emojiCache[e];const c=document.crea
 
 /* ---------------- camera + modes + travel ---------------- */
 let camAngle=0.4, camDist=22, camH=12, focusX=0, focusXTarget=0, traveling=false;
+let interiorGroup=null, insideRec=null, intAngle=0, intDist=12.5; const intClickable=[];
 function updateCam(){const cz=6, fx=focusX;
   camera.position.set(fx+Math.sin(camAngle)*camDist, camH, Math.cos(camAngle)*camDist + cz);
   camera.lookAt(fx,3.2,0);
@@ -357,7 +359,10 @@ function buildUI(){
    '<div class="bg3-modal" id="bg3modal"><div class="bg3-box"><button class="bg3-x" id="bg3x">✕</button><div id="bg3modalbody"></div></div></div>'+
    '<div class="bg3-tour" id="bg3tour"><div class="bg3-spot" id="bg3spot"></div>'+
      '<div class="bg3-tourcard" id="bg3tcard"><div class="tt"></div><div class="tb"></div>'+
-       '<div class="trow"><span class="tstep"></span><span class="tbtns"><button class="tskip">Skip</button><button class="tback">Back</button><button class="tnext">Next</button></span></div></div></div>';
+       '<div class="trow"><span class="tstep"></span><span class="tbtns"><button class="tskip">Skip</button><button class="tback">Back</button><button class="tnext">Next</button></span></div></div></div>'+
+   '<div class="bg3-store" id="bg3store"><div class="bg3-storebar"><button class="bg3-back" id="bg3exit">‹ Back to street</button><div class="bg3-storetitle" id="bg3storetitle"></div></div>'+
+     '<div class="bg3-storepanel"><div id="bg3storebody"></div></div></div>'+
+   '<div class="bg3-fade" id="bg3fade"></div>';
   host.innerHTML='';host.appendChild(wrap);
   ui.wrap=wrap;ui.canvaswrap=wrap.querySelector('.bg3-canvaswrap');
   ui.coins=wrap.querySelector('#bg3coins b');ui.streak=wrap.querySelector('#bg3streak b');
@@ -367,6 +372,8 @@ function buildUI(){
   ui.rank=wrap.querySelector('#bg3rank');ui.lucky=wrap.querySelector('#bg3lucky');
   ui.canvaswrap.appendChild(cv);
   ui.tour=wrap.querySelector('#bg3tour');ui.tourSpot=wrap.querySelector('#bg3spot');ui.tourCard=wrap.querySelector('#bg3tcard');
+  ui.store=wrap.querySelector('#bg3store');ui.storeTitle=wrap.querySelector('#bg3storetitle');ui.storeBody=wrap.querySelector('#bg3storebody');ui.fade=wrap.querySelector('#bg3fade');
+  wrap.querySelector('#bg3exit').onclick=exitStore;
   wrap.querySelector('#bg3rivals').onclick=openRivals;
   wrap.querySelector('#bg3help').onclick=startTour;
   ui.tourCard.querySelector('.tnext').onclick=()=>tourStep(tourIdx+1);
@@ -463,6 +470,17 @@ function injectCSS(){ if(document.getElementById('bg3css'))return;const s=docume
 .bg3-tourcard .tskip{background:transparent;color:#9a8a5a}
 .bg3-tourcard .tback{background:#e7dcc2;color:#5a5038}
 .bg3-tourcard .tnext{background:linear-gradient(180deg,#F4D06A,#C89A34);color:#3a2a06;box-shadow:0 3px 0 #8a6a2a}
+.bg3-store{position:absolute;inset:0;z-index:15;display:none;pointer-events:none}
+.bg3-store.on{display:block}
+.bg3-storebar{position:absolute;top:10px;left:10px;right:10px;display:flex;align-items:center;gap:10px;pointer-events:none}
+.bg3-back{pointer-events:auto;background:linear-gradient(180deg,#fffdf6,#efe4cb);border:2px solid #e0be5e;color:#3a2a06;font-weight:800;border-radius:20px;padding:8px 14px;font-size:13px;cursor:pointer;box-shadow:0 3px 0 rgba(120,90,30,.3)}
+.bg3-storetitle{pointer-events:auto;background:rgba(8,11,9,.6);backdrop-filter:blur(6px);border:2px solid rgba(227,192,90,.4);color:#F5F1E6;font-family:Georgia,serif;font-weight:800;font-size:15px;border-radius:16px;padding:6px 14px}
+.bg3-storepanel{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);width:min(370px,calc(100% - 24px));pointer-events:auto;background:linear-gradient(160deg,rgba(26,38,32,.96),rgba(13,21,16,.96));backdrop-filter:blur(4px);border:2px solid rgba(227,192,90,.5);border-radius:16px;padding:12px 15px;box-shadow:0 12px 34px rgba(0,0,0,.55);max-height:54%;overflow-y:auto}
+.bg3-storepanel .bg3-stat{padding:4px 0;font-size:12.5px}
+.bg3-storepanel .bg3-btn{margin-top:9px;padding:11px}
+.bg3-link{width:100%;background:none;border:none;color:#9AA79A;font-size:12px;font-weight:700;cursor:pointer;padding:7px 0 2px;text-align:center}
+.bg3-fade{position:absolute;inset:0;z-index:30;background:#0a0f0c;opacity:0;pointer-events:none;transition:opacity .24s ease}
+.bg3-fade.on{opacity:1}
 `;document.head.appendChild(s);}
 
 let shownCoins=0;
@@ -495,12 +513,20 @@ function closeModal(){ui.modal.classList.remove('on');}
 const ray=new THREE.Raycaster();let dragId=null,dragX=0,moved=0,downX=0,downY=0;
 function bindInput(){
   cv.addEventListener('pointerdown',e=>{dragId=e.pointerId;dragX=e.clientX;downX=e.clientX;downY=e.clientY;moved=0;});
-  cv.addEventListener('pointermove',e=>{if(e.pointerId!==dragId)return;const dx=e.clientX-dragX;camAngle=Math.max(-0.9,Math.min(0.9,camAngle-dx*0.006));dragX=e.clientX;moved+=Math.abs(dx);updateCam();});
+  cv.addEventListener('pointermove',e=>{if(e.pointerId!==dragId)return;const dx=e.clientX-dragX;
+    if(insideRec){intAngle=Math.max(-0.6,Math.min(0.6,intAngle-dx*0.005));updateIntCam();}
+    else{camAngle=Math.max(-0.9,Math.min(0.9,camAngle-dx*0.006));updateCam();}
+    dragX=e.clientX;moved+=Math.abs(dx);});
   cv.addEventListener('pointerup',e=>{if(e.pointerId!==dragId)return;if(moved<6&&Math.hypot(e.clientX-downX,e.clientY-downY)<8)tap(e.clientX,e.clientY);dragId=null;});
-  cv.addEventListener('wheel',e=>{camDist=Math.max(13,Math.min(30,camDist+Math.sign(e.deltaY)*1.4));updateCam();e.preventDefault();},{passive:false});
+  cv.addEventListener('wheel',e=>{if(insideRec){intDist=Math.max(9,Math.min(18,intDist+Math.sign(e.deltaY)*1.1));updateIntCam();}else{camDist=Math.max(13,Math.min(30,camDist+Math.sign(e.deltaY)*1.4));updateCam();}e.preventDefault();},{passive:false});
 }
 function tap(cx,cy){const r=cv.getBoundingClientRect();const ndc=new THREE.Vector2(((cx-r.left)/r.width)*2-1,-((cy-r.top)/r.height)*2+1);
-  ray.setFromCamera(ndc,camera);const hits=ray.intersectObjects(clickable,false);if(!hits.length)return;
+  ray.setFromCamera(ndc,camera);
+  if(insideRec){const ih=ray.intersectObjects(intClickable,false);if(ih.length){let o=ih[0].object;while(o&&!(o.userData&&o.userData.station))o=o.parent;
+    if(o&&o.userData.station==='register'){collect(insideRec);refreshStorePanel(insideRec);}
+    else if(o&&o.userData.station==='equip'){const lot=lotOf(insideRec);if(lot.broke||condOf(lot)<100){const rep=ui.storeBody.querySelector('#bg3rep');if(rep)rep.click();}}}
+    return;}
+  const hits=ray.intersectObjects(clickable,false);if(!hits.length)return;
   const obj=hits[0].object;let o=obj;while(o&&!(o.userData&&o.userData.rec))o=o.parent;if(!o)return;const rec=o.userData.rec;const lot=lotOf(rec);
   ensureDaily();
   if(rec.d!==S.district) travelTo(rec.d); // clicked a shop in another district — go there
@@ -510,12 +536,12 @@ function tap(cx,cy){const r=cv.getBoundingClientRect();const ndc=new THREE.Vecto
     if(lot.ev.type==='rush'){ if(Math.floor(lot.stock||0)>=1){collect(rec);return;} openStore(rec); return; }
     claimEvent(rec); return;
   }
-  // tap the coin bubble to quick-collect; tap the building to open its dashboard
+  // tap the coin bubble to quick-collect; tap the building to step inside
   if(rec.coin && obj===rec.coin && !lot.broke && Math.floor(lot.stock||0)>=1){ collect(rec); return; }
-  openStore(rec);
+  enterStore(rec);
 }
 function collect(rec){const lot=lotOf(rec);const amt=Math.floor(lot.stock||0);if(amt<1)return;
-  lot.stock-=amt;S.coins+=amt;gainXP(amt);flyCoin(rec);flyCoins(rec.coin);toast('+'+amt+' Y');refreshUI();saveSoon();updateCoin(rec);}
+  lot.stock-=amt;S.coins+=amt;gainXP(amt);flyCoin(rec);flyCoins((insideRec===rec&&rec.intCoin)?rec.intCoin:rec.coin);toast('+'+amt+' Y');refreshUI();saveSoon();updateCoin(rec);if(insideRec===rec)updateIntCoin(rec);}
 function flyCoin(rec){ if(rec.coin){rec.coin.scale.set(3.2,1.7,1);setTimeout(()=>{if(rec.coin)rec.coin.scale.set(2.6,1.32,1);},130);} }
 function gainXP(n){S.xp+=n;let lvlup=false;while(S.xp>=LEVEL_XP(S.level)){S.xp-=LEVEL_XP(S.level);S.level++;lvlup=true;}if(lvlup){toast('🎉 Level up! Lvl '+S.level);confettiBurst();}}
 function openBuild(rec){const idx=rec.i;const next=nextUnlockIndex(rec.d);
@@ -531,39 +557,88 @@ function openBuild(rec){const idx=rec.i;const next=nextUnlockIndex(rec.d);
   btn.onclick=()=>{if(!sel||S.coins<cost)return;S.coins-=cost;const t=TYPES[sel];lotBuild(rec,sel);toast('Opened '+t.name+'!');closeModal();refreshUI();saveSoon();updateDistrictUI();};
 }
 function lotBuild(rec,type){const lot=lotOf(rec);lot.built=true;lot.unlocked=true;lot.type=type;lot.name=TYPES[type].name;lot.lvl=1;lot.stock=0;lot.t=Date.now();lot.cond=100;lot.broke=false;lot.rev=0;lot.exp=0;renderPlot(rec);applyMode(mode);}
-function openStore(rec){const lot=lotOf(rec);const t=TYPES[lot.type];
-  const em=eventMult(lot);
-  const gMin=grossPerMin(lot)*condMult(lot)*em;
-  const supMin=gMin*SUPPLY_RATE, rentMin=(gMin>0?rentPerMin(lot):0);
-  const netMin=Math.max(0,gMin-supMin-rentMin);
-  const cond=Math.round(condOf(lot)), upC=upgradeCost(lot), repC=repairCost(lot), stock=Math.floor(lot.stock||0);
-  const cc=lot.broke?'#ff6a5a':cond>=COND_WARN?'#7ad03a':cond>=COND_LOW?'#E3C05A':'#ff9a4a';
-  const cl=lot.broke?'BROKEN':cond>=COND_WARN?'Good':cond>=COND_LOW?'Worn':'Failing';
+/* ---- inside the store: 3D interior + docked management panel ---- */
+function storeTopHTML(rec){const lot=lotOf(rec);const em=eventMult(lot);
+  const gMin=grossPerMin(lot)*condMult(lot)*em, netMin=Math.max(0,gMin-gMin*SUPPLY_RATE-(gMin>0?rentPerMin(lot):0));
+  const cond=Math.round(condOf(lot)), cc=lot.broke?'#ff6a5a':cond>=COND_WARN?'#7ad03a':cond>=COND_LOW?'#E3C05A':'#ff9a4a', cl=lot.broke?'BROKEN':cond>=COND_WARN?'Good':cond>=COND_LOW?'Worn':'Failing';
+  const stock=Math.floor(lot.stock||0);
+  let h='';
+  if(em>1)h+='<div style="background:rgba(227,192,90,.16);border:1px solid rgba(227,192,90,.4);border-radius:8px;padding:5px 10px;margin-bottom:7px;font-size:12px;color:#E3C05A;font-weight:700">'+(lot.ev&&lot.ev.type==='rush'?'🎉 Customer rush':'✨ Lucky Hour')+' — earning ×'+em+'!</div>';
+  h+='<div style="display:flex;align-items:center;gap:8px;margin:0 0 7px"><span style="font-size:11px;color:#9AA79A">Equipment</span><div style="flex:1;height:9px;background:rgba(255,255,255,.12);border-radius:6px;overflow:hidden"><i style="display:block;height:100%;width:'+(lot.broke?100:cond)+'%;background:'+cc+'"></i></div><b style="font-size:12px;color:'+cc+'">'+cl+'</b></div>';
+  h+='<div style="display:flex;gap:8px">'+
+     '<div class="bg3-mini"><div class="k">Profit /min</div><div class="v" style="color:#7ad03a">'+netMin.toFixed(1)+'</div></div>'+
+     '<div class="bg3-mini"><div class="k">In register</div><div class="v">'+stock+'</div></div></div>';
+  return h;}
+function storeDetailHTML(rec){const lot=lotOf(rec);const em=eventMult(lot);
+  const gMin=grossPerMin(lot)*condMult(lot)*em, supMin=gMin*SUPPLY_RATE, rentMin=(gMin>0?rentPerMin(lot):0), netMin=Math.max(0,gMin-supMin-rentMin);
   const rev=Math.round(lot.rev||0), exp=Math.round(lot.exp||0), prof=rev-exp;
-  let h='<h3>'+t.emoji+' '+t.name+' <span style="font-size:12px;color:#9AA79A;font-family:Work Sans">Lvl '+lot.lvl+'</span></h3>';
-  if(em>1)h+='<div style="background:rgba(227,192,90,.16);border:1px solid rgba(227,192,90,.4);border-radius:8px;padding:6px 10px;margin-bottom:8px;font-size:12px;color:#E3C05A;font-weight:700">'+(lot.ev&&lot.ev.type==='rush'?'🎉 Customer rush':'✨ Lucky Hour')+' — earning ×'+em+' right now!</div>';
-  h+='<div style="display:flex;align-items:center;gap:8px;margin:2px 0 12px"><span style="font-size:11px;color:#9AA79A">Equipment</span><div style="flex:1;height:9px;background:rgba(255,255,255,.12);border-radius:6px;overflow:hidden"><i style="display:block;height:100%;width:'+(lot.broke?100:cond)+'%;background:'+cc+'"></i></div><b style="font-size:12px;color:'+cc+'">'+cl+'</b></div>';
-  h+='<div class="bg3-stat"><span>Earning</span><b>'+gMin.toFixed(1)+' Y/min</b></div>';
+  let h='<div class="bg3-stat"><span>Earning</span><b>'+gMin.toFixed(1)+' Y/min</b></div>';
   h+='<div class="bg3-stat"><span>– Supplies (15%)</span><b style="color:#ef8fb0">'+(supMin>0?'-'+supMin.toFixed(1):'0.0')+'</b></div>';
   h+='<div class="bg3-stat"><span>– Rent</span><b style="color:#ef8fb0">'+(rentMin>0?'-'+rentMin.toFixed(1):'0.0')+'</b></div>';
   h+='<div class="bg3-stat" style="border-bottom:none"><span style="color:#F5F1E6"><b>= Profit</b></span><b style="color:#7ad03a">'+netMin.toFixed(1)+' Y/min</b></div>';
-  h+='<div style="display:flex;gap:8px;margin:10px 0 2px">'+
+  h+='<div style="display:flex;gap:8px;margin:8px 0 2px">'+
      '<div class="bg3-mini"><div class="k">Revenue today</div><div class="v">'+rev+'</div></div>'+
      '<div class="bg3-mini"><div class="k">Expenses</div><div class="v" style="color:#ef8fb0">'+exp+'</div></div>'+
      '<div class="bg3-mini"><div class="k">Profit</div><div class="v" style="color:#7ad03a">'+prof+'</div></div></div>';
+  return h;}
+function openStorePanel(rec){const lot=lotOf(rec);const t=TYPES[lot.type];
+  const upC=upgradeCost(lot), repC=repairCost(lot), stock=Math.floor(lot.stock||0), cond=Math.round(condOf(lot));
+  if(ui.storeTitle)ui.storeTitle.innerHTML=t.emoji+' '+t.name+' <span style="font-size:11px;color:#9AA79A">Lvl '+lot.lvl+'</span>';
+  let h=storeTopHTML(rec);
+  h+='<div id="bg3det" style="display:none;margin-top:4px">'+storeDetailHTML(rec)+'</div>';
+  h+='<button class="bg3-link" id="bg3dett">Business details ▾</button>';
   if(lot.broke){
-    h+='<p style="color:#ff9a4a;font-size:12px;margin:10px 0 0">Equipment is broken — this shop earns nothing until you repair it.</p>';
+    h+='<p style="color:#ff9a4a;font-size:12px;margin:8px 0 0">Equipment is broken — tap the machine or Repair to fix it.</p>';
     h+='<button class="bg3-btn" id="bg3rep" '+(S.coins>=repC?'':'disabled')+'>🔧 Repair · Y '+repC+'</button>';
   } else {
-    if(stock>=1) h+='<button class="bg3-btn" id="bg3col" style="background:linear-gradient(180deg,#7ad03a,#4fae2a);color:#0c1a08">Collect '+stock+' Y</button>';
-    if(cond<100) h+='<button class="bg3-btn" id="bg3rep" style="background:rgba(227,192,90,.14);color:#E3C05A;border:1px solid rgba(227,192,90,.4)" '+(S.coins>=repC?'':'disabled')+'>🔧 Tune-up · Y '+repC+'</button>';
-    h+='<button class="bg3-btn" id="bg3up" '+(S.coins>=upC?'':'disabled')+'>⬆ Upgrade · Y '+upC+'</button>';
+    if(stock>=1) h+='<button class="bg3-btn" id="bg3col" style="background:linear-gradient(180deg,#7ad03a,#4fae2a);color:#0c1a08">💰 Collect '+stock+' Y</button>';
+    h+='<div style="display:flex;gap:8px">';
+    if(cond<100) h+='<button class="bg3-btn" id="bg3rep" style="flex:1;background:rgba(227,192,90,.14);color:#E3C05A;border:1px solid rgba(227,192,90,.4)" '+(S.coins>=repC?'':'disabled')+'>🔧 Tune-up ·Y'+repC+'</button>';
+    h+='<button class="bg3-btn" id="bg3up" style="flex:1" '+(S.coins>=upC?'':'disabled')+'>⬆ Upgrade ·Y'+upC+'</button>';
+    h+='</div>';
   }
-  openModal(h);
-  const col=ui.modalbody.querySelector('#bg3col');if(col)col.onclick=()=>{collect(rec);closeModal();};
-  const rep=ui.modalbody.querySelector('#bg3rep');if(rep)rep.onclick=()=>{if(S.coins<repC)return;S.coins-=repC;lot.exp=(lot.exp||0)+repC;lot.broke=false;lot.cond=100;toast('Repaired '+t.name+'!');updateCoin(rec);closeModal();refreshUI();saveSoon();};
-  const up=ui.modalbody.querySelector('#bg3up');if(up)up.onclick=()=>{if(S.coins<upC)return;S.coins-=upC;lot.lvl++;gainXP(8);renderPlot(rec);applyMode(mode);toast('Upgraded to Lvl '+lot.lvl);closeModal();refreshUI();saveSoon();};
+  ui.storeBody.innerHTML=h;ui.store.classList.add('on');
+  const dett=ui.storeBody.querySelector('#bg3dett');if(dett)dett.onclick=()=>{const d=ui.storeBody.querySelector('#bg3det');if(!d)return;const open=d.style.display!=='none';d.style.display=open?'none':'block';dett.textContent='Business details '+(open?'▾':'▴');};
+  const col=ui.storeBody.querySelector('#bg3col');if(col)col.onclick=()=>{collect(rec);refreshStorePanel(rec);};
+  const rep=ui.storeBody.querySelector('#bg3rep');if(rep)rep.onclick=()=>{if(S.coins<repC)return;S.coins-=repC;lot.exp=(lot.exp||0)+repC;lot.broke=false;lot.cond=100;toast('Repaired '+t.name+'!');updateCoin(rec);themeInterior(rec);refreshUI();saveSoon();refreshStorePanel(rec);};
+  const up=ui.storeBody.querySelector('#bg3up');if(up)up.onclick=()=>{if(S.coins<upC)return;S.coins-=upC;lot.lvl++;gainXP(8);renderPlot(rec);applyMode(mode);toast('Upgraded to Lvl '+lot.lvl);themeInterior(rec);refreshUI();saveSoon();refreshStorePanel(rec);};
 }
+function refreshStorePanel(rec){updateIntCoin(rec);openStorePanel(rec);}
+function enterStore(rec){if(insideRec)return;fade(()=>{insideRec=rec;themeInterior(rec);interiorGroup.visible=true;intAngle=0;updateIntCam();openStorePanel(rec);});}
+function exitStore(){if(!insideRec)return;fade(()=>{insideRec=null;interiorGroup.visible=false;clearGroup(interiorGroup);intClickable.length=0;if(ui.store)ui.store.classList.remove('on');updateCam();});}
+function fade(mid){const f=ui.fade;if(!f){if(mid)mid();return;}f.classList.add('on');setTimeout(()=>{if(mid)mid();setTimeout(()=>f.classList.remove('on'),70);},240);}
+const IC=new THREE.Vector3(0,400,0);
+function updateIntCam(){camera.position.set(IC.x+Math.sin(intAngle)*intDist,IC.y+6.2,IC.z+Math.cos(intAngle)*intDist+4);camera.lookAt(IC.x,IC.y+2.3,IC.z-3.0);if(sky)sky.position.x=IC.x;}
+function updateIntCoin(rec){if(!rec.intCoin)return;const lot=lotOf(rec);const n=Math.floor(lot.stock||0);const t=coinTex(n);if(rec.intCoin.material.map&&rec.intCoin.material.map.dispose)rec.intCoin.material.map.dispose();rec.intCoin.material.map=t;rec.intCoin.material.needsUpdate=true;rec.intCoin.visible=n>=1;}
+function themeInterior(rec){const lot=lotOf(rec);const t=TYPES[lot.type];const g=interiorGroup;clearGroup(g);intClickable.length=0;
+  // interior lighting (only active while this group is visible)
+  g.add(new THREE.AmbientLight(0xeaf0ff,0.8));
+  const pl=new THREE.PointLight(0xfff0d0,1.15,90,2);pl.position.set(0,6.8,3);g.add(pl);
+  const floor=new THREE.Mesh(new THREE.BoxGeometry(14,0.4,13),std({color:0x8a6a45,roughness:.9}));floor.position.set(0,-0.2,0);floor.receiveShadow=true;g.add(floor);
+  const rug=new THREE.Mesh(new THREE.BoxGeometry(6,0.06,5),std({color:t.awn,roughness:.9}));rug.position.set(0,0.04,1.4);g.add(rug);
+  const wallMat=std({color:t.pal.fac,roughness:.97});
+  g.add(mesh(new THREE.BoxGeometry(14,7,0.4),wallMat,0,3.3,-6.2));
+  g.add(mesh(new THREE.BoxGeometry(0.4,7,13),wallMat,-7,3.3,0));
+  g.add(mesh(new THREE.BoxGeometry(0.4,7,13),wallMat,7,3.3,0));
+  g.add(mesh(new THREE.BoxGeometry(14,1.5,0.5),std({color:t.pal.trim}),0,0.75,-6.0));
+  const st=signTex(t.name,t.emoji,'#E3C05A');const sm=std({map:st,emissiveMap:st,emissive:0xffffff,emissiveIntensity:.75,transparent:true});
+  g.add(mesh(new THREE.PlaneGeometry(6,6*72/256),sm,0,5.1,-5.98));
+  // shelves stocked with product
+  for(let r=0;r<2;r++){g.add(mesh(new THREE.BoxGeometry(8.4,0.2,0.7),std({color:t.pal.trim}),0,2.2+r*1.5,-5.5));
+    for(let c=0;c<5;c++)g.add(mesh(new THREE.PlaneGeometry(0.72,0.72),std({map:emojiTex(t.emoji),transparent:true}),-3.2+c*1.6,2.58+r*1.5,-5.28));}
+  // counter + register toward the back, below the shelves (tap to collect)
+  const counter=mesh(new THREE.BoxGeometry(6,1.7,1.4),std({color:t.pal.trim,roughness:.7}),0,0.85,-3.4);counter.userData={rec,station:'register'};counter.castShadow=true;g.add(counter);intClickable.push(counter);
+  g.add(mesh(new THREE.BoxGeometry(6.3,0.22,1.7),std({color:0x2a2018}),0,1.75,-3.4));
+  const reg=mesh(new THREE.BoxGeometry(1.1,0.8,0.9),std({color:0x33383f,emissive:0x2a3a5a,emissiveIntensity:.25}),-1.8,2.15,-3.4);reg.userData={rec,station:'register'};g.add(reg);intClickable.push(reg);
+  const ct=coinTex(Math.floor(lot.stock||0));const cm=new THREE.SpriteMaterial({map:ct,transparent:true,depthTest:false});const spr=new THREE.Sprite(cm);spr.scale.set(2.4,1.2,1);spr.position.set(-1.8,3.2,-3.4);spr.userData={rec,station:'register'};g.add(spr);intClickable.push(spr);rec.intCoin=spr;updateIntCoin(rec);
+  // equipment machine (tap to fix)
+  const eq=mesh(new THREE.BoxGeometry(1.9,2.4,1.5),std({color:lot.broke?0x7a2e28:0x545a63,metalness:.35,roughness:.5}),5.2,1.2,-3.8);eq.userData={rec,station:'equip'};eq.castShadow=true;g.add(eq);intClickable.push(eq);
+  g.add(mesh(new THREE.PlaneGeometry(1.1,1.1),std({map:emojiTex(lot.broke?'🔧':'⚙️'),transparent:true}),5.2,1.4,-3.03));
+  // shopkeeper behind the counter + a browsing customer up front
+  const keep=makePerson(rec.i+2);keep.position.set(1.4,0,-4.5);keep.rotation.y=0;g.add(keep);rec.intKeeper=keep;
+  const cust=makePerson(rec.i+5);cust.position.set(-2.2,0,0.6);g.add(cust);rec.intCust=cust;
+}
+function mesh(geo,mat,x,y,z){const m=new THREE.Mesh(geo,mat);m.position.set(x,y,z);return m;}
 function updateCoin(rec){if(!rec.coin)return;const lot=lotOf(rec);let t,vis;
   if(lot.broke){t=repairTex();vis=true;} else {const n=Math.floor(lot.stock||0);t=coinTex(n);vis=n>=1;}
   if(rec.coin.material.map&&rec.coin.material.map.dispose)rec.coin.material.map.dispose();
@@ -579,7 +654,7 @@ function ensureDaily(){const td=todayStr();if(S.lastDay===td)return;
 let tourIdx=0;
 const TOUR=[
   {title:'Welcome to your block! 🏙️',body:"Let's take a quick tour. You'll run little shops, collect coins, and grow a whole city."},
-  {world:()=>{const rec=plots.find(r=>lotOf(r).built&&r.d===S.district);return rec&&rec.coin?worldToScreen(rec.coin):null;},title:'Collect your coins',body:'Your shops earn coins over time. Tap a shop — or its coin bubble — to collect what it made.'},
+  {world:()=>{const rec=plots.find(r=>lotOf(r).built&&r.d===S.district);return rec&&rec.coin?worldToScreen(rec.coin):null;},title:'Collect & step inside',body:'Tap a shop to go inside and run it — collect earnings, upgrade, and repair. Or tap its coin bubble to grab coins fast.'},
   {world:()=>{const ni=nextUnlockIndex(S.district);if(ni<0)return null;const rec=plots.find(r=>r.d===S.district&&r.i===ni);return rec?worldToScreen(rec.group):null;},title:'Open new shops',body:'Spend coins on an empty lot to open a new shop. More shops means more coins!'},
   {sel:'.bg3-travel',title:'Explore the city',body:'Use these arrows to travel between districts — tap ＋ to unlock brand-new ones. The city never ends.'},
   {sel:'#bg3rivals',title:'Beat your rivals',body:'Open the leaderboard to raid rival tycoons for coins and climb your way to #1.'},
@@ -710,18 +785,27 @@ function tick(now){const dt=Math.min(.1,(now-last)/1000);last=now;
   });
   // animate the coin counter (count-up) toward the real balance
   if(ui.coins){const target=Math.floor(S.coins);if(shownCoins!==target){const diff=target-shownCoins;shownCoins+=(Math.abs(diff)<2)?diff:diff*Math.min(1,dt*6);if(Math.abs(target-shownCoins)<1)shownCoins=target;ui.coins.textContent=Math.round(shownCoins).toLocaleString();}}
-  // stroll the customers along the sidewalk
-  for(let w=0;w<walkers.length;w++){const wk=walkers[w];wk.x+=wk.dir*wk.sp*dt;
-    if(wk.x>wk.max){wk.x=wk.max;wk.dir=-1;}else if(wk.x<wk.min){wk.x=wk.min;wk.dir=1;}
-    wk.m.position.x=wk.x;wk.m.rotation.y=wk.dir>0?Math.PI/2:-Math.PI/2;
-    wk.m.position.y=Math.abs(Math.sin(now/150+w))*0.05;}
-  // smooth travel between districts
-  if(traveling||Math.abs(focusX-focusXTarget)>0.01){focusX+=(focusXTarget-focusX)*Math.min(1,dt*3.2);if(Math.abs(focusX-focusXTarget)<0.05){focusX=focusXTarget;traveling=false;}updateCam();}
-  // update coin bubbles ~2/sec + bob (coin + event bubbles)
-  coinAcc+=dt;const ts=now/1000;
-  plots.forEach(rec=>{if(rec.coin)rec.coin.position.y=(rec.coinBaseY||8)+Math.sin(ts*2+rec.i)*0.12;
-    if(rec.evSprite&&rec.evSprite.visible)rec.evSprite.position.y=(rec.evBaseY||9)+Math.sin(ts*2.6+rec.i)*0.16;});
-  if(coinAcc>0.5){coinAcc=0;plots.forEach(rec=>{if(rec.coin)updateCoin(rec);if(rec.evSprite)updateEventSprite(rec);});updateLuckyUI();}
+  const ts=now/1000;
+  if(insideRec){
+    // idle life inside the shop
+    const rec=insideRec;if(rec.intKeeper)rec.intKeeper.position.y=Math.abs(Math.sin(ts*1.6))*0.04;
+    if(rec.intCust){rec.intCust.position.x=-2.6+Math.sin(ts*0.5)*0.8;rec.intCust.rotation.y=Math.cos(ts*0.5)>0?Math.PI/2:-Math.PI/2;}
+    if(rec.intCoin)rec.intCoin.position.y=3.3+Math.sin(ts*2)*0.1;
+    coinAcc+=dt;if(coinAcc>0.5){coinAcc=0;updateIntCoin(rec);updateLuckyUI();}
+  } else {
+    // stroll the customers along the sidewalk
+    for(let w=0;w<walkers.length;w++){const wk=walkers[w];wk.x+=wk.dir*wk.sp*dt;
+      if(wk.x>wk.max){wk.x=wk.max;wk.dir=-1;}else if(wk.x<wk.min){wk.x=wk.min;wk.dir=1;}
+      wk.m.position.x=wk.x;wk.m.rotation.y=wk.dir>0?Math.PI/2:-Math.PI/2;
+      wk.m.position.y=Math.abs(Math.sin(now/150+w))*0.05;}
+    // smooth travel between districts
+    if(traveling||Math.abs(focusX-focusXTarget)>0.01){focusX+=(focusXTarget-focusX)*Math.min(1,dt*3.2);if(Math.abs(focusX-focusXTarget)<0.05){focusX=focusXTarget;traveling=false;}updateCam();}
+    // update coin bubbles ~2/sec + bob (coin + event bubbles)
+    coinAcc+=dt;
+    plots.forEach(rec=>{if(rec.coin)rec.coin.position.y=(rec.coinBaseY||8)+Math.sin(ts*2+rec.i)*0.12;
+      if(rec.evSprite&&rec.evSprite.visible)rec.evSprite.position.y=(rec.evBaseY||9)+Math.sin(ts*2.6+rec.i)*0.16;});
+    if(coinAcc>0.5){coinAcc=0;plots.forEach(rec=>{if(rec.coin)updateCoin(rec);if(rec.evSprite)updateEventSprite(rec);});updateLuckyUI();}
+  }
   renderer.render(scene,camera);requestAnimationFrame(tick);
 }
 function resize(){if(!ui.canvaswrap)return;const w=ui.canvaswrap.clientWidth||800,h=ui.canvaswrap.clientHeight||500;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();}
