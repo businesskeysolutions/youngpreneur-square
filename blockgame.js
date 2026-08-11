@@ -31,6 +31,25 @@ function districtAccent(i){return DTHEMES[i%DTHEMES.length].accent;}
 function districtLots(i){return LOTS_PER+Math.min(3,Math.floor(i/2));} // 5,5,6,6,7,7,8,8...
 function lotCostFor(di,li){let base;if(li<LOT_COST.length)base=LOT_COST[li];else base=LOT_COST[LOT_COST.length-1]+(li-LOT_COST.length+1)*3200;return Math.round(base*Math.pow(1.9,di));}
 function districtOpenCost(di){return Math.round(1500*Math.pow(2.3,di-1));} // di>=1
+/* ---- AI rivals & raids (kid-safe: computer opponents only, never real players) ---- */
+const RIVALS=[
+  {id:'r1',name:'Tycoon Tasha',   emoji:'👑',mult:1.45},
+  {id:'r2',name:'Biz-Whiz Ben',   emoji:'🤓',mult:1.10},
+  {id:'r3',name:'Mogul Mia',      emoji:'💼',mult:1.28},
+  {id:'r4',name:'Captain Cash',   emoji:'🧢',mult:0.92},
+  {id:'r5',name:'Duchess Dee',    emoji:'🎩',mult:1.60},
+  {id:'r6',name:'Sir Save-a-Lot', emoji:'🦉',mult:0.78}
+];
+const RAID_MAX_TICKETS=5, RAID_REFILL=25*60*1000, RAID_CD=45*60*1000;
+const SHIELD_COST=120, SHIELD_DUR=60*60*1000;
+function hash01(str){let h=2166136261;for(let i=0;i<str.length;i++){h^=str.charCodeAt(i);h=Math.imul(h,16777619);}return ((h>>>0)%100000)/100000;}
+function playerWorth(){let w=Math.floor(S.coins||0);eachLot(l=>{if(l.built)w+=140+(l.lvl||1)*80;});w+=(S.districts.length-1)*900+ (S.level||1)*120;return w;}
+function rivalWorth(r){const pw=Math.max(300,playerWorth());const j=0.86+0.22*hash01(r.id+todayStr());
+  // base lead early (something to chase) that fades so a committed player can climb to #1
+  return Math.round(r.mult*(1600+0.5*pw)*j);}
+function raidTickets(){const R=S.raid;const now=Date.now();if(R.tickets<RAID_MAX_TICKETS){const g=Math.floor((now-(R.ticketsT||now))/RAID_REFILL);if(g>0){R.tickets=Math.min(RAID_MAX_TICKETS,R.tickets+g);R.ticketsT=(R.tickets>=RAID_MAX_TICKETS)?now:(R.ticketsT+g*RAID_REFILL);}}return R.tickets;}
+function shieldActive(){return (S.raid&&S.raid.shieldUntil||0)>Date.now();}
+function fmtMs(ms){ms=Math.max(0,ms);const m=Math.round(ms/60000);if(m>=60)return Math.floor(m/60)+'h'+(m%60?(' '+(m%60)+'m'):'');return m+'m';}
 const TYPES={
   bakery:  {emoji:'🧁',name:'Bakery',   earn:1.00,lvlReq:1, pal:{fac:'#8a5560',win:'#ffe0ea',trim:'#5a3a44'}, awn:0xE3242B, sign:'#f6dcef'},
   lemonade:{emoji:'🍋',name:'Lemonade', earn:0.90,lvlReq:1, pal:{fac:'#9a8a3a',win:'#fff4b0',trim:'#6a5a1e'}, awn:0xE6C020, sign:'#241a06'},
@@ -69,6 +88,7 @@ function makeDistrict(i,seed){const n=districtLots(i);const lots=[];for(let k=0;
   return {id:i,lots:lots};}
 function fresh(){return {v:3,coins:120,xp:0,level:1,streak:0,lastDay:'',tut:0,
   visited:{day:'',refs:{}},tokens:{},pid:uuid(),pname:'',district:0,
+  raid:{tickets:RAID_MAX_TICKETS,ticketsT:Date.now(),cd:{},shieldUntil:0,wins:0,losses:0},
   districts:[makeDistrict(0,true)]};}
 let S=fresh();
 function eachLot(fn){S.districts.forEach((D,di)=>D.lots.forEach((l,li)=>fn(l,di,li,D)));}
@@ -78,6 +98,8 @@ function load(){try{const raw=localStorage.getItem(LS);if(raw){const o=JSON.pars
   }}}catch(e){}
   if(!S.districts||!S.districts.length)S.districts=[makeDistrict(0,true)];
   if(typeof S.district!=='number'||S.district<0||S.district>=S.districts.length)S.district=0;
+  if(!S.raid)S.raid={tickets:RAID_MAX_TICKETS,ticketsT:Date.now(),cd:{},shieldUntil:0,wins:0,losses:0};
+  if(!S.raid.cd)S.raid.cd={};
   // ensure lot counts + backfill business fields
   S.districts.forEach((D,di)=>{const need=districtLots(di);while(D.lots.length<need)D.lots.push(makeLot());
     D.lots.forEach(l=>{if(l.built){if(l.cond==null)l.cond=100;l.broke=!!l.broke;l.rev=l.rev||0;l.exp=l.exp||0;}});});
@@ -276,6 +298,7 @@ function buildUI(){
    '<div class="bg3-top">'+
      '<div class="bg3-chip" id="bg3coins"><span class="bg3-ycoin"></span><b>0</b></div>'+
      '<div class="bg3-chip" id="bg3streak">🔥 <b>0</b></div>'+
+     '<button class="bg3-chip" id="bg3rivals" style="cursor:pointer" title="Rivals & raids">🏆 <b id="bg3rank">#1</b></button>'+
      '<div class="bg3-lvl"><div class="bg3-lvlrow"><span id="bg3lvl">Lvl 1</span><span id="bg3xp">0/50 XP</span></div><div class="bg3-bar"><i id="bg3xpbar"></i></div></div>'+
      '<button class="bg3-icon" id="bg3fs" title="Fullscreen">⤢</button>'+
    '</div>'+
@@ -290,7 +313,9 @@ function buildUI(){
   ui.lvl=wrap.querySelector('#bg3lvl');ui.xp=wrap.querySelector('#bg3xp');ui.xpbar=wrap.querySelector('#bg3xpbar');
   ui.toast=wrap.querySelector('#bg3toast');ui.modal=wrap.querySelector('#bg3modal');ui.modalbody=wrap.querySelector('#bg3modalbody');
   ui.dname=wrap.querySelector('#bg3dname');ui.prev=wrap.querySelector('#bg3prev');ui.next=wrap.querySelector('#bg3next');
+  ui.rank=wrap.querySelector('#bg3rank');
   ui.canvaswrap.appendChild(cv);
+  wrap.querySelector('#bg3rivals').onclick=openRivals;
   wrap.querySelector('#bg3x').onclick=closeModal;
   ui.modal.addEventListener('click',e=>{if(e.target===ui.modal)closeModal();});
   wrap.querySelector('#bg3fs').onclick=toggleFs;
@@ -352,6 +377,15 @@ function injectCSS(){ if(document.getElementById('bg3css'))return;const s=docume
 .bg3-mini{flex:1;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:7px 5px;text-align:center}
 .bg3-mini .k{font-size:9px;color:#9AA79A;text-transform:uppercase;letter-spacing:.03em;line-height:1.2}
 .bg3-mini .v{font-size:17px;font-weight:800;margin-top:3px}
+.bg3-lb{margin-top:8px;max-height:238px;overflow-y:auto;display:flex;flex-direction:column;gap:3px}
+.bg3-lbrow{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:10px;font-size:13px;background:rgba(255,255,255,.03)}
+.bg3-lbrow.me{background:rgba(227,192,90,.15);border:1px solid rgba(227,192,90,.4)}
+.bg3-lbrow .rk{width:16px;color:#9AA79A;font-weight:800;text-align:center}
+.bg3-lbrow .av{font-size:18px}
+.bg3-lbrow .nm{flex:1;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bg3-lbrow .wo{color:#E3C05A;font-weight:800;font-size:11.5px;white-space:nowrap}
+.bg3-raid{background:linear-gradient(180deg,#E3242B,#a01820);color:#fff;border:none;border-radius:8px;padding:5px 0;width:56px;font-weight:800;font-size:11.5px;cursor:pointer;flex:none}
+.bg3-raid:disabled{filter:grayscale(.55);opacity:.5;cursor:not-allowed}
 `;document.head.appendChild(s);}
 
 function refreshUI(){
@@ -360,6 +394,7 @@ function refreshUI(){
   ui.lvl.textContent='Lvl '+S.level;
   const need=LEVEL_XP(S.level);ui.xp.textContent=Math.floor(S.xp)+'/'+need+' XP';
   ui.xpbar.style.width=Math.min(100,(S.xp/need)*100)+'%';
+  if(ui.rank){const pw=playerWorth();let above=0;RIVALS.forEach(r=>{if(rivalWorth(r)>pw)above++;});ui.rank.textContent='#'+(above+1);}
 }
 let toastT;
 function toast(msg){ui.toast.textContent=msg;ui.toast.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>ui.toast.classList.remove('on'),2000);}
@@ -443,6 +478,63 @@ function ensureDaily(){const td=todayStr();if(S.lastDay===td)return;
   eachLot(l=>{if(l.built){l.rev=0;l.exp=0;}}); // reset daily books city-wide
   const bonus=Math.min(120,20*S.streak);S.coins+=bonus;toast('Daily +'+bonus+' Y · streak '+S.streak);refreshUI();saveSoon();}
 
+/* ---------------- AI rivals & raids ---------------- */
+function openRivals(){ raidTickets();
+  const pw=playerWorth();
+  const list=RIVALS.map(r=>({name:r.name,emoji:r.emoji,worth:rivalWorth(r),r:r}));
+  list.push({name:'You',emoji:'⭐',worth:pw,me:true});
+  list.sort((a,b)=>b.worth-a.worth);
+  const rank=list.findIndex(x=>x.me)+1;
+  const R=S.raid;
+  let h='<h3>🏆 City Rivals</h3><p>You\'re rank <b>#'+rank+'</b> of '+list.length+' · Net worth <b style="color:#E3C05A">Y '+pw.toLocaleString()+'</b></p>';
+  h+='<div style="display:flex;gap:8px;margin-bottom:10px">'+
+     '<div class="bg3-mini"><div class="k">Raid tickets</div><div class="v">'+R.tickets+'/'+RAID_MAX_TICKETS+'</div></div>'+
+     '<div class="bg3-mini"><div class="k">Shield</div><div class="v" style="font-size:13px">'+(shieldActive()?fmtMs(R.shieldUntil-Date.now()):'off')+'</div></div>'+
+     '<div class="bg3-mini"><div class="k">Raids won</div><div class="v" style="font-size:15px">'+(R.wins||0)+'</div></div></div>';
+  if(!shieldActive()) h+='<button class="bg3-btn" id="bg3shield" style="background:rgba(80,140,220,.16);color:#8fc4f0;border:1px solid rgba(120,170,230,.5);margin-top:0" '+(S.coins>=SHIELD_COST?'':'disabled')+'>🛡️ Shield your city 1h · Y '+SHIELD_COST+'</button>';
+  else h+='<p style="color:#8fc4f0;font-size:12px;text-align:center;margin:2px 0">🛡️ Protected for '+fmtMs(R.shieldUntil-Date.now())+' — rivals can\'t raid you.</p>';
+  h+='<div class="bg3-lb">';
+  list.forEach((x,idx)=>{ const onCd=x.r&&(R.cd[x.r.id]||0)>Date.now();
+    h+='<div class="bg3-lbrow'+(x.me?' me':'')+'"><span class="rk">'+(idx+1)+'</span><span class="av">'+x.emoji+'</span><span class="nm">'+x.name+'</span><span class="wo">Y '+x.worth.toLocaleString()+'</span>'+
+      (x.me?'<span style="width:56px"></span>':'<button class="bg3-raid" data-r="'+x.r.id+'" '+((R.tickets<1||onCd)?'disabled':'')+'>'+(onCd?fmtMs((R.cd[x.r.id]||0)-Date.now()):'Raid')+'</button>')+'</div>';
+  });
+  h+='</div><p style="font-size:11px;color:#9AA79A;margin-top:8px;margin-bottom:0">Raiding earns you coins from a rival\'s vault. Tickets refill over time. Rivals are computer players — never real people.</p>';
+  openModal(h);
+  const sh=ui.modalbody.querySelector('#bg3shield');if(sh)sh.onclick=()=>{if(S.coins<SHIELD_COST)return;S.coins-=SHIELD_COST;S.raid.shieldUntil=Date.now()+SHIELD_DUR;toast('🛡️ Shield up for 1 hour!');refreshUI();saveSoon();openRivals();};
+  ui.modalbody.querySelectorAll('.bg3-raid').forEach(b=>b.onclick=()=>{const id=b.getAttribute('data-r');const r=RIVALS.find(z=>z.id===id);if(r&&doRaid(r))openRivals();});
+}
+function doRaid(r){raidTickets();const R=S.raid;const now=Date.now();
+  if(R.tickets<1){toast('No raid tickets left — they refill over time');return false;}
+  if((R.cd[r.id]||0)>now){toast(r.name+' is recovering — try again later');return false;}
+  const wasMax=R.tickets>=RAID_MAX_TICKETS;R.tickets-=1;if(wasMax)R.ticketsT=now;
+  R.cd[r.id]=now+RAID_CD;
+  const defended=hash01(r.id+':'+Math.floor(now/1000))<0.22; // ~22%: rival had a shield up
+  let reward=Math.round(rivalWorth(r)*0.03*(0.8+0.5*hash01(r.name+now)));
+  reward=Math.max(15,Math.min(reward,Math.round(playerWorth()*0.2)+60));
+  if(defended)reward=Math.max(8,Math.round(reward*0.45));
+  S.coins+=reward;R.wins=(R.wins||0)+1;gainXP(4);
+  toast((defended?'🛡️ '+r.name+' blocked some — ':'💰 Raided '+r.name+'! ')+'+'+reward+' Y');
+  refreshUI();saveSoon();return true;
+}
+let raidTO=null;
+function scheduleIncoming(){clearTimeout(raidTO);const t=105000+Math.random()*75000;raidTO=setTimeout(()=>{incomingRaid();scheduleIncoming();},t);}
+function incomingRaid(){ if(shieldActive())return; if(ui.modal&&ui.modal.classList.contains('on'))return;
+  const r=RIVALS[Math.floor(Math.random()*RIVALS.length)];
+  const bonus=Math.round(playerWorth()*0.02)+20;
+  const skim=Math.min(45,Math.max(8,Math.round(playerWorth()*0.012)));
+  let done=false;
+  openModal('<h3>🚨 Raid incoming!</h3><p><b>'+r.emoji+' '+r.name+'</b> is trying to raid your block. Defend to chase them off and grab a bonus!</p>'+
+    '<div class="bg3-stat"><span>If you defend</span><b style="color:#7ad03a">+'+bonus+' Y</b></div>'+
+    '<div class="bg3-stat" style="border-bottom:none"><span>If they get through</span><b style="color:#ef8fb0">-'+skim+' Y</b></div>'+
+    '<button class="bg3-btn" id="bg3def">🛡️ Defend!</button>');
+  const finish=(won)=>{if(done)return;done=true;
+    if(won){S.coins+=bonus;S.raid.wins=(S.raid.wins||0)+1;toast('🛡️ Defended! +'+bonus+' Y');}
+    else{S.coins=Math.max(0,S.coins-skim);S.raid.losses=(S.raid.losses||0)+1;toast(r.emoji+' '+r.name+' skimmed '+skim+' Y');}
+    refreshUI();saveSoon();closeModal();};
+  const b=ui.modalbody.querySelector('#bg3def');if(b)b.onclick=()=>finish(true);
+  setTimeout(()=>finish(false),9000); // auto-resolve if ignored (small, capped)
+}
+
 /* ---------------- loop ---------------- */
 let last=performance.now(),coinAcc=0;
 function tick(now){const dt=Math.min(.1,(now-last)/1000);last=now;
@@ -475,6 +567,7 @@ function mount(el){host=el||document.getElementById('blockMount');if(!host)retur
   window.addEventListener('resize',resize);
   // re-check day/night every few minutes
   setInterval(()=>applyMode(autoMode()),120000);
+  scheduleIncoming(); // rivals start trying to raid after a couple minutes
   requestAnimationFrame(tick);
 }
 function reward(n,msg){n=Math.max(0,Math.floor(n||0));S.coins+=n;if(msg)toast(msg);else toast('+'+n+' Y');refreshUI&&refreshUI();saveSoon();}
