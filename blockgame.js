@@ -70,6 +70,7 @@ const COND_WARN=45, COND_LOW=20;              // condition thresholds
 const BREAK_P_PER_SEC=0.10/60;                // ~10%/min chance to break down once worn
 function condOf(l){return (l.cond==null?100:l.cond);}
 function condMult(l){ if(l.broke) return 0; const c=condOf(l); return c>=COND_WARN?1:(c>=COND_LOW?0.7:0.45); }
+function eventMult(l){let m=1;if(l.ev&&l.ev.type==='rush'&&(l.ev.until||0)>Date.now())m*=(l.ev.mult||3);if((S.lucky||0)>Date.now())m*=2;return m;}
 function grossPerMin(l){const t=TYPES[l.type];return CFG.ratePerMin*t.earn*(1+0.25*((l.lvl||1)-1));}
 function netPerMin(l){const g=grossPerMin(l)*condMult(l); if(g<=0) return 0; return Math.max(0,g - g*SUPPLY_RATE - rentPerMin(l));}
 function ratePerSec(l){return netPerMin(l)/60;}         // wallet accrues NET
@@ -100,6 +101,9 @@ function load(){try{const raw=localStorage.getItem(LS);if(raw){const o=JSON.pars
   if(typeof S.district!=='number'||S.district<0||S.district>=S.districts.length)S.district=0;
   if(!S.raid)S.raid={tickets:RAID_MAX_TICKETS,ticketsT:Date.now(),cd:{},shieldUntil:0,wins:0,losses:0};
   if(!S.raid.cd)S.raid.cd={};
+  // clear stale timed events from a previous session
+  eachLot(l=>{if(l.ev&&(l.ev.until||0)<Date.now())l.ev=null;});
+  if((S.lucky||0)<Date.now())S.lucky=0;
   // ensure lot counts + backfill business fields
   S.districts.forEach((D,di)=>{const need=districtLots(di);while(D.lots.length<need)D.lots.push(makeLot());
     D.lots.forEach(l=>{if(l.built){if(l.cond==null)l.cond=100;l.broke=!!l.broke;l.rev=l.rev||0;l.exp=l.exp||0;}});});
@@ -246,6 +250,9 @@ function buildShop(rec,lot){
   const ct=coinTex(Math.floor(lot.stock||0));const cm=new THREE.SpriteMaterial({map:ct,transparent:true,depthTest:false});
   const spr=new THREE.Sprite(cm);spr.scale.set(2.6,1.32,1);spr.position.set(0,h+2.0,0.4);spr.userData={rec};g.add(spr);clickable.push(spr);
   rec.coin=spr;rec.coinTex=ct;rec.coinBaseY=h+2.0;
+  // event bubble (rush / tip / restock) — hidden until an event fires
+  const em=new THREE.SpriteMaterial({map:coinTex(0),transparent:true,depthTest:false});const esp=new THREE.Sprite(em);esp.scale.set(2.7,1.2,1);esp.position.set(0,h+3.4,0.4);esp.visible=false;esp.userData={rec};g.add(esp);clickable.push(esp);
+  rec.evSprite=esp;rec.evBaseY=h+3.4;updateEventSprite(rec);
 }
 function buildLot(rec,lot){
   const g=rec.group;const idx=rec.i;
@@ -305,6 +312,7 @@ function buildUI(){
    '<div class="bg3-travel"><button class="bg3-nav" id="bg3prev" title="Previous district">‹</button>'+
      '<div class="bg3-dname" id="bg3dname">Founders Row</div>'+
      '<button class="bg3-nav" id="bg3next" title="Next district">›</button></div>'+
+   '<div class="bg3-lucky" id="bg3lucky"><b>✨ ×2</b></div>'+
    '<div class="bg3-toast" id="bg3toast"></div>'+
    '<div class="bg3-modal" id="bg3modal"><div class="bg3-box"><button class="bg3-x" id="bg3x">✕</button><div id="bg3modalbody"></div></div></div>';
   host.innerHTML='';host.appendChild(wrap);
@@ -313,7 +321,7 @@ function buildUI(){
   ui.lvl=wrap.querySelector('#bg3lvl');ui.xp=wrap.querySelector('#bg3xp');ui.xpbar=wrap.querySelector('#bg3xpbar');
   ui.toast=wrap.querySelector('#bg3toast');ui.modal=wrap.querySelector('#bg3modal');ui.modalbody=wrap.querySelector('#bg3modalbody');
   ui.dname=wrap.querySelector('#bg3dname');ui.prev=wrap.querySelector('#bg3prev');ui.next=wrap.querySelector('#bg3next');
-  ui.rank=wrap.querySelector('#bg3rank');
+  ui.rank=wrap.querySelector('#bg3rank');ui.lucky=wrap.querySelector('#bg3lucky');
   ui.canvaswrap.appendChild(cv);
   wrap.querySelector('#bg3rivals').onclick=openRivals;
   wrap.querySelector('#bg3x').onclick=closeModal;
@@ -360,6 +368,8 @@ function injectCSS(){ if(document.getElementById('bg3css'))return;const s=docume
 .bg3-nav.plus{color:#E3C05A;font-weight:800}
 .bg3-nav:disabled{opacity:.3;cursor:not-allowed}
 .bg3-dname{font-size:12.5px;font-weight:800;min-width:168px;text-align:center;color:#F5F1E6}
+.bg3-lucky{position:absolute;top:56px;left:50%;transform:translateX(-50%);z-index:6;display:none;align-items:center;background:linear-gradient(180deg,rgba(227,192,90,.95),rgba(176,134,47,.95));color:#14231a;font-weight:800;font-size:13px;padding:5px 14px;border-radius:20px;box-shadow:0 4px 14px rgba(0,0,0,.4);animation:bg3pulse 1.4s ease-in-out infinite}
+@keyframes bg3pulse{0%,100%{transform:translateX(-50%) scale(1)}50%{transform:translateX(-50%) scale(1.06)}}
 .bg3-modal{position:absolute;inset:0;z-index:10;display:none;align-items:center;justify-content:center;background:rgba(4,6,9,.6);backdrop-filter:blur(3px);padding:16px}
 .bg3-modal.on{display:flex}
 .bg3-box{position:relative;width:100%;max-width:420px;background:linear-gradient(160deg,#14201a,#0b130e);border:1px solid rgba(227,192,90,.4);border-radius:16px;padding:20px}
@@ -415,6 +425,11 @@ function tap(cx,cy){const r=cv.getBoundingClientRect();const ndc=new THREE.Vecto
   ensureDaily();
   if(rec.d!==S.district) travelTo(rec.d); // clicked a shop in another district — go there
   if(!lot.built){ openBuild(rec); return; }
+  // tap an event bubble: rush -> collect the boosted earnings; tip/restock -> claim the bonus
+  if(rec.evSprite && obj===rec.evSprite && lot.ev && (lot.ev.until||0)>Date.now()){
+    if(lot.ev.type==='rush'){ if(Math.floor(lot.stock||0)>=1){collect(rec);return;} openStore(rec); return; }
+    claimEvent(rec); return;
+  }
   // tap the coin bubble to quick-collect; tap the building to open its dashboard
   if(rec.coin && obj===rec.coin && !lot.broke && Math.floor(lot.stock||0)>=1){ collect(rec); return; }
   openStore(rec);
@@ -437,7 +452,8 @@ function openBuild(rec){const idx=rec.i;const next=nextUnlockIndex(rec.d);
 }
 function lotBuild(rec,type){const lot=lotOf(rec);lot.built=true;lot.unlocked=true;lot.type=type;lot.name=TYPES[type].name;lot.lvl=1;lot.stock=0;lot.t=Date.now();lot.cond=100;lot.broke=false;lot.rev=0;lot.exp=0;renderPlot(rec);applyMode(mode);}
 function openStore(rec){const lot=lotOf(rec);const t=TYPES[lot.type];
-  const gMin=grossPerMin(lot)*condMult(lot);
+  const em=eventMult(lot);
+  const gMin=grossPerMin(lot)*condMult(lot)*em;
   const supMin=gMin*SUPPLY_RATE, rentMin=(gMin>0?rentPerMin(lot):0);
   const netMin=Math.max(0,gMin-supMin-rentMin);
   const cond=Math.round(condOf(lot)), upC=upgradeCost(lot), repC=repairCost(lot), stock=Math.floor(lot.stock||0);
@@ -445,6 +461,7 @@ function openStore(rec){const lot=lotOf(rec);const t=TYPES[lot.type];
   const cl=lot.broke?'BROKEN':cond>=COND_WARN?'Good':cond>=COND_LOW?'Worn':'Failing';
   const rev=Math.round(lot.rev||0), exp=Math.round(lot.exp||0), prof=rev-exp;
   let h='<h3>'+t.emoji+' '+t.name+' <span style="font-size:12px;color:#9AA79A;font-family:Work Sans">Lvl '+lot.lvl+'</span></h3>';
+  if(em>1)h+='<div style="background:rgba(227,192,90,.16);border:1px solid rgba(227,192,90,.4);border-radius:8px;padding:6px 10px;margin-bottom:8px;font-size:12px;color:#E3C05A;font-weight:700">'+(lot.ev&&lot.ev.type==='rush'?'🎉 Customer rush':'✨ Lucky Hour')+' — earning ×'+em+' right now!</div>';
   h+='<div style="display:flex;align-items:center;gap:8px;margin:2px 0 12px"><span style="font-size:11px;color:#9AA79A">Equipment</span><div style="flex:1;height:9px;background:rgba(255,255,255,.12);border-radius:6px;overflow:hidden"><i style="display:block;height:100%;width:'+(lot.broke?100:cond)+'%;background:'+cc+'"></i></div><b style="font-size:12px;color:'+cc+'">'+cl+'</b></div>';
   h+='<div class="bg3-stat"><span>Earning</span><b>'+gMin.toFixed(1)+' Y/min</b></div>';
   h+='<div class="bg3-stat"><span>– Supplies (15%)</span><b style="color:#ef8fb0">'+(supMin>0?'-'+supMin.toFixed(1):'0.0')+'</b></div>';
@@ -477,6 +494,40 @@ function ensureDaily(){const td=todayStr();if(S.lastDay===td)return;
   if(S.lastDay===yStr())S.streak=(S.streak||0)+1;else S.streak=1;S.lastDay=td;
   eachLot(l=>{if(l.built){l.rev=0;l.exp=0;}}); // reset daily books city-wide
   const bonus=Math.min(120,20*S.streak);S.coins+=bonus;toast('Daily +'+bonus+' Y · streak '+S.streak);refreshUI();saveSoon();}
+
+/* ---------------- random events (rush / tip / restock / lucky hour) ---------------- */
+const EV_CFG={rush:['🎉','RUSH ×3','#E3242B'],tip:['💝','TIP!','#E05aa0'],restock:['📦','RESTOCK','#c98a3a']};
+function evTex(ev){const cfg=EV_CFG[ev.type]||EV_CFG.rush;
+  const c=document.createElement('canvas');c.width=176;c.height=76;const x=c.getContext('2d');x.clearRect(0,0,176,76);
+  x.fillStyle='rgba(8,11,9,.9)';rr(x,4,10,168,44,22);x.fill();x.strokeStyle=cfg[2];x.lineWidth=3;rr(x,4,10,168,44,22);x.stroke();
+  x.font='28px serif';x.textAlign='left';x.textBaseline='middle';x.fillText(cfg[0],16,33);
+  x.fillStyle='#f6efdd';x.font='800 21px Georgia';x.fillText(cfg[1],56,34);
+  return new THREE.CanvasTexture(c);}
+function updateEventSprite(rec){if(!rec.evSprite)return;const lot=lotOf(rec);const ev=lot.ev;
+  const active=ev&&(ev.until||0)>Date.now();
+  if(active){const t=evTex(ev);if(rec.evSprite.material.map&&rec.evSprite.material.map.dispose)rec.evSprite.material.map.dispose();rec.evSprite.material.map=t;rec.evSprite.material.needsUpdate=true;rec.evSprite.visible=true;}
+  else {if(ev)lot.ev=null;rec.evSprite.visible=false;}}
+function claimEvent(rec){const lot=lotOf(rec);const ev=lot.ev;if(!ev||(ev.until||0)<Date.now())return false;
+  if(ev.type==='tip'){S.coins+=ev.amt;gainXP(3);toast('💝 Happy customer! +'+ev.amt+' Y');}
+  else if(ev.type==='restock'){lot.stock=Math.min(storageCap(lot),(lot.stock||0)+ev.amt);lot.cond=Math.min(100,condOf(lot)+18);toast('📦 Restocked '+lot.name+'! +'+ev.amt+' Y in stock');}
+  else return false; // rush is auto-applied, not "claimed"
+  lot.ev=null;updateEventSprite(rec);updateCoin(rec);refreshUI();saveSoon();return true;}
+let evTO;
+function scheduleEvent(){clearTimeout(evTO);const t=55000+Math.random()*70000;evTO=setTimeout(()=>{spawnEvent();scheduleEvent();},t);}
+function spawnEvent(){const now=Date.now();const elig=[];
+  plots.forEach(rec=>{const l=lotOf(rec);if(l.built&&!l.broke&&!(l.ev&&(l.ev.until||0)>now))elig.push(rec);});
+  if(!elig.length)return;
+  const rec=elig[Math.floor(Math.random()*elig.length)];const lot=lotOf(rec);const roll=Math.random();
+  if(roll<0.55){lot.ev={type:'rush',mult:3,until:now+70000};toast('🎉 Customer rush at '+lot.name+' — earning ×3 for a bit!');}
+  else if(roll<0.80){lot.ev={type:'tip',amt:Math.max(20,Math.round(grossPerMin(lot)*8)),until:now+90000};}
+  else {lot.ev={type:'restock',amt:Math.max(25,Math.round(grossPerMin(lot)*12)),until:now+90000};}
+  updateEventSprite(rec);saveSoon();}
+let luckyTO;
+function scheduleLucky(){clearTimeout(luckyTO);const t=(10+Math.random()*9)*60000;luckyTO=setTimeout(()=>{startLucky();scheduleLucky();},t);}
+function startLucky(){S.lucky=Date.now()+120000;toast('✨ Lucky Hour! The whole city earns ×2 for 2 minutes!');updateLuckyUI();saveSoon();}
+function updateLuckyUI(){if(!ui.lucky)return;const on=(S.lucky||0)>Date.now();ui.lucky.style.display=on?'flex':'none';
+  if(on)ui.lucky.querySelector('b').textContent=fmtSec(S.lucky-Date.now());}
+function fmtSec(ms){ms=Math.max(0,ms);const s=Math.round(ms/1000);return s>=60?('✨ ×2 '+Math.floor(s/60)+':'+String(s%60).padStart(2,'0')):('✨ ×2 0:'+String(s).padStart(2,'0'));}
 
 /* ---------------- AI rivals & raids ---------------- */
 function openRivals(){ raidTickets();
@@ -544,7 +595,7 @@ function tick(now){const dt=Math.min(.1,(now-last)/1000);last=now;
       l.cond=Math.max(0,condOf(l)-COND_DECAY*dt);
       if(l.cond<COND_WARN && Math.random()<BREAK_P_PER_SEC*dt){ l.broke=true; toast('🔧 '+(l.name||'A shop')+' broke down — tap to repair'); }
     }
-    const gSec=grossPerMin(l)*condMult(l)/60*dt;   // gross this frame (0 when broke)
+    const gSec=grossPerMin(l)*condMult(l)*eventMult(l)/60*dt;   // gross this frame (0 when broke; boosted during rush/lucky)
     const supSec=gSec*SUPPLY_RATE, rentSec=(gSec>0?rentPerMin(l)/60*dt:0);
     const netSec=Math.max(0,gSec-supSec-rentSec);
     const cap=storageCap(l); l.stock=Math.min(cap,(l.stock||0)+netSec);
@@ -552,10 +603,11 @@ function tick(now){const dt=Math.min(.1,(now-last)/1000);last=now;
   });
   // smooth travel between districts
   if(traveling||Math.abs(focusX-focusXTarget)>0.01){focusX+=(focusXTarget-focusX)*Math.min(1,dt*3.2);if(Math.abs(focusX-focusXTarget)<0.05){focusX=focusXTarget;traveling=false;}updateCam();}
-  // update coin bubbles ~2/sec + bob
+  // update coin bubbles ~2/sec + bob (coin + event bubbles)
   coinAcc+=dt;const ts=now/1000;
-  plots.forEach(rec=>{if(rec.coin){rec.coin.position.y=(rec.coinBaseY||8)+Math.sin(ts*2+rec.i)*0.12;}});
-  if(coinAcc>0.5){coinAcc=0;plots.forEach(rec=>{if(rec.coin)updateCoin(rec);});}
+  plots.forEach(rec=>{if(rec.coin)rec.coin.position.y=(rec.coinBaseY||8)+Math.sin(ts*2+rec.i)*0.12;
+    if(rec.evSprite&&rec.evSprite.visible)rec.evSprite.position.y=(rec.evBaseY||9)+Math.sin(ts*2.6+rec.i)*0.16;});
+  if(coinAcc>0.5){coinAcc=0;plots.forEach(rec=>{if(rec.coin)updateCoin(rec);if(rec.evSprite)updateEventSprite(rec);});updateLuckyUI();}
   renderer.render(scene,camera);requestAnimationFrame(tick);
 }
 function resize(){if(!ui.canvaswrap)return;const w=ui.canvaswrap.clientWidth||800,h=ui.canvaswrap.clientHeight||500;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();}
@@ -568,6 +620,9 @@ function mount(el){host=el||document.getElementById('blockMount');if(!host)retur
   // re-check day/night every few minutes
   setInterval(()=>applyMode(autoMode()),120000);
   scheduleIncoming(); // rivals start trying to raid after a couple minutes
+  scheduleEvent();    // rushes / tips / restocks
+  scheduleLucky();    // occasional city-wide lucky hour
+  updateLuckyUI();
   requestAnimationFrame(tick);
 }
 function reward(n,msg){n=Math.max(0,Math.floor(n||0));S.coins+=n;if(msg)toast(msg);else toast('+'+n+' Y');refreshUI&&refreshUI();saveSoon();}
