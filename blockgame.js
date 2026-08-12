@@ -90,7 +90,7 @@ function makeDistrict(i,seed){const n=districtLots(i);const lots=[];for(let k=0;
 function fresh(){return {v:3,coins:120,xp:0,level:1,streak:0,lastDay:'',tut:0,
   visited:{day:'',refs:{}},tokens:{},pid:uuid(),pname:'',district:0,
   lastSeen:0,spinDay:'',goals:null,servedToday:0,collectsToday:0,earnedToday:0,
-  cityName:'',decor:{planters:false,lights:false,banner:false,fountain:false},collected:['bakery'],collectClaimed:false,rank:0,
+  cityName:'',decor:{planters:false,lights:false,banner:false,fountain:false},collected:['bakery'],collectClaimed:false,rank:0,event:null,
   raid:{tickets:RAID_MAX_TICKETS,ticketsT:Date.now(),cd:{},shieldUntil:0,wins:0,losses:0},
   districts:[makeDistrict(0,true)]};}
 let S=fresh();
@@ -381,6 +381,7 @@ function buildUI(){
    '<div class="bg3-travel"><button class="bg3-nav" id="bg3prev" title="Previous district">‹</button>'+
      '<div class="bg3-dname" id="bg3dname">Founders Row</div>'+
      '<button class="bg3-nav" id="bg3next" title="Next district">›</button></div>'+
+   '<button class="bg3-event" id="bg3event"><b>🎪 Event</b><i>ends —</i></button>'+
    '<div class="bg3-lucky" id="bg3lucky"><b>✨ ×2</b></div>'+
    '<div class="bg3-toast" id="bg3toast"></div>'+
    '<div class="bg3-modal" id="bg3modal"><div class="bg3-box"><button class="bg3-x" id="bg3x">✕</button><div id="bg3modalbody"></div></div></div>'+
@@ -396,7 +397,8 @@ function buildUI(){
   ui.lvl=wrap.querySelector('#bg3lvl');ui.xp=wrap.querySelector('#bg3xp');ui.xpbar=wrap.querySelector('#bg3xpbar');
   ui.toast=wrap.querySelector('#bg3toast');ui.modal=wrap.querySelector('#bg3modal');ui.modalbody=wrap.querySelector('#bg3modalbody');
   ui.dname=wrap.querySelector('#bg3dname');ui.prev=wrap.querySelector('#bg3prev');ui.next=wrap.querySelector('#bg3next');
-  ui.rank=wrap.querySelector('#bg3rank');ui.lucky=wrap.querySelector('#bg3lucky');
+  ui.rank=wrap.querySelector('#bg3rank');ui.lucky=wrap.querySelector('#bg3lucky');ui.event=wrap.querySelector('#bg3event');
+  ui.event.onclick=openEvent;
   ui.canvaswrap.appendChild(cv);
   ui.tour=wrap.querySelector('#bg3tour');ui.tourSpot=wrap.querySelector('#bg3spot');ui.tourCard=wrap.querySelector('#bg3tcard');
   ui.store=wrap.querySelector('#bg3store');ui.storeTitle=wrap.querySelector('#bg3storetitle');ui.served=wrap.querySelector('#bg3served');ui.fade=wrap.querySelector('#bg3fade');
@@ -460,7 +462,20 @@ function injectCSS(){ if(document.getElementById('bg3css'))return;const s=docume
 .bg3-nav.plus{color:#2a5a1e}
 .bg3-nav:disabled{opacity:.4;cursor:not-allowed;box-shadow:none}
 .bg3-dname{font-size:12.5px;font-weight:800;min-width:168px;text-align:center;color:#3a3020}
-.bg3-lucky{position:absolute;top:56px;left:50%;transform:translateX(-50%);z-index:6;display:none;align-items:center;background:linear-gradient(180deg,rgba(227,192,90,.95),rgba(176,134,47,.95));color:#14231a;font-weight:800;font-size:13px;padding:5px 14px;border-radius:20px;box-shadow:0 4px 14px rgba(0,0,0,.4);animation:bg3pulse 1.4s ease-in-out infinite}
+.bg3-event{position:absolute;top:54px;left:50%;transform:translateX(-50%);z-index:6;display:flex;align-items:center;gap:7px;pointer-events:auto;cursor:pointer;background:linear-gradient(180deg,#E05aa0,#a83a78);color:#fff;border:2px solid #ffd0ea;font-weight:800;font-size:12.5px;padding:5px 14px;border-radius:20px;box-shadow:0 4px 14px rgba(0,0,0,.4)}
+.bg3-event i{font-style:normal;font-weight:600;font-size:11px;opacity:.9}
+.bg3-event.ready{animation:bg3pulse2 1.2s ease-in-out infinite}
+.bg3-lucky{position:absolute;top:92px;left:50%;transform:translateX(-50%);z-index:6;display:none;align-items:center;background:linear-gradient(180deg,rgba(227,192,90,.95),rgba(176,134,47,.95));color:#14231a;font-weight:800;font-size:13px;padding:5px 14px;border-radius:20px;box-shadow:0 4px 14px rgba(0,0,0,.4);animation:bg3pulse 1.4s ease-in-out infinite}
+.bg3-etiers{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.bg3-etier{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:9px 12px}
+.bg3-etier.reached{border-color:rgba(122,208,58,.4);background:rgba(122,208,58,.08)}
+.bg3-etier .et-l{flex:1;min-width:0}
+.bg3-etier .et-pts{font-size:13px;font-weight:700;color:#F5F1E6}
+.bg3-etier .et-bar{height:6px;background:rgba(255,255,255,.12);border-radius:5px;margin-top:5px;overflow:hidden}
+.bg3-etier .et-bar i{display:block;height:100%;background:linear-gradient(90deg,#E05aa0,#a83a78);border-radius:5px}
+.bg3-etier .et-r{font-size:13px;font-weight:800;color:#E3C05A;display:flex;align-items:center;gap:8px;white-space:nowrap}
+.bg3-etier .et-claim{background:linear-gradient(180deg,#7ad03a,#4fae2a);color:#0c1a08;border:none;border-radius:8px;padding:5px 12px;font-weight:800;font-size:12px;cursor:pointer;box-shadow:0 2px 0 #2f7a1a}
+.bg3-etier .et-claimed{color:#7ad03a}.bg3-etier .et-lock{opacity:.5}
 @keyframes bg3pulse{0%,100%{transform:translateX(-50%) scale(1)}50%{transform:translateX(-50%) scale(1.06)}}
 .bg3-modal{position:absolute;inset:0;z-index:10;display:none;align-items:center;justify-content:center;background:rgba(4,6,9,.6);backdrop-filter:blur(3px);padding:16px}
 .bg3-modal.on{display:flex}
@@ -614,7 +629,7 @@ function tap(cx,cy){const r=cv.getBoundingClientRect();const ndc=new THREE.Vecto
   enterStore(rec);
 }
 function collect(rec){const lot=lotOf(rec);const amt=Math.floor(lot.stock||0);if(amt<1)return;
-  lot.stock-=amt;S.coins+=amt;S.earnedToday=(S.earnedToday||0)+amt;S.collectsToday=(S.collectsToday||0)+1;gainXP(amt);flyCoin(rec);flyCoins((insideRec===rec&&rec.intCoin)?rec.intCoin:rec.coin);toast('+'+amt+' Y');refreshUI();saveSoon();updateCoin(rec);if(insideRec===rec)updateIntCoin(rec);refreshDailyBadges();}
+  lot.stock-=amt;S.coins+=amt;S.earnedToday=(S.earnedToday||0)+amt;S.collectsToday=(S.collectsToday||0)+1;addEventPoints(1);gainXP(amt);flyCoin(rec);flyCoins((insideRec===rec&&rec.intCoin)?rec.intCoin:rec.coin);toast('+'+amt+' Y');refreshUI();saveSoon();updateCoin(rec);if(insideRec===rec)updateIntCoin(rec);refreshDailyBadges();}
 function flyCoin(rec){ if(rec.coin){rec.coin.scale.set(3.2,1.7,1);setTimeout(()=>{if(rec.coin)rec.coin.scale.set(2.6,1.32,1);},130);} }
 function gainXP(n){S.xp+=n;let lvlup=false;while(S.xp>=LEVEL_XP(S.level)){S.xp-=LEVEL_XP(S.level);S.level++;lvlup=true;}if(lvlup){toast('🎉 Level up! Lvl '+S.level);confettiBurst();}}
 function openBuild(rec){const idx=rec.i;const next=nextUnlockIndex(rec.d);
@@ -688,7 +703,7 @@ function exitStore(){if(!insideRec)return;fade(()=>{stopServing();insideRec=null
 const QUEUE_MAX=5, PATIENCE=13, SERVE_Z=-1.7, DOOR_Z=4.6;
 let queue=[], leaving=[], projectiles=[], spawnT=0, servingRec=null;
 function slotPos(i){return {x:-0.4, z:SERVE_Z+i*1.3};}
-function saleValue(lot){return Math.max(3,Math.round(grossPerMin(lot)*condMult(lot)*eventMult(lot)*1.5));}
+function saleValue(lot){return Math.max(3,Math.round(grossPerMin(lot)*condMult(lot)*eventMult(lot)*1.5*eventPerk()));}
 function makeWantBubble(emoji){const c=document.createElement('canvas');c.width=96;c.height=112;const x=c.getContext('2d');x.clearRect(0,0,96,112);
   x.fillStyle='rgba(255,253,246,.97)';rr(x,10,6,76,64,18);x.fill();x.strokeStyle='#e0be5e';x.lineWidth=4;rr(x,10,6,76,64,18);x.stroke();
   x.fillStyle='rgba(255,253,246,.97)';x.beginPath();x.moveTo(40,68);x.lineTo(58,68);x.lineTo(46,86);x.closePath();x.fill();
@@ -709,7 +724,7 @@ function serveFront(){const rec=servingRec;if(!rec)return;const lot=lotOf(rec);i
   flyCoins(front.mesh);floatText(front.mesh,'+'+val+' Y');flyProduct(TYPES[lot.type].emoji,front.mesh);
   front.state='leaving';if(front.want)front.want.visible=false;
   queue.shift();leaving.push(front);queue.forEach((c,i)=>c.slot=i);
-  refreshServeHUD();refreshUI();saveSoon();refreshDailyBadges();}
+  addEventPoints(1);refreshServeHUD();refreshUI();saveSoon();refreshDailyBadges();}
 function floatText(fromMesh,txt){if(!ui.wrap||!fromMesh)return;const p=worldToScreen(fromMesh);const d=document.createElement('div');d.className='bg3-float';d.textContent=txt;d.style.left=p.x+'px';d.style.top=(p.y-30)+'px';ui.wrap.appendChild(d);
   requestAnimationFrame(()=>{d.style.transform='translate(-50%,-46px)';d.style.opacity='0';});setTimeout(()=>d.remove(),820);}
 function flyProduct(emoji,toMesh){if(!toMesh)return;const m=new THREE.SpriteMaterial({map:emojiTex(emoji),transparent:true,depthTest:false});const s=new THREE.Sprite(m);s.scale.set(0.9,0.9,1);
@@ -947,6 +962,34 @@ function welcomeBack(){const now=Date.now();const away=now-(S.lastSeen||now);S.l
   const ca=ui.modalbody.querySelector('#bg3colall');if(ca)ca.onclick=()=>{collectAll();closeModal();};
   const ok=ui.modalbody.querySelector('#bg3okb');if(ok)ok.onclick=closeModal;}
 
+/* ---------------- live events & seasons: always something happening ---------------- */
+const EVENTS=[
+  {id:'grand',name:'Grand Opening',emoji:'🎉',color:'#E3242B'},
+  {id:'summer',name:'Summer Festival',emoji:'🎪',color:'#E6A020'},
+  {id:'rush',name:'Rush Weekend',emoji:'⚡',color:'#8a5aff'},
+  {id:'sweet',name:'Sweet Treats Fair',emoji:'🍰',color:'#E05aa0'}];
+const EV_TIERS=[{pts:12,rw:120},{pts:35,rw:350},{pts:75,rw:750},{pts:150,rw:1600}];
+const EV_PERIOD=3*864e5; // a fresh event every 3 days
+function eventIndex(){return Math.floor(Date.now()/EV_PERIOD);}
+function currentEvent(){return EVENTS[eventIndex()%EVENTS.length];}
+function eventEndsIn(){return (eventIndex()+1)*EV_PERIOD-Date.now();}
+function ensureEvent(){const ev=currentEvent();if(!S.event||S.event.id!==ev.id)S.event={id:ev.id,points:0,claimed:[]};if(!S.event.claimed)S.event.claimed=[];}
+function addEventPoints(n){ensureEvent();S.event.points=(S.event.points||0)+n;refreshEventUI();}
+function eventPerk(){return 1.25;}
+function fmtDur(ms){ms=Math.max(0,ms);const h=Math.floor(ms/3600000),m=Math.floor(ms%3600000/60000),d=Math.floor(h/24);return d>0?(d+'d '+(h%24)+'h'):(h+'h '+m+'m');}
+function eventClaimable(){ensureEvent();const p=S.event.points||0;return EV_TIERS.some((t,i)=>p>=t.pts&&S.event.claimed.indexOf(i)<0);}
+function refreshEventUI(){if(!ui.event)return;ensureEvent();const ev=currentEvent();
+  ui.event.querySelector('b').textContent=ev.emoji+' '+ev.name;ui.event.querySelector('i').textContent='ends '+fmtDur(eventEndsIn());
+  ui.event.classList.toggle('ready',eventClaimable());}
+function openEvent(){ensureEvent();const ev=currentEvent();const pts=S.event.points||0;
+  let h='<h3>'+ev.emoji+' '+ev.name+'</h3><p>Limited-time event — ends in <b>'+fmtDur(eventEndsIn())+'</b>! Every sale gets <b style="color:#7ad03a">+25%</b>. Earn event points by serving customers and collecting, then grab the prizes.</p>';
+  h+='<div class="bg3-stat"><span>Your event points</span><b style="color:#E3C05A">'+pts+'</b></div><div class="bg3-etiers">';
+  EV_TIERS.forEach((t,i)=>{const got=pts>=t.pts;const claimed=S.event.claimed.indexOf(i)>=0;const special=i===EV_TIERS.length-1;const pct=Math.min(100,Math.round(pts/t.pts*100));
+    h+='<div class="bg3-etier'+(got?' reached':'')+'"><div class="et-l"><div class="et-pts">'+(special?'🏆 ':'')+t.pts+' points</div><div class="et-bar"><i style="width:'+pct+'%"></i></div></div>'+
+      '<div class="et-r">+'+t.rw+' Y '+(claimed?'<span class="et-claimed">✓</span>':(got?'<button class="et-claim" data-i="'+i+'">Claim</button>':'<span class="et-lock">🔒</span>'))+'</div></div>';});
+  h+='</div>';openModal(h);
+  ui.modalbody.querySelectorAll('.et-claim').forEach(b=>b.onclick=()=>{const i=+b.getAttribute('data-i');const t=EV_TIERS[i];if((S.event.points||0)<t.pts||S.event.claimed.indexOf(i)>=0)return;S.event.claimed.push(i);S.coins+=t.rw;S.earnedToday=(S.earnedToday||0)+t.rw;confettiBurst();toast('🎪 Event prize! +'+t.rw+' Y');refreshUI();saveSoon();refreshEventUI();openEvent();});}
+
 /* ---------------- career rank journey: the thing you climb toward ---------------- */
 const RANKS=[
   {name:'Lemonade Stand',icon:'🍋',worth:0},
@@ -1051,9 +1094,10 @@ function mount(el){host=el||document.getElementById('blockMount');if(!host)retur
   scheduleEvent();    // rushes / tips / restocks
   scheduleLucky();    // occasional city-wide lucky hour
   updateLuckyUI();
-  ensureGoals();refreshDailyBadges();
+  ensureGoals();ensureEvent();refreshDailyBadges();refreshEventUI();
   setTimeout(()=>{ if(!S.tut){startTour();} else { welcomeBack(); } },900); // welcome-back after tour on first run
   setInterval(()=>{S.lastSeen=Date.now();save();},20000); // heartbeat so away-time is known next visit
+  setInterval(refreshEventUI,30000); // keep the event countdown fresh
   window.addEventListener('beforeunload',()=>{S.lastSeen=Date.now();save();});
   requestAnimationFrame(tick);
 }
