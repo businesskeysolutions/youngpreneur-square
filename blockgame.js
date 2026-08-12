@@ -91,6 +91,7 @@ function fresh(){return {v:3,coins:120,xp:0,level:1,streak:0,lastDay:'',tut:0,
   visited:{day:'',refs:{}},tokens:{},pid:uuid(),pname:'',district:0,
   lastSeen:0,spinDay:'',goals:null,servedToday:0,collectsToday:0,earnedToday:0,
   cityName:'',decor:{planters:false,lights:false,banner:false,fountain:false},collected:['bakery'],collectClaimed:false,rank:0,event:null,
+  spins:30,spinsT:0,stickers:{},stickerClaimed:false,
   raid:{tickets:RAID_MAX_TICKETS,ticketsT:Date.now(),cd:{},shieldUntil:0,wins:0,losses:0},
   districts:[makeDistrict(0,true)]};}
 let S=fresh();
@@ -105,6 +106,7 @@ function load(){try{const raw=localStorage.getItem(LS);if(raw){const o=JSON.pars
   if(!S.raid.cd)S.raid.cd={};
   if(!S.decor)S.decor={planters:false,lights:false,banner:false,fountain:false};
   if(!S.collected)S.collected=[];eachLot(l=>{if(l.built&&l.type&&S.collected.indexOf(l.type)<0)S.collected.push(l.type);});
+  if(S.spins==null)S.spins=30;if(!S.spinsT)S.spinsT=Date.now();if(!S.stickers)S.stickers={};
   // clear stale timed events from a previous session
   eachLot(l=>{if(l.ev&&(l.ev.until||0)<Date.now())l.ev=null;});
   if((S.lucky||0)<Date.now())S.lucky=0;
@@ -373,6 +375,7 @@ function buildUI(){
      '<button class="bg3-chip" id="bg3rivals" style="cursor:pointer" title="Rivals & raids">🏆 <b id="bg3rank">#1</b></button>'+
      '<button class="bg3-chip bg3-dchip" id="bg3goals" title="Daily goals">🎯<span class="bg3-badge" id="bg3goalsbadge">0</span></button>'+
      '<button class="bg3-chip bg3-dchip" id="bg3spin" title="Daily spin">🎡</button>'+
+     '<button class="bg3-chip bg3-dchip" id="bg3slots" title="Lucky Slots">🎰<b id="bg3energy" style="margin-left:2px;font-size:12px">30</b></button>'+
      '<button class="bg3-chip bg3-dchip" id="bg3myblock" title="My city">🎨</button>'+
      '<div class="bg3-lvl"><div class="bg3-lvlrow"><span id="bg3lvl">Lvl 1</span><span id="bg3xp">0/50 XP</span></div><div class="bg3-bar"><i id="bg3xpbar"></i></div></div>'+
      '<button class="bg3-icon" id="bg3help" title="How to play">?</button>'+
@@ -408,7 +411,9 @@ function buildUI(){
   ui.goalsBadge=wrap.querySelector('#bg3goalsbadge');ui.spinBtn=wrap.querySelector('#bg3spin');
   wrap.querySelector('#bg3rivals').onclick=openRivals;
   wrap.querySelector('#bg3goals').onclick=openGoals;
+  ui.slotEnergy=wrap.querySelector('#bg3energy');ui.slotBtn=wrap.querySelector('#bg3slots');
   wrap.querySelector('#bg3spin').onclick=openSpin;
+  wrap.querySelector('#bg3slots').onclick=openSlots;
   wrap.querySelector('#bg3myblock').onclick=openMyBlock;
   wrap.querySelector('#bg3help').onclick=startTour;
   ui.tourCard.querySelector('.tnext').onclick=()=>tourStep(tourIdx+1);
@@ -538,7 +543,12 @@ function injectCSS(){ if(document.getElementById('bg3css'))return;const s=docume
 @keyframes bg3combopop{0%{transform:translate(-50%,-50%) scale(.5) rotate(-6deg)}50%{transform:translate(-50%,-50%) scale(1.25) rotate(3deg)}100%{transform:translate(-50%,-50%) scale(1) rotate(0)}}
 .bg3-dchip{position:relative;cursor:pointer;padding:6px 11px;font-size:16px}
 .bg3-badge{position:absolute;top:-5px;right:-5px;min-width:17px;height:17px;padding:0 4px;background:#E3242B;color:#fff;border-radius:9px;font-size:11px;font-weight:800;display:none;align-items:center;justify-content:center;border:1.5px solid #fffdf6}
-#bg3spin.avail{animation:bg3pulse2 1.3s ease-in-out infinite}
+#bg3spin.avail,#bg3slots.avail{animation:bg3pulse2 1.3s ease-in-out infinite}
+.bg3-reels{display:flex;gap:10px;justify-content:center;margin:12px 0}
+.bg3-reel{width:74px;height:74px;display:flex;align-items:center;justify-content:center;font-size:40px;background:linear-gradient(180deg,#fffdf6,#e7dcc2);border:3px solid #e0be5e;border-radius:14px;box-shadow:inset 0 -4px 8px rgba(0,0,0,.15),0 4px 10px rgba(0,0,0,.35)}
+.bg3-reel.land{animation:bg3reelland .25s ease-out}
+@keyframes bg3reelland{0%{transform:translateY(-8px) scale(1.1)}100%{transform:translateY(0) scale(1)}}
+.bg3-slotmsg{text-align:center;font-size:14px;font-weight:700;color:#F5F1E6;min-height:20px;margin-bottom:4px}
 @keyframes bg3pulse2{0%,100%{transform:scale(1)}50%{transform:scale(1.12)}}
 .bg3-goals{display:flex;flex-direction:column;gap:9px;margin-top:6px}
 .bg3-goal{background:rgba(255,255,255,.05);border:1px solid rgba(227,192,90,.25);border-radius:12px;padding:10px 12px}
@@ -812,6 +822,7 @@ function ensureDaily(){const td=todayStr();if(S.lastDay===td)return;
   if(S.lastDay===yStr())S.streak=(S.streak||0)+1;else S.streak=1;S.lastDay=td;
   eachLot(l=>{if(l.built){l.rev=0;l.exp=0;}}); // reset daily books city-wide
   S.servedToday=0;S.collectsToday=0;S.earnedToday=0;S.goals=rollGoals();
+  S.spins=Math.min(SPIN_MAX,(S.spins||0)+15); // free daily spins to bring you back
   const bonus=Math.min(120,20*S.streak);S.coins+=bonus;toast('Daily +'+bonus+' Y · streak '+S.streak);refreshUI();saveSoon();if(typeof refreshDailyBadges==='function')refreshDailyBadges();}
 
 /* ---------------- guided coach tour ---------------- */
@@ -1014,6 +1025,60 @@ function openEvent(){ensureEvent();const ev=currentEvent();const pts=S.event.poi
   h+='</div>';openModal(h);
   ui.modalbody.querySelectorAll('.et-claim').forEach(b=>b.onclick=()=>{const i=+b.getAttribute('data-i');const t=EV_TIERS[i];if((S.event.points||0)<t.pts||S.event.claimed.indexOf(i)>=0)return;S.event.claimed.push(i);S.coins+=t.rw;S.earnedToday=(S.earnedToday||0)+t.rw;confettiBurst();toast('🎪 Event prize! +'+t.rw+' Y');refreshUI();saveSoon();refreshEventUI();openEvent();});}
 
+/* ---------------- spin-to-win slot machine + collectible stickers ---------------- */
+const SPIN_MAX=50, SPIN_REFILL=4*60*1000;
+const SYM=[{k:'coin',e:'🪙',w:34},{k:'bag',e:'💰',w:15},{k:'star',e:'⭐',w:15},{k:'raid',e:'⚔️',w:11},{k:'shield',e:'🛡️',w:11},{k:'sticker',e:'🃏',w:9},{k:'jackpot',e:'💎',w:5}];
+const SYM_TOTAL=SYM.reduce((a,s)=>a+s.w,0);
+const STICKERS=[{id:'cupcake',e:'🧁'},{id:'lemon',e:'🍋'},{id:'sneaker',e:'👟'},{id:'book',e:'📚'},{id:'flower',e:'🌸'},{id:'pizza',e:'🍕'},{id:'coffee',e:'☕'},{id:'game',e:'🎮'},{id:'gold',e:'🌟'}];
+function spinsNow(){const now=Date.now();if(S.spins<SPIN_MAX){const g=Math.floor((now-(S.spinsT||now))/SPIN_REFILL);if(g>0){S.spins=Math.min(SPIN_MAX,S.spins+g);S.spinsT=(S.spins>=SPIN_MAX)?now:(S.spinsT+g*SPIN_REFILL);}}return S.spins;}
+function spinsETA(){return S.spins>=SPIN_MAX?0:Math.max(0,SPIN_REFILL-(Date.now()-(S.spinsT||Date.now())));}
+function pickSym(){let r=Math.random()*SYM_TOTAL;for(let i=0;i<SYM.length;i++){r-=SYM[i].w;if(r<=0)return SYM[i];}return SYM[0];}
+function winSticker(){const s=STICKERS[Math.floor(Math.random()*STICKERS.length)];const had=(S.stickers[s.id]||0);S.stickers[s.id]=had+1;return {s:s,isNew:had===0};}
+function stickersOwned(){return STICKERS.filter(s=>(S.stickers[s.id]||0)>0).length;}
+function refreshSpinChip(){if(ui.slotEnergy){spinsNow();ui.slotEnergy.textContent=S.spins;}if(ui.slotBtn)ui.slotBtn.classList.toggle('avail',S.spins>0);}
+function openSlots(){spinsNow();
+  const h='<h3>🎰 Lucky Slots</h3><p>Every spin wins something — coins, jackpots, raids, shields or stickers! <b style="color:#E3C05A">⚡ '+S.spins+'/'+SPIN_MAX+'</b>'+(S.spins<SPIN_MAX?(' · +1 in '+fmtDur(spinsETA())):'')+'</p>'+
+    '<div class="bg3-reels"><div class="bg3-reel" id="bg3r0">🪙</div><div class="bg3-reel" id="bg3r1">💰</div><div class="bg3-reel" id="bg3r2">⭐</div></div>'+
+    '<div class="bg3-slotmsg" id="bg3slotmsg">Pull the lever!</div>'+
+    '<button class="bg3-btn" id="bg3dospin" '+(S.spins>0?'':'disabled')+'>'+(S.spins>0?'SPIN! · ⚡1':'Out of spins — come back soon')+'</button>'+
+    '<button class="bg3-link" id="bg3openstk">🃏 View sticker album ('+stickersOwned()+'/'+STICKERS.length+')</button>';
+  openModal(h);
+  const btn=ui.modalbody.querySelector('#bg3dospin'),msg=ui.modalbody.querySelector('#bg3slotmsg');
+  const reels=[ui.modalbody.querySelector('#bg3r0'),ui.modalbody.querySelector('#bg3r1'),ui.modalbody.querySelector('#bg3r2')];
+  ui.modalbody.querySelector('#bg3openstk').onclick=openStickers;
+  let spinning=false;
+  btn.onclick=()=>{if(spinning)return;spinsNow();if(S.spins<1){msg.textContent='No spins left — they refill over time!';return;}
+    spinning=true;S.spins--;if(S.spins===SPIN_MAX-1)S.spinsT=Date.now();refreshSpinChip();saveSoon();
+    btn.disabled=true;msg.textContent='Spinning…';
+    const result=[pickSym(),pickSym(),pickSym()];
+    reels.forEach((rl,i)=>{let n=0;const iv=setInterval(()=>{rl.textContent=SYM[Math.floor(Math.random()*SYM.length)].e;n++;},70);
+      setTimeout(()=>{clearInterval(iv);rl.textContent=result[i].e;rl.classList.remove('land');void rl.offsetWidth;rl.classList.add('land');if(i===2){setTimeout(()=>{resolveSlots(result,msg);spinning=false;btn.disabled=S.spins<1;btn.textContent=S.spins>0?'SPIN! · ⚡1':'Out of spins — come back soon';},250);}},700+i*380);});
+  };
+}
+function resolveSlots(result,msg){const cnt={};result.forEach(r=>cnt[r.k]=(cnt[r.k]||0)+1);const lv=S.level||1;let coins=0,parts=[];
+  coins+=(cnt.coin||0)*(8+lv*2)+(cnt.bag||0)*(26+lv*6)+(cnt.star||0)*(14+lv*3)+(cnt.jackpot||0)*(60+lv*15);
+  const three=result[0].k===result[1].k&&result[1].k===result[2].k;
+  if(three&&result[0].k==='jackpot'){coins*=5;parts.push('💎 JACKPOT!');}
+  else if(three){coins=Math.round(coins*2.2);parts.push('3 in a row!');}
+  if((cnt.raid||0)>=2){const r=RIVALS[Math.floor(Math.random()*RIVALS.length)];const rw=Math.round(rivalWorth(r)*0.02)+30;coins+=rw;parts.push('⚔️ Raided '+r.name+' +'+rw);}
+  if((cnt.shield||0)>=2){S.raid.shieldUntil=Date.now()+SHIELD_DUR;parts.push('🛡️ Shield up 1h');}
+  if((cnt.sticker||0)>=1){for(let i=0;i<cnt.sticker;i++){const w=winSticker();parts.push((w.isNew?'🃏 NEW sticker ':'🃏 sticker ')+w.s.e);}}
+  coins=Math.max(5,Math.round(coins));
+  S.coins+=coins;S.earnedToday=(S.earnedToday||0)+coins;
+  if(coins>=(300+lv*80)||three||(cnt.jackpot||0))confettiBurst();
+  msg.innerHTML='<b style="color:#8ede4a">+'+coins+' Y</b>'+(parts.length?(' · '+parts.join(' · ')):'');
+  refreshUI();saveSoon();refreshDailyBadges();}
+function openStickers(){const owned=stickersOwned(),all=owned>=STICKERS.length;
+  let h='<h3>🃏 Sticker Album <span style="font-size:12px;color:#E3C05A">'+owned+'/'+STICKERS.length+'</span></h3><p>Win stickers from the slot machine. Complete the set for a big prize!</p><div class="bg3-collect" style="grid-template-columns:repeat(3,1fr)">';
+  STICKERS.forEach(s=>{const n=S.stickers[s.id]||0;h+='<div class="bg3-ccell'+(n>0?' got':'')+'" style="aspect-ratio:1;font-size:30px;position:relative">'+(n>0?s.e:'❔')+(n>1?'<span style="position:absolute;bottom:2px;right:5px;font-size:11px;color:#E3C05A;font-weight:800">x'+n+'</span>':'')+'</div>';});
+  h+='</div>';
+  if(all&&!S.stickerClaimed)h+='<button class="bg3-btn" id="bg3stkreward">🏆 Set complete! Claim +2500 Y</button>';
+  else if(all)h+='<p style="text-align:center;color:#7ad03a;font-weight:700;margin-top:8px">🏆 Set complete — legendary collector!</p>';
+  h+='<button class="bg3-link" id="bg3backslots">‹ Back to slots</button>';
+  openModal(h);
+  const rw=ui.modalbody.querySelector('#bg3stkreward');if(rw)rw.onclick=()=>{S.coins+=2500;S.stickerClaimed=true;confettiBurst();toast('🏆 Sticker set complete! +2500 Y');refreshUI();saveSoon();openStickers();};
+  const bk=ui.modalbody.querySelector('#bg3backslots');if(bk)bk.onclick=openSlots;}
+
 /* ---------------- career rank journey: the thing you climb toward ---------------- */
 const RANKS=[
   {name:'Lemonade Stand',icon:'🍋',worth:0},
@@ -1118,10 +1183,11 @@ function mount(el){host=el||document.getElementById('blockMount');if(!host)retur
   scheduleEvent();    // rushes / tips / restocks
   scheduleLucky();    // occasional city-wide lucky hour
   updateLuckyUI();
-  ensureGoals();ensureEvent();refreshDailyBadges();refreshEventUI();
+  ensureGoals();ensureEvent();refreshDailyBadges();refreshEventUI();refreshSpinChip();
   setTimeout(()=>{ if(!S.tut){startTour();} else { welcomeBack(); } },900); // welcome-back after tour on first run
   setInterval(()=>{S.lastSeen=Date.now();save();},20000); // heartbeat so away-time is known next visit
   setInterval(refreshEventUI,30000); // keep the event countdown fresh
+  setInterval(refreshSpinChip,15000); // slot energy refills over time
   window.addEventListener('beforeunload',()=>{S.lastSeen=Date.now();save();});
   requestAnimationFrame(tick);
 }
