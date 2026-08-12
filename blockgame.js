@@ -527,10 +527,10 @@ function bindInput(){
 }
 function tap(cx,cy){const r=cv.getBoundingClientRect();const ndc=new THREE.Vector2(((cx-r.left)/r.width)*2-1,-((cy-r.top)/r.height)*2+1);
   ray.setFromCamera(ndc,camera);
-  if(insideRec){const ih=ray.intersectObjects(intClickable,true);if(ih.length){let o=ih[0].object;while(o&&!(o.userData&&o.userData.station))o=o.parent;
-    if(o&&o.userData.station==='serve'){serveFront();}
-    else if(o&&o.userData.station==='register'){collect(insideRec);updateIntCoin(insideRec);}
-    else if(o&&o.userData.station==='equip'){openStoreManage(insideRec);}}
+  if(insideRec){const ih=ray.intersectObjects(intClickable,true);let station=null;if(ih.length){let o=ih[0].object;while(o&&!(o.userData&&o.userData.station))o=o.parent;if(o)station=o.userData.station;}
+    if(station==='register'){collect(insideRec);updateIntCoin(insideRec);}
+    else if(station==='equip'){openStoreManage(insideRec);}
+    else {serveFront();} // tap the customer, the counter, or anywhere -> serve the next one
     return;}
   const hits=ray.intersectObjects(clickable,false);if(!hits.length)return;
   const obj=hits[0].object;let o=obj;while(o&&!(o.userData&&o.userData.rec))o=o.parent;if(!o)return;const rec=o.userData.rec;const lot=lotOf(rec);
@@ -631,11 +631,11 @@ function spawnCustomer(){const rec=servingRec;if(!rec)return;const lot=lotOf(rec
   const seed=(Math.floor(performance.now()/97)+queue.length)%SHIRTS.length;
   const p=makePerson(seed);const slot=queue.length;const sp=slotPos(slot);
   p.position.set(sp.x,0,DOOR_Z);p.rotation.y=Math.PI;p.userData={station:'serve'};interiorGroup.add(p);
-  const want=makeWantBubble(TYPES[lot.type].emoji);want.position.set(sp.x,2.3,DOOR_Z);want.visible=false;want.userData={station:'serve'};interiorGroup.add(want);
+  const want=makeWantBubble(TYPES[lot.type].emoji);want.position.set(sp.x,2.3,DOOR_Z);want.visible=true;want.userData={station:'serve'};interiorGroup.add(want);
   const cust={mesh:p,want:want,slot:slot,state:'walking',t:PATIENCE};p.userData.cust=cust;
   queue.push(cust);intClickable.push(p);intClickable.push(want);}
-function serveFront(){const rec=servingRec;if(!rec)return;const lot=lotOf(rec);if(lot.broke)return;
-  const front=queue[0];if(!front||front.state!=='waiting')return;
+function serveFront(){const rec=servingRec;if(!rec)return;const lot=lotOf(rec);if(lot.broke){toast('🔧 Repair the equipment to serve');return;}
+  const front=queue[0];if(!front||front.state==='leaving')return;
   const val=saleValue(lot);S.coins+=val;S.servedToday=(S.servedToday||0)+1;gainXP(1);
   flyCoins(front.mesh);floatText(front.mesh,'+'+val+' Y');flyProduct(TYPES[lot.type].emoji,front.mesh);
   front.state='leaving';if(front.want)front.want.visible=false;
@@ -653,7 +653,7 @@ function tickServing(dt){const rec=servingRec;if(!rec)return;const lot=lotOf(rec
     if(d>0.06){const step=Math.min(3.4*dt,d);c.mesh.position.x+=dx/d*step;c.mesh.position.z+=dz/d*step;if(c.state!=='waiting')c.state='walking';}
     else if(c.state!=='waiting'){c.state='waiting';}
     c.mesh.position.y=(c.state==='walking')?Math.abs(Math.sin(now/130+i))*0.05:0;
-    if(c.want){c.want.position.set(c.mesh.position.x,2.25+Math.sin(now/300+i)*0.06,c.mesh.position.z);c.want.visible=(c.state==='waiting');}
+    if(c.want){c.want.position.set(c.mesh.position.x,2.25+Math.sin(now/300+i)*0.06,c.mesh.position.z);c.want.visible=(c.state!=='leaving');}
     if(i===0&&c.state==='waiting'){c.t-=dt;if(c.t<=0){if(c.want)c.want.visible=false;queue.shift();leaving.push(c);queue.forEach((q,j)=>q.slot=j);}}
   }
   for(let k=leaving.length-1;k>=0;k--){const c=leaving[k];c.mesh.rotation.y=0;c.mesh.position.z+=4.2*dt;if(c.want)c.want.visible=false;
