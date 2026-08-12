@@ -91,7 +91,7 @@ function fresh(){return {v:3,coins:120,xp:0,level:1,streak:0,lastDay:'',tut:0,
   visited:{day:'',refs:{}},tokens:{},pid:uuid(),pname:'',district:0,
   lastSeen:0,spinDay:'',goals:null,servedToday:0,collectsToday:0,earnedToday:0,
   cityName:'',decor:{planters:false,lights:false,banner:false,fountain:false},collected:['bakery'],collectClaimed:false,rank:0,event:null,
-  spins:30,spinsT:0,stickers:{},stickerClaimed:false,
+  spins:30,spinsT:0,stickers:{},stickerClaimed:false,journey:{ch:0},servedTotal:0,
   raid:{tickets:RAID_MAX_TICKETS,ticketsT:Date.now(),cd:{},shieldUntil:0,wins:0,losses:0},
   districts:[makeDistrict(0,true)]};}
 let S=fresh();
@@ -107,6 +107,7 @@ function load(){try{const raw=localStorage.getItem(LS);if(raw){const o=JSON.pars
   if(!S.decor)S.decor={planters:false,lights:false,banner:false,fountain:false};
   if(!S.collected)S.collected=[];eachLot(l=>{if(l.built&&l.type&&S.collected.indexOf(l.type)<0)S.collected.push(l.type);});
   if(S.spins==null)S.spins=30;if(!S.spinsT)S.spinsT=Date.now();if(!S.stickers)S.stickers={};
+  if(!S.journey)S.journey={ch:0};if(S.servedTotal==null)S.servedTotal=0;
   // clear stale timed events from a previous session
   eachLot(l=>{if(l.ev&&(l.ev.until||0)<Date.now())l.ev=null;});
   if((S.lucky||0)<Date.now())S.lucky=0;
@@ -373,6 +374,7 @@ function buildUI(){
      '<div class="bg3-chip" id="bg3coins"><span class="bg3-ycoin"></span><b>0</b></div>'+
      '<div class="bg3-chip" id="bg3streak">🔥 <b>0</b></div>'+
      '<button class="bg3-chip" id="bg3rivals" style="cursor:pointer" title="Rivals & raids">🏆 <b id="bg3rank">#1</b></button>'+
+     '<button class="bg3-chip bg3-dchip" id="bg3journey" title="Your journey">📖<span class="bg3-badge" id="bg3jbadge">!</span></button>'+
      '<button class="bg3-chip bg3-dchip" id="bg3goals" title="Daily goals">🎯<span class="bg3-badge" id="bg3goalsbadge">0</span></button>'+
      '<button class="bg3-chip bg3-dchip" id="bg3spin" title="Daily spin">🎡</button>'+
      '<button class="bg3-chip bg3-dchip" id="bg3slots" title="Lucky Slots">🎰<b id="bg3energy" style="margin-left:2px;font-size:12px">30</b></button>'+
@@ -408,7 +410,8 @@ function buildUI(){
   ui.store=wrap.querySelector('#bg3store');ui.storeTitle=wrap.querySelector('#bg3storetitle');ui.served=wrap.querySelector('#bg3served');ui.combo=wrap.querySelector('#bg3combo');ui.fade=wrap.querySelector('#bg3fade');
   wrap.querySelector('#bg3exit').onclick=exitStore;
   wrap.querySelector('#bg3manage').onclick=()=>{if(insideRec)openStoreManage(insideRec);};
-  ui.goalsBadge=wrap.querySelector('#bg3goalsbadge');ui.spinBtn=wrap.querySelector('#bg3spin');
+  ui.goalsBadge=wrap.querySelector('#bg3goalsbadge');ui.spinBtn=wrap.querySelector('#bg3spin');ui.journeyBadge=wrap.querySelector('#bg3jbadge');
+  wrap.querySelector('#bg3journey').onclick=openJourney;
   wrap.querySelector('#bg3rivals').onclick=openRivals;
   wrap.querySelector('#bg3goals').onclick=openGoals;
   ui.slotEnergy=wrap.querySelector('#bg3energy');ui.slotBtn=wrap.querySelector('#bg3slots');
@@ -574,6 +577,9 @@ function injectCSS(){ if(document.getElementById('bg3css'))return;const s=docume
 .bg3-collect{display:grid;grid-template-columns:repeat(8,1fr);gap:6px}
 .bg3-ccell{aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:20px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:10px;opacity:.5}
 .bg3-ccell.got{opacity:1;background:rgba(227,192,90,.15);border-color:rgba(227,192,90,.45)}
+.bg3-mentor{display:flex;gap:11px;align-items:flex-start;background:linear-gradient(120deg,rgba(122,208,58,.14),rgba(122,208,58,.04));border:1px solid rgba(122,208,58,.35);border-radius:14px;padding:11px 13px;margin:6px 0}
+.bg3-mentor .mt-face{font-size:34px;line-height:1;flex:none}
+.bg3-mentor .mt-say{font-size:13px;line-height:1.45;color:#e8f0e0}
 .bg3-career{display:flex;align-items:center;gap:12px;background:linear-gradient(120deg,rgba(227,192,90,.18),rgba(227,192,90,.06));border:1px solid rgba(227,192,90,.4);border-radius:14px;padding:11px 13px;margin:8px 0 4px}
 .bg3-career .cr-ic{font-size:34px;line-height:1}
 .bg3-career .cr-mid{flex:1;min-width:0}
@@ -606,6 +612,7 @@ function refreshUI(){
   ui.xpbar.style.width=Math.min(100,(S.xp/need)*100)+'%';
   if(ui.rank){const pw=playerWorth();let above=0;RIVALS.forEach(r=>{if(rivalWorth(r)>pw)above++;});ui.rank.textContent='#'+(above+1);}
   if(typeof checkRank==='function')checkRank();
+  if(typeof refreshDailyBadges==='function')refreshDailyBadges();
 }
 let toastT;
 function toast(msg){ui.toast.textContent=msg;ui.toast.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>ui.toast.classList.remove('on'),2000);}
@@ -748,7 +755,7 @@ function serveFront(){const rec=servingRec;if(!rec)return;const lot=lotOf(rec);i
   const frac=Math.max(0,Math.min(1,front.t/PATIENCE));
   const tip=Math.round(base*0.7*frac);                   // serve fast → bigger tip
   const total=Math.round((base+tip)*cmult);
-  S.coins+=total;S.earnedToday=(S.earnedToday||0)+total;S.servedToday=(S.servedToday||0)+1;gainXP(1);
+  S.coins+=total;S.earnedToday=(S.earnedToday||0)+total;S.servedToday=(S.servedToday||0)+1;S.servedTotal=(S.servedTotal||0)+1;gainXP(1);
   flyCoins(front.mesh);floatText(front.mesh,'+'+total+' Y'+(tip>0?' 💛':''),'#8ede4a');
   flyProduct(TYPES[lot.type].emoji,front.mesh);popHearts(front.mesh);if(combo>=2)showCombo(combo);
   front.state='leaving';if(front.want)front.want.visible=false;
@@ -955,7 +962,8 @@ function goalDone(g){return goalProg(g)>=g.target;}
 function goalsClaimable(){return S.goals?S.goals.items.filter(g=>goalDone(g)&&!g.claimed).length:0;}
 function goalLabel(g){const d=GOAL_DEFS[g.type];return d?d.icon+' '+d.label(g.target):g.type;}
 function refreshDailyBadges(){if(ui.goalsBadge){const n=goalsClaimable();ui.goalsBadge.style.display=n>0?'flex':'none';ui.goalsBadge.textContent=n;}
-  if(ui.spinBtn)ui.spinBtn.classList.toggle('avail',spinAvailable());}
+  if(ui.spinBtn)ui.spinBtn.classList.toggle('avail',spinAvailable());
+  if(ui.journeyBadge)ui.journeyBadge.style.display=(typeof journeyClaimable==='function'&&journeyClaimable())?'flex':'none';}
 function openGoals(){ensureGoals();
   let h='<h3>🦉 Biz Buddy\'s to-do list</h3><p>Finish these today for bonus coins — fresh goals every morning!</p><div class="bg3-goals">';
   S.goals.items.forEach((g,i)=>{const p=goalProg(g),done=p>=g.target,pct=Math.min(100,Math.round(p/g.target*100));
@@ -996,6 +1004,43 @@ function welcomeBack(){const now=Date.now();const away=now-(S.lastSeen||now);S.l
   openModal(h);
   const ca=ui.modalbody.querySelector('#bg3colall');if(ca)ca.onclick=()=>{collectAll();closeModal();};
   const ok=ui.modalbody.querySelector('#bg3okb');if(ok)ok.onclick=closeModal;}
+
+/* ---------------- story journey: a guided adventure with Biz Buddy ---------------- */
+const CHAPTERS=[
+  {t:'Welcome to the Square',say:"Hi, I'm Biz Buddy! Together we'll turn this empty block into a whole city. First — step into your bakery and serve some customers!",type:'serveTotal',target:5,rw:150},
+  {t:'Open for Business',say:"Nice! More shops means more coins. Open a second shop on one of the empty lots.",type:'shops',target:2,rw:250},
+  {t:'Rush Hour',say:"Word's getting out! Keep the line moving and serve, serve, serve.",type:'serveTotal',target:30,rw:300},
+  {t:'Meet the Rivals',say:"Other tycoons want the crown. Open the 🏆 leaderboard and raid one of them for coins!",type:'raids',target:1,rw:350},
+  {t:"Movin' On Up",say:"Your net worth is climbing fast. Grow until you reach the Corner Shop rank!",type:'rank',target:1,rw:450},
+  {t:'Lucky Collector',say:"Give the 🎰 Lucky Slots a spin — you might just win a shiny collectible sticker!",type:'stickers',target:2,rw:450},
+  {t:'A Growing City',say:"It's time to think bigger. Unlock a brand-new district and travel there!",type:'districts',target:2,rw:900},
+  {t:'Festival Fever',say:"There's a live event on right now! Play during it to rack up event points.",type:'eventpts',target:40,rw:700},
+  {t:'Make it Yours',say:"This city is YOURS. Head to 🎨 My City and place your first decoration.",type:'decor',target:1,rw:600},
+  {t:'Tycoon in the Making',say:"Look at you — a real mogul! One more push to reach Market Street rank.",type:'rank',target:2,rw:1800}];
+function statVal(t){switch(t){
+  case 'serveTotal':return S.servedTotal||0;
+  case 'shops':{let n=0;eachLot(l=>{if(l.built)n++;});return n;}
+  case 'raids':return (S.raid&&S.raid.wins)||0;
+  case 'rank':return S.rank||0;
+  case 'stickers':return stickersOwned();
+  case 'districts':return S.districts.length;
+  case 'eventpts':return (S.event&&S.event.points)||0;
+  case 'decor':return Object.keys(S.decor||{}).filter(k=>S.decor[k]).length;
+  case 'level':return S.level||1;}
+  return 0;}
+function journeyCh(){return Math.min((S.journey&&S.journey.ch)||0,CHAPTERS.length);}
+function curChapter(){return journeyCh()>=CHAPTERS.length?null:CHAPTERS[journeyCh()];}
+function chapterComplete(){const c=curChapter();return c?statVal(c.type)>=c.target:false;}
+function journeyClaimable(){return chapterComplete();}
+function openJourney(){const c=curChapter();
+  if(!c){openModal('<h3>📖 Your Journey</h3><div class="bg3-mentor"><div class="mt-face">🦉</div><div class="mt-say">You\'ve finished every chapter — you\'re a true Youngpreneur legend! 🌟 New adventures are always around the corner.</div></div>');return;}
+  const prog=statVal(c.type),done=prog>=c.target,pct=Math.min(100,Math.round(prog/c.target*100));
+  let h='<h3>📖 Chapter '+(journeyCh()+1)+' · '+c.t+'</h3>';
+  h+='<div class="bg3-mentor"><div class="mt-face">🦉</div><div class="mt-say">'+c.say+'</div></div>';
+  h+='<div class="bg3-goal" style="margin-top:10px"><div class="gtop"><span class="gl">🎯 Goal</span><span class="gr">+'+c.rw+' Y</span></div><div class="gbar"><i style="width:'+pct+'%"></i></div><div class="gbot"><span>'+Math.min(prog,c.target)+' / '+c.target+'</span>'+(done?'<span class="gdone">ready!</span>':'<span class="gmuted">keep going…</span>')+'</div></div>';
+  h+='<button class="bg3-btn" id="bg3jclaim" '+(done?'':'disabled')+'>'+(done?('Claim +'+c.rw+' Y & continue →'):'Objective in progress')+'</button>';
+  openModal(h);
+  const b=ui.modalbody.querySelector('#bg3jclaim');if(b)b.onclick=()=>{if(!chapterComplete())return;S.coins+=c.rw;S.earnedToday=(S.earnedToday||0)+c.rw;if(!S.journey)S.journey={ch:0};S.journey.ch=journeyCh()+1;confettiBurst();toast('📖 Chapter complete! +'+c.rw+' Y');refreshUI();saveSoon();refreshDailyBadges();openJourney();};}
 
 /* ---------------- live events & seasons: always something happening ---------------- */
 const EVENTS=[
@@ -1184,6 +1229,7 @@ function mount(el){host=el||document.getElementById('blockMount');if(!host)retur
   scheduleLucky();    // occasional city-wide lucky hour
   updateLuckyUI();
   ensureGoals();ensureEvent();refreshDailyBadges();refreshEventUI();refreshSpinChip();
+  if((S.journey&&S.journey.ch||0)===0&&S.tut){setTimeout(()=>{if(!ui.modal.classList.contains('on'))openJourney();},1400);} // introduce the story after onboarding
   setTimeout(()=>{ if(!S.tut){startTour();} else { welcomeBack(); } },900); // welcome-back after tour on first run
   setInterval(()=>{S.lastSeen=Date.now();save();},20000); // heartbeat so away-time is known next visit
   setInterval(refreshEventUI,30000); // keep the event countdown fresh
