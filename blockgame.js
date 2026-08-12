@@ -90,7 +90,7 @@ function makeDistrict(i,seed){const n=districtLots(i);const lots=[];for(let k=0;
 function fresh(){return {v:3,coins:120,xp:0,level:1,streak:0,lastDay:'',tut:0,
   visited:{day:'',refs:{}},tokens:{},pid:uuid(),pname:'',district:0,
   lastSeen:0,spinDay:'',goals:null,servedToday:0,collectsToday:0,earnedToday:0,
-  cityName:'',decor:{planters:false,lights:false,banner:false,fountain:false},collected:['bakery'],collectClaimed:false,
+  cityName:'',decor:{planters:false,lights:false,banner:false,fountain:false},collected:['bakery'],collectClaimed:false,rank:0,
   raid:{tickets:RAID_MAX_TICKETS,ticketsT:Date.now(),cd:{},shieldUntil:0,wins:0,losses:0},
   districts:[makeDistrict(0,true)]};}
 let S=fresh();
@@ -543,6 +543,13 @@ function injectCSS(){ if(document.getElementById('bg3css'))return;const s=docume
 .bg3-collect{display:grid;grid-template-columns:repeat(8,1fr);gap:6px}
 .bg3-ccell{aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:20px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:10px;opacity:.5}
 .bg3-ccell.got{opacity:1;background:rgba(227,192,90,.15);border-color:rgba(227,192,90,.45)}
+.bg3-career{display:flex;align-items:center;gap:12px;background:linear-gradient(120deg,rgba(227,192,90,.18),rgba(227,192,90,.06));border:1px solid rgba(227,192,90,.4);border-radius:14px;padding:11px 13px;margin:8px 0 4px}
+.bg3-career .cr-ic{font-size:34px;line-height:1}
+.bg3-career .cr-mid{flex:1;min-width:0}
+.bg3-career .cr-name{font-family:Georgia,serif;font-weight:800;font-size:17px;color:#F5F1E6}
+.bg3-career .cr-bar{height:8px;background:rgba(255,255,255,.12);border-radius:6px;margin:5px 0 4px;overflow:hidden}
+.bg3-career .cr-bar i{display:block;height:100%;background:linear-gradient(90deg,#F4D06A,#C89A34);border-radius:6px}
+.bg3-career .cr-next{font-size:11px;color:#cdd6cd;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bg3-fade{position:absolute;inset:0;z-index:30;background:#0a0f0c;opacity:0;pointer-events:none;transition:opacity .24s ease}
 .bg3-fade.on{opacity:1}
 `;document.head.appendChild(s);}
@@ -567,6 +574,7 @@ function refreshUI(){
   const need=LEVEL_XP(S.level);ui.xp.textContent=Math.floor(S.xp)+'/'+need+' XP';
   ui.xpbar.style.width=Math.min(100,(S.xp/need)*100)+'%';
   if(ui.rank){const pw=playerWorth();let above=0;RIVALS.forEach(r=>{if(rivalWorth(r)>pw)above++;});ui.rank.textContent='#'+(above+1);}
+  if(typeof checkRank==='function')checkRank();
 }
 let toastT;
 function toast(msg){ui.toast.textContent=msg;ui.toast.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>ui.toast.classList.remove('on'),2000);}
@@ -939,12 +947,40 @@ function welcomeBack(){const now=Date.now();const away=now-(S.lastSeen||now);S.l
   const ca=ui.modalbody.querySelector('#bg3colall');if(ca)ca.onclick=()=>{collectAll();closeModal();};
   const ok=ui.modalbody.querySelector('#bg3okb');if(ok)ok.onclick=closeModal;}
 
+/* ---------------- career rank journey: the thing you climb toward ---------------- */
+const RANKS=[
+  {name:'Lemonade Stand',icon:'🍋',worth:0},
+  {name:'Corner Shop',icon:'🏪',worth:1500},
+  {name:'Market Street',icon:'🛍️',worth:6000},
+  {name:'Shopping Plaza',icon:'🏬',worth:18000},
+  {name:'Business Park',icon:'🏢',worth:45000},
+  {name:'Mall Mogul',icon:'🎡',worth:110000},
+  {name:'City Tycoon',icon:'👑',worth:260000},
+  {name:'Legendary Mogul',icon:'🌟',worth:650000}];
+function currentRank(){const w=playerWorth();let r=0;for(let i=0;i<RANKS.length;i++){if(w>=RANKS[i].worth)r=i;}return r;}
+function rankReward(i){return 200+i*350;}
+function checkRank(){if(S.rank==null)S.rank=currentRank();const cr=currentRank();if(cr<=S.rank)return;
+  S.rank=cr;const R=RANKS[cr];const rw=rankReward(cr);S.coins+=rw;confettiBurst();
+  if(ui.modal&&!ui.modal.classList.contains('on')){
+    openModal('<h3>'+R.icon+' Rank up!</h3><p>Your business grew into a <b>'+R.name+'</b>! Keep building to climb even higher.</p><div class="bg3-stat" style="border:none"><span>Milestone reward</span><b style="color:#7ad03a">+'+rw+' Y</b></div><button class="bg3-btn" id="bg3rankok">Awesome!</button>');
+    const b=ui.modalbody.querySelector('#bg3rankok');if(b)b.onclick=closeModal;
+  } else { toast(R.icon+' Rank up: '+R.name+'! +'+rw+' Y'); }
+  saveSoon();}
+function careerHTML(){const cr=currentRank(),R=RANKS[cr],next=RANKS[cr+1],w=playerWorth();
+  let h='<div class="bg3-career"><div class="cr-ic">'+R.icon+'</div><div class="cr-mid"><div class="cr-name">'+R.name+'</div>';
+  if(next){const pct=Math.max(0,Math.min(100,Math.round((w-R.worth)/(next.worth-R.worth)*100)));
+    h+='<div class="cr-bar"><i style="width:'+pct+'%"></i></div><div class="cr-next">Net worth Y '+w.toLocaleString()+' · next: '+next.icon+' '+next.name+'</div>';}
+  else h+='<div class="cr-next">🌟 Top rank reached — you\'re a legend!</div>';
+  h+='</div></div>';return h;}
+
 /* ---------------- make it yours: name, decorate, collect ---------------- */
 const DECOR=[{key:'planters',name:'Flower planters',emoji:'🌷',cost:150},{key:'lights',name:'String lights',emoji:'✨',cost:400},{key:'banner',name:'Welcome banner',emoji:'🎊',cost:500},{key:'fountain',name:'Fountain',emoji:'⛲',cost:900}];
 const BADNAME=/(f+u+c+k|sh[i1]t|b[i1]tch|cunt|d[i1]ck|p[o0]rn|\bsex\b|nazi|rape|penis|vagina)/i;
 function ensureCollected(){if(!S.collected)S.collected=[];eachLot(l=>{if(l.built&&l.type&&S.collected.indexOf(l.type)<0)S.collected.push(l.type);});}
 function openMyBlock(){ensureCollected();const have=S.collected||[];const nm=(S.cityName||'').replace(/"/g,'&quot;');
-  let h='<h3>🎨 My City</h3><p>Make your block yours — name it, decorate it, and collect every shop.</p>';
+  let h='<h3>🎨 My City</h3>';
+  h+=careerHTML();
+  h+='<div class="bg3-sec">City name</div>';
   h+='<div style="display:flex;gap:6px;margin:2px 0 12px"><input id="bg3cname" maxlength="18" placeholder="Name your city…" value="'+nm+'" style="flex:1;background:rgba(255,255,255,.08);border:1px solid rgba(227,192,90,.4);border-radius:9px;color:#F5F1E6;padding:9px 11px;font-size:14px"><button class="bg3-btn" id="bg3savename" style="width:auto;margin:0;padding:9px 15px">Save</button></div>';
   h+='<div class="bg3-sec">Decorate your block</div><div class="bg3-decor">';
   DECOR.forEach(d=>{const owned=S.decor&&S.decor[d.key];h+='<div class="bg3-dcell'+(owned?' owned':'')+'"><div class="e">'+d.emoji+'</div><div class="n">'+d.name+'</div>'+(owned?'<div class="own">✓ Placed</div>':'<button class="bg3-dbuy" data-k="'+d.key+'" '+(S.coins>=d.cost?'':'disabled')+'>Y '+d.cost+'</button>')+'</div>';});
