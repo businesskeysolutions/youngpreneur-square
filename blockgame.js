@@ -361,7 +361,7 @@ function buildUI(){
      '<div class="bg3-tourcard" id="bg3tcard"><div class="tt"></div><div class="tb"></div>'+
        '<div class="trow"><span class="tstep"></span><span class="tbtns"><button class="tskip">Skip</button><button class="tback">Back</button><button class="tnext">Next</button></span></div></div></div>'+
    '<div class="bg3-store" id="bg3store"><div class="bg3-storebar"><button class="bg3-back" id="bg3exit">‹ Back to street</button><div class="bg3-storetitle" id="bg3storetitle"></div></div>'+
-     '<div class="bg3-storepanel"><div id="bg3storebody"></div></div></div>'+
+     '<div class="bg3-servehud"><div class="bg3-servehint">🛎️ Tap customers to serve them!</div><div class="bg3-servecount">Served today <b id="bg3served">0</b></div><button class="bg3-mbtn" id="bg3manage">⚙ Manage</button></div></div>'+
    '<div class="bg3-fade" id="bg3fade"></div>';
   host.innerHTML='';host.appendChild(wrap);
   ui.wrap=wrap;ui.canvaswrap=wrap.querySelector('.bg3-canvaswrap');
@@ -372,8 +372,9 @@ function buildUI(){
   ui.rank=wrap.querySelector('#bg3rank');ui.lucky=wrap.querySelector('#bg3lucky');
   ui.canvaswrap.appendChild(cv);
   ui.tour=wrap.querySelector('#bg3tour');ui.tourSpot=wrap.querySelector('#bg3spot');ui.tourCard=wrap.querySelector('#bg3tcard');
-  ui.store=wrap.querySelector('#bg3store');ui.storeTitle=wrap.querySelector('#bg3storetitle');ui.storeBody=wrap.querySelector('#bg3storebody');ui.fade=wrap.querySelector('#bg3fade');
+  ui.store=wrap.querySelector('#bg3store');ui.storeTitle=wrap.querySelector('#bg3storetitle');ui.served=wrap.querySelector('#bg3served');ui.fade=wrap.querySelector('#bg3fade');
   wrap.querySelector('#bg3exit').onclick=exitStore;
+  wrap.querySelector('#bg3manage').onclick=()=>{if(insideRec)openStoreManage(insideRec);};
   wrap.querySelector('#bg3rivals').onclick=openRivals;
   wrap.querySelector('#bg3help').onclick=startTour;
   ui.tourCard.querySelector('.tnext').onclick=()=>tourStep(tourIdx+1);
@@ -475,10 +476,14 @@ function injectCSS(){ if(document.getElementById('bg3css'))return;const s=docume
 .bg3-storebar{position:absolute;top:10px;left:10px;right:10px;display:flex;align-items:center;gap:10px;pointer-events:none}
 .bg3-back{pointer-events:auto;background:linear-gradient(180deg,#fffdf6,#efe4cb);border:2px solid #e0be5e;color:#3a2a06;font-weight:800;border-radius:20px;padding:8px 14px;font-size:13px;cursor:pointer;box-shadow:0 3px 0 rgba(120,90,30,.3)}
 .bg3-storetitle{pointer-events:auto;background:rgba(8,11,9,.6);backdrop-filter:blur(6px);border:2px solid rgba(227,192,90,.4);color:#F5F1E6;font-family:Georgia,serif;font-weight:800;font-size:15px;border-radius:16px;padding:6px 14px}
-.bg3-storepanel{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);width:min(370px,calc(100% - 24px));pointer-events:auto;background:linear-gradient(160deg,rgba(26,38,32,.96),rgba(13,21,16,.96));backdrop-filter:blur(4px);border:2px solid rgba(227,192,90,.5);border-radius:16px;padding:12px 15px;box-shadow:0 12px 34px rgba(0,0,0,.55);max-height:54%;overflow-y:auto}
-.bg3-storepanel .bg3-stat{padding:4px 0;font-size:12.5px}
-.bg3-storepanel .bg3-btn{margin-top:9px;padding:11px}
+.bg3-servehud{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);display:flex;align-items:center;gap:10px;pointer-events:none;flex-wrap:wrap;justify-content:center;max-width:calc(100% - 20px)}
+.bg3-servehint{pointer-events:none;background:rgba(8,11,9,.7);backdrop-filter:blur(5px);border:1px solid rgba(227,192,90,.35);color:#F5F1E6;font-size:13px;font-weight:700;border-radius:20px;padding:8px 15px}
+.bg3-servecount{pointer-events:none;background:linear-gradient(180deg,#fffdf6,#f0e6cf);border:2px solid #e0be5e;color:#233;font-size:13px;font-weight:800;border-radius:20px;padding:6px 13px;box-shadow:0 3px 0 rgba(120,90,30,.3)}
+.bg3-servecount b{color:#2a5a1e}
+.bg3-mbtn{pointer-events:auto;background:linear-gradient(180deg,#fffdf6,#efe4cb);border:2px solid #e0be5e;color:#3a2a06;font-weight:800;border-radius:20px;padding:8px 15px;font-size:13px;cursor:pointer;box-shadow:0 3px 0 rgba(120,90,30,.3)}
 .bg3-link{width:100%;background:none;border:none;color:#9AA79A;font-size:12px;font-weight:700;cursor:pointer;padding:7px 0 2px;text-align:center}
+.bg3-float{position:absolute;z-index:9;pointer-events:none;color:#7ad03a;font-weight:800;font-size:18px;text-shadow:0 1px 3px rgba(0,0,0,.6);transform:translate(-50%,0);transition:transform .8s ease-out,opacity .8s ease-out}
+.bg3-inside .bg3-travel{display:none}
 .bg3-fade{position:absolute;inset:0;z-index:30;background:#0a0f0c;opacity:0;pointer-events:none;transition:opacity .24s ease}
 .bg3-fade.on{opacity:1}
 `;document.head.appendChild(s);}
@@ -522,9 +527,10 @@ function bindInput(){
 }
 function tap(cx,cy){const r=cv.getBoundingClientRect();const ndc=new THREE.Vector2(((cx-r.left)/r.width)*2-1,-((cy-r.top)/r.height)*2+1);
   ray.setFromCamera(ndc,camera);
-  if(insideRec){const ih=ray.intersectObjects(intClickable,false);if(ih.length){let o=ih[0].object;while(o&&!(o.userData&&o.userData.station))o=o.parent;
-    if(o&&o.userData.station==='register'){collect(insideRec);refreshStorePanel(insideRec);}
-    else if(o&&o.userData.station==='equip'){const lot=lotOf(insideRec);if(lot.broke||condOf(lot)<100){const rep=ui.storeBody.querySelector('#bg3rep');if(rep)rep.click();}}}
+  if(insideRec){const ih=ray.intersectObjects(intClickable,true);if(ih.length){let o=ih[0].object;while(o&&!(o.userData&&o.userData.station))o=o.parent;
+    if(o&&o.userData.station==='serve'){serveFront();}
+    else if(o&&o.userData.station==='register'){collect(insideRec);updateIntCoin(insideRec);}
+    else if(o&&o.userData.station==='equip'){openStoreManage(insideRec);}}
     return;}
   const hits=ray.intersectObjects(clickable,false);if(!hits.length)return;
   const obj=hits[0].object;let o=obj;while(o&&!(o.userData&&o.userData.rec))o=o.parent;if(!o)return;const rec=o.userData.rec;const lot=lotOf(rec);
@@ -581,34 +587,84 @@ function storeDetailHTML(rec){const lot=lotOf(rec);const em=eventMult(lot);
      '<div class="bg3-mini"><div class="k">Expenses</div><div class="v" style="color:#ef8fb0">'+exp+'</div></div>'+
      '<div class="bg3-mini"><div class="k">Profit</div><div class="v" style="color:#7ad03a">'+prof+'</div></div></div>';
   return h;}
-function openStorePanel(rec){const lot=lotOf(rec);const t=TYPES[lot.type];
+function openStoreManage(rec){const lot=lotOf(rec);const t=TYPES[lot.type];
   const upC=upgradeCost(lot), repC=repairCost(lot), stock=Math.floor(lot.stock||0), cond=Math.round(condOf(lot));
-  if(ui.storeTitle)ui.storeTitle.innerHTML=t.emoji+' '+t.name+' <span style="font-size:11px;color:#9AA79A">Lvl '+lot.lvl+'</span>';
-  let h=storeTopHTML(rec);
+  let h='<h3>'+t.emoji+' '+t.name+' <span style="font-size:12px;color:#9AA79A;font-family:Work Sans">Lvl '+lot.lvl+'</span></h3>';
+  h+=storeTopHTML(rec);
   h+='<div id="bg3det" style="display:none;margin-top:4px">'+storeDetailHTML(rec)+'</div>';
   h+='<button class="bg3-link" id="bg3dett">Business details ▾</button>';
   if(lot.broke){
-    h+='<p style="color:#ff9a4a;font-size:12px;margin:8px 0 0">Equipment is broken — tap the machine or Repair to fix it.</p>';
+    h+='<p style="color:#ff9a4a;font-size:12px;margin:8px 0 0">Equipment is broken — customers can\'t be served until you repair it.</p>';
     h+='<button class="bg3-btn" id="bg3rep" '+(S.coins>=repC?'':'disabled')+'>🔧 Repair · Y '+repC+'</button>';
   } else {
-    if(stock>=1) h+='<button class="bg3-btn" id="bg3col" style="background:linear-gradient(180deg,#7ad03a,#4fae2a);color:#0c1a08">💰 Collect '+stock+' Y</button>';
+    if(stock>=1) h+='<button class="bg3-btn" id="bg3col" style="background:linear-gradient(180deg,#7ad03a,#4fae2a);color:#0c1a08">💰 Collect register · '+stock+' Y</button>';
     h+='<div style="display:flex;gap:8px">';
     if(cond<100) h+='<button class="bg3-btn" id="bg3rep" style="flex:1;background:rgba(227,192,90,.14);color:#E3C05A;border:1px solid rgba(227,192,90,.4)" '+(S.coins>=repC?'':'disabled')+'>🔧 Tune-up ·Y'+repC+'</button>';
     h+='<button class="bg3-btn" id="bg3up" style="flex:1" '+(S.coins>=upC?'':'disabled')+'>⬆ Upgrade ·Y'+upC+'</button>';
     h+='</div>';
   }
-  ui.storeBody.innerHTML=h;ui.store.classList.add('on');
-  const dett=ui.storeBody.querySelector('#bg3dett');if(dett)dett.onclick=()=>{const d=ui.storeBody.querySelector('#bg3det');if(!d)return;const open=d.style.display!=='none';d.style.display=open?'none':'block';dett.textContent='Business details '+(open?'▾':'▴');};
-  const col=ui.storeBody.querySelector('#bg3col');if(col)col.onclick=()=>{collect(rec);refreshStorePanel(rec);};
-  const rep=ui.storeBody.querySelector('#bg3rep');if(rep)rep.onclick=()=>{if(S.coins<repC)return;S.coins-=repC;lot.exp=(lot.exp||0)+repC;lot.broke=false;lot.cond=100;toast('Repaired '+t.name+'!');updateCoin(rec);themeInterior(rec);refreshUI();saveSoon();refreshStorePanel(rec);};
-  const up=ui.storeBody.querySelector('#bg3up');if(up)up.onclick=()=>{if(S.coins<upC)return;S.coins-=upC;lot.lvl++;gainXP(8);renderPlot(rec);applyMode(mode);toast('Upgraded to Lvl '+lot.lvl);themeInterior(rec);refreshUI();saveSoon();refreshStorePanel(rec);};
+  openModal(h);
+  const dett=ui.modalbody.querySelector('#bg3dett');if(dett)dett.onclick=()=>{const d=ui.modalbody.querySelector('#bg3det');if(!d)return;const open=d.style.display!=='none';d.style.display=open?'none':'block';dett.textContent='Business details '+(open?'▾':'▴');};
+  const col=ui.modalbody.querySelector('#bg3col');if(col)col.onclick=()=>{collect(rec);closeModal();};
+  const rep=ui.modalbody.querySelector('#bg3rep');if(rep)rep.onclick=()=>{if(S.coins<repC)return;S.coins-=repC;lot.exp=(lot.exp||0)+repC;lot.broke=false;lot.cond=100;toast('Repaired '+t.name+'!');updateCoin(rec);themeInterior(rec);startServing(rec);refreshUI();saveSoon();closeModal();};
+  const up=ui.modalbody.querySelector('#bg3up');if(up)up.onclick=()=>{if(S.coins<upC)return;S.coins-=upC;lot.lvl++;gainXP(8);renderPlot(rec);applyMode(mode);toast('Upgraded to Lvl '+lot.lvl);themeInterior(rec);startServing(rec);refreshUI();saveSoon();closeModal();};
 }
-function refreshStorePanel(rec){updateIntCoin(rec);openStorePanel(rec);}
-function enterStore(rec){if(insideRec)return;fade(()=>{insideRec=rec;themeInterior(rec);interiorGroup.visible=true;intAngle=0;updateIntCam();openStorePanel(rec);});}
-function exitStore(){if(!insideRec)return;fade(()=>{insideRec=null;interiorGroup.visible=false;clearGroup(interiorGroup);intClickable.length=0;if(ui.store)ui.store.classList.remove('on');updateCam();});}
+function refreshServeHUD(){if(ui.served)ui.served.textContent=(S.servedToday||0);}
+function enterStore(rec){if(insideRec)return;fade(()=>{insideRec=rec;themeInterior(rec);interiorGroup.visible=true;intAngle=0;updateIntCam();
+  const lot=lotOf(rec),t=TYPES[lot.type];if(ui.storeTitle)ui.storeTitle.innerHTML=t.emoji+' '+lot.name+' <span style="font-size:11px;color:#9AA79A">Lvl '+lot.lvl+'</span>';
+  if(ui.store)ui.store.classList.add('on');ui.wrap.classList.add('bg3-inside');refreshServeHUD();startServing(rec);});}
+function exitStore(){if(!insideRec)return;fade(()=>{stopServing();insideRec=null;interiorGroup.visible=false;clearGroup(interiorGroup);intClickable.length=0;if(ui.store)ui.store.classList.remove('on');ui.wrap.classList.remove('bg3-inside');updateCam();});}
+
+/* ---- active customer-serving loop: the shop is a place you play ---- */
+const QUEUE_MAX=5, PATIENCE=13, SERVE_Z=-1.7, DOOR_Z=4.6;
+let queue=[], leaving=[], projectiles=[], spawnT=0, servingRec=null;
+function slotPos(i){return {x:-0.4, z:SERVE_Z+i*1.3};}
+function saleValue(lot){return Math.max(3,Math.round(grossPerMin(lot)*condMult(lot)*eventMult(lot)*1.5));}
+function makeWantBubble(emoji){const c=document.createElement('canvas');c.width=96;c.height=112;const x=c.getContext('2d');x.clearRect(0,0,96,112);
+  x.fillStyle='rgba(255,253,246,.97)';rr(x,10,6,76,64,18);x.fill();x.strokeStyle='#e0be5e';x.lineWidth=4;rr(x,10,6,76,64,18);x.stroke();
+  x.fillStyle='rgba(255,253,246,.97)';x.beginPath();x.moveTo(40,68);x.lineTo(58,68);x.lineTo(46,86);x.closePath();x.fill();
+  x.font='42px serif';x.textAlign='center';x.textBaseline='middle';x.fillText(emoji,48,38);
+  const tx=new THREE.CanvasTexture(c);const m=new THREE.SpriteMaterial({map:tx,transparent:true,depthTest:false});const s=new THREE.Sprite(m);s.scale.set(1.5,1.75,1);return s;}
+function startServing(rec){stopServing();servingRec=rec;spawnT=1.6;refreshServeHUD();spawnCustomer();spawnCustomer();}
+function stopServing(){queue=[];leaving=[];projectiles=[];servingRec=null;}
+function spawnCustomer(){const rec=servingRec;if(!rec)return;const lot=lotOf(rec);if(lot.broke||queue.length>=QUEUE_MAX)return;
+  const seed=(Math.floor(performance.now()/97)+queue.length)%SHIRTS.length;
+  const p=makePerson(seed);const slot=queue.length;const sp=slotPos(slot);
+  p.position.set(sp.x,0,DOOR_Z);p.rotation.y=Math.PI;p.userData={station:'serve'};interiorGroup.add(p);
+  const want=makeWantBubble(TYPES[lot.type].emoji);want.position.set(sp.x,2.3,DOOR_Z);want.visible=false;want.userData={station:'serve'};interiorGroup.add(want);
+  const cust={mesh:p,want:want,slot:slot,state:'walking',t:PATIENCE};p.userData.cust=cust;
+  queue.push(cust);intClickable.push(p);intClickable.push(want);}
+function serveFront(){const rec=servingRec;if(!rec)return;const lot=lotOf(rec);if(lot.broke)return;
+  const front=queue[0];if(!front||front.state!=='waiting')return;
+  const val=saleValue(lot);S.coins+=val;S.servedToday=(S.servedToday||0)+1;gainXP(1);
+  flyCoins(front.mesh);floatText(front.mesh,'+'+val+' Y');flyProduct(TYPES[lot.type].emoji,front.mesh);
+  front.state='leaving';if(front.want)front.want.visible=false;
+  queue.shift();leaving.push(front);queue.forEach((c,i)=>c.slot=i);
+  refreshServeHUD();refreshUI();saveSoon();}
+function floatText(fromMesh,txt){if(!ui.wrap||!fromMesh)return;const p=worldToScreen(fromMesh);const d=document.createElement('div');d.className='bg3-float';d.textContent=txt;d.style.left=p.x+'px';d.style.top=(p.y-30)+'px';ui.wrap.appendChild(d);
+  requestAnimationFrame(()=>{d.style.transform='translate(-50%,-46px)';d.style.opacity='0';});setTimeout(()=>d.remove(),820);}
+function flyProduct(emoji,toMesh){if(!toMesh)return;const m=new THREE.SpriteMaterial({map:emojiTex(emoji),transparent:true,depthTest:false});const s=new THREE.Sprite(m);s.scale.set(0.9,0.9,1);
+  s.position.set(0,2.2,-3.2);interiorGroup.add(s);const to=toMesh.position.clone();to.y=1.6;projectiles.push({spr:s,from:s.position.clone(),to:to,t:0});}
+function removeMesh(mesh){if(mesh&&mesh.parent)mesh.parent.remove(mesh);const i=intClickable.indexOf(mesh);if(i>=0)intClickable.splice(i,1);}
+function tickServing(dt){const rec=servingRec;if(!rec)return;const lot=lotOf(rec);const now=performance.now();
+  if(!lot.broke){spawnT-=dt;const interval=(eventMult(lot)>1?1.5:3.3);if(spawnT<=0){spawnCustomer();spawnT=interval;}}
+  for(let i=0;i<queue.length;i++){const c=queue[i];const sp=slotPos(c.slot);
+    const dx=sp.x-c.mesh.position.x,dz=sp.z-c.mesh.position.z,d=Math.hypot(dx,dz);
+    if(d>0.06){const step=Math.min(3.4*dt,d);c.mesh.position.x+=dx/d*step;c.mesh.position.z+=dz/d*step;if(c.state!=='waiting')c.state='walking';}
+    else if(c.state!=='waiting'){c.state='waiting';}
+    c.mesh.position.y=(c.state==='walking')?Math.abs(Math.sin(now/130+i))*0.05:0;
+    if(c.want){c.want.position.set(c.mesh.position.x,2.25+Math.sin(now/300+i)*0.06,c.mesh.position.z);c.want.visible=(c.state==='waiting');}
+    if(i===0&&c.state==='waiting'){c.t-=dt;if(c.t<=0){if(c.want)c.want.visible=false;queue.shift();leaving.push(c);queue.forEach((q,j)=>q.slot=j);}}
+  }
+  for(let k=leaving.length-1;k>=0;k--){const c=leaving[k];c.mesh.rotation.y=0;c.mesh.position.z+=4.2*dt;if(c.want)c.want.visible=false;
+    if(c.mesh.position.z>DOOR_Z+1.5){removeMesh(c.mesh);if(c.want)removeMesh(c.want);leaving.splice(k,1);}}
+  for(let k=projectiles.length-1;k>=0;k--){const pr=projectiles[k];pr.t+=dt*3.2;const u=Math.min(1,pr.t);
+    pr.spr.position.lerpVectors(pr.from,pr.to,u);pr.spr.position.y+=Math.sin(u*Math.PI)*0.7;
+    if(u>=1){if(pr.spr.parent)pr.spr.parent.remove(pr.spr);projectiles.splice(k,1);}}
+}
 function fade(mid){const f=ui.fade;if(!f){if(mid)mid();return;}f.classList.add('on');setTimeout(()=>{if(mid)mid();setTimeout(()=>f.classList.remove('on'),70);},240);}
 const IC=new THREE.Vector3(0,400,0);
-function updateIntCam(){camera.position.set(IC.x+Math.sin(intAngle)*intDist,IC.y+6.2,IC.z+Math.cos(intAngle)*intDist+4);camera.lookAt(IC.x,IC.y+2.3,IC.z-3.0);if(sky)sky.position.x=IC.x;}
+function updateIntCam(){camera.position.set(IC.x+Math.sin(intAngle)*intDist,IC.y+5.6,IC.z+Math.cos(intAngle)*intDist+7);camera.lookAt(IC.x,IC.y+1.4,IC.z-1.6);if(sky)sky.position.x=IC.x;}
 function updateIntCoin(rec){if(!rec.intCoin)return;const lot=lotOf(rec);const n=Math.floor(lot.stock||0);const t=coinTex(n);if(rec.intCoin.material.map&&rec.intCoin.material.map.dispose)rec.intCoin.material.map.dispose();rec.intCoin.material.map=t;rec.intCoin.material.needsUpdate=true;rec.intCoin.visible=n>=1;}
 function themeInterior(rec){const lot=lotOf(rec);const t=TYPES[lot.type];const g=interiorGroup;clearGroup(g);intClickable.length=0;
   // interior lighting (only active while this group is visible)
@@ -634,9 +690,8 @@ function themeInterior(rec){const lot=lotOf(rec);const t=TYPES[lot.type];const g
   // equipment machine (tap to fix)
   const eq=mesh(new THREE.BoxGeometry(1.9,2.4,1.5),std({color:lot.broke?0x7a2e28:0x545a63,metalness:.35,roughness:.5}),5.2,1.2,-3.8);eq.userData={rec,station:'equip'};eq.castShadow=true;g.add(eq);intClickable.push(eq);
   g.add(mesh(new THREE.PlaneGeometry(1.1,1.1),std({map:emojiTex(lot.broke?'🔧':'⚙️'),transparent:true}),5.2,1.4,-3.03));
-  // shopkeeper behind the counter + a browsing customer up front
+  // shopkeeper behind the counter (customers arrive live via the serving loop)
   const keep=makePerson(rec.i+2);keep.position.set(1.4,0,-4.5);keep.rotation.y=0;g.add(keep);rec.intKeeper=keep;
-  const cust=makePerson(rec.i+5);cust.position.set(-2.2,0,0.6);g.add(cust);rec.intCust=cust;
 }
 function mesh(geo,mat,x,y,z){const m=new THREE.Mesh(geo,mat);m.position.set(x,y,z);return m;}
 function updateCoin(rec){if(!rec.coin)return;const lot=lotOf(rec);let t,vis;
@@ -648,6 +703,7 @@ function updateCoin(rec){if(!rec.coin)return;const lot=lotOf(rec);let t,vis;
 function ensureDaily(){const td=todayStr();if(S.lastDay===td)return;
   if(S.lastDay===yStr())S.streak=(S.streak||0)+1;else S.streak=1;S.lastDay=td;
   eachLot(l=>{if(l.built){l.rev=0;l.exp=0;}}); // reset daily books city-wide
+  S.servedToday=0;
   const bonus=Math.min(120,20*S.streak);S.coins+=bonus;toast('Daily +'+bonus+' Y · streak '+S.streak);refreshUI();saveSoon();}
 
 /* ---------------- guided coach tour ---------------- */
@@ -787,10 +843,10 @@ function tick(now){const dt=Math.min(.1,(now-last)/1000);last=now;
   if(ui.coins){const target=Math.floor(S.coins);if(shownCoins!==target){const diff=target-shownCoins;shownCoins+=(Math.abs(diff)<2)?diff:diff*Math.min(1,dt*6);if(Math.abs(target-shownCoins)<1)shownCoins=target;ui.coins.textContent=Math.round(shownCoins).toLocaleString();}}
   const ts=now/1000;
   if(insideRec){
-    // idle life inside the shop
+    // active shop life: serve the customer line
     const rec=insideRec;if(rec.intKeeper)rec.intKeeper.position.y=Math.abs(Math.sin(ts*1.6))*0.04;
-    if(rec.intCust){rec.intCust.position.x=-2.6+Math.sin(ts*0.5)*0.8;rec.intCust.rotation.y=Math.cos(ts*0.5)>0?Math.PI/2:-Math.PI/2;}
-    if(rec.intCoin)rec.intCoin.position.y=3.3+Math.sin(ts*2)*0.1;
+    if(rec.intCoin)rec.intCoin.position.y=3.2+Math.sin(ts*2)*0.1;
+    tickServing(dt);
     coinAcc+=dt;if(coinAcc>0.5){coinAcc=0;updateIntCoin(rec);updateLuckyUI();}
   } else {
     // stroll the customers along the sidewalk
