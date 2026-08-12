@@ -89,6 +89,7 @@ function makeDistrict(i,seed){const n=districtLots(i);const lots=[];for(let k=0;
   return {id:i,lots:lots};}
 function fresh(){return {v:3,coins:120,xp:0,level:1,streak:0,lastDay:'',tut:0,
   visited:{day:'',refs:{}},tokens:{},pid:uuid(),pname:'',district:0,
+  lastSeen:0,spinDay:'',goals:null,servedToday:0,collectsToday:0,earnedToday:0,
   raid:{tickets:RAID_MAX_TICKETS,ticketsT:Date.now(),cd:{},shieldUntil:0,wins:0,losses:0},
   districts:[makeDistrict(0,true)]};}
 let S=fresh();
@@ -347,6 +348,8 @@ function buildUI(){
      '<div class="bg3-chip" id="bg3coins"><span class="bg3-ycoin"></span><b>0</b></div>'+
      '<div class="bg3-chip" id="bg3streak">🔥 <b>0</b></div>'+
      '<button class="bg3-chip" id="bg3rivals" style="cursor:pointer" title="Rivals & raids">🏆 <b id="bg3rank">#1</b></button>'+
+     '<button class="bg3-chip bg3-dchip" id="bg3goals" title="Daily goals">🎯<span class="bg3-badge" id="bg3goalsbadge">0</span></button>'+
+     '<button class="bg3-chip bg3-dchip" id="bg3spin" title="Daily spin">🎡</button>'+
      '<div class="bg3-lvl"><div class="bg3-lvlrow"><span id="bg3lvl">Lvl 1</span><span id="bg3xp">0/50 XP</span></div><div class="bg3-bar"><i id="bg3xpbar"></i></div></div>'+
      '<button class="bg3-icon" id="bg3help" title="How to play">?</button>'+
      '<button class="bg3-icon" id="bg3fs" title="Fullscreen">⤢</button>'+
@@ -375,7 +378,10 @@ function buildUI(){
   ui.store=wrap.querySelector('#bg3store');ui.storeTitle=wrap.querySelector('#bg3storetitle');ui.served=wrap.querySelector('#bg3served');ui.fade=wrap.querySelector('#bg3fade');
   wrap.querySelector('#bg3exit').onclick=exitStore;
   wrap.querySelector('#bg3manage').onclick=()=>{if(insideRec)openStoreManage(insideRec);};
+  ui.goalsBadge=wrap.querySelector('#bg3goalsbadge');ui.spinBtn=wrap.querySelector('#bg3spin');
   wrap.querySelector('#bg3rivals').onclick=openRivals;
+  wrap.querySelector('#bg3goals').onclick=openGoals;
+  wrap.querySelector('#bg3spin').onclick=openSpin;
   wrap.querySelector('#bg3help').onclick=startTour;
   ui.tourCard.querySelector('.tnext').onclick=()=>tourStep(tourIdx+1);
   ui.tourCard.querySelector('.tback').onclick=()=>tourStep(tourIdx-1);
@@ -484,6 +490,23 @@ function injectCSS(){ if(document.getElementById('bg3css'))return;const s=docume
 .bg3-link{width:100%;background:none;border:none;color:#9AA79A;font-size:12px;font-weight:700;cursor:pointer;padding:7px 0 2px;text-align:center}
 .bg3-float{position:absolute;z-index:9;pointer-events:none;color:#7ad03a;font-weight:800;font-size:18px;text-shadow:0 1px 3px rgba(0,0,0,.6);transform:translate(-50%,0);transition:transform .8s ease-out,opacity .8s ease-out}
 .bg3-inside .bg3-travel{display:none}
+.bg3-dchip{position:relative;cursor:pointer;padding:6px 11px;font-size:16px}
+.bg3-badge{position:absolute;top:-5px;right:-5px;min-width:17px;height:17px;padding:0 4px;background:#E3242B;color:#fff;border-radius:9px;font-size:11px;font-weight:800;display:none;align-items:center;justify-content:center;border:1.5px solid #fffdf6}
+#bg3spin.avail{animation:bg3pulse2 1.3s ease-in-out infinite}
+@keyframes bg3pulse2{0%,100%{transform:scale(1)}50%{transform:scale(1.12)}}
+.bg3-goals{display:flex;flex-direction:column;gap:9px;margin-top:6px}
+.bg3-goal{background:rgba(255,255,255,.05);border:1px solid rgba(227,192,90,.25);border-radius:12px;padding:10px 12px}
+.bg3-goal .gtop{display:flex;justify-content:space-between;font-size:13.5px;font-weight:700}
+.bg3-goal .gr{color:#E3C05A}
+.bg3-goal .gbar{height:8px;background:rgba(255,255,255,.12);border-radius:6px;margin:7px 0 5px;overflow:hidden}
+.bg3-goal .gbar i{display:block;height:100%;background:linear-gradient(90deg,#8ede4a,#4fae2a);border-radius:6px}
+.bg3-goal .gbot{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:#9AA79A}
+.bg3-goal .gclaim{background:linear-gradient(180deg,#7ad03a,#4fae2a);color:#0c1a08;border:none;border-radius:8px;padding:5px 14px;font-weight:800;font-size:12px;cursor:pointer;box-shadow:0 2px 0 #2f7a1a}
+.bg3-goal .gdone{color:#7ad03a;font-weight:800}
+.bg3-wheelwrap{position:relative;width:180px;height:180px;margin:6px auto 12px}
+.bg3-wheel{position:absolute;inset:0;border-radius:50%;border:5px solid #fffdf6;box-shadow:0 8px 24px rgba(0,0,0,.5),inset 0 0 0 3px rgba(0,0,0,.2);transform:rotate(0deg)}
+.bg3-wlabel{position:absolute;left:50%;top:50%;font-size:12px;font-weight:800;color:#14231a;text-shadow:0 1px 1px rgba(255,255,255,.4);white-space:nowrap}
+.bg3-wpin{position:absolute;top:-10px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:11px solid transparent;border-right:11px solid transparent;border-top:20px solid #fffdf6;z-index:3;filter:drop-shadow(0 2px 2px rgba(0,0,0,.5))}
 .bg3-fade{position:absolute;inset:0;z-index:30;background:#0a0f0c;opacity:0;pointer-events:none;transition:opacity .24s ease}
 .bg3-fade.on{opacity:1}
 `;document.head.appendChild(s);}
@@ -547,7 +570,7 @@ function tap(cx,cy){const r=cv.getBoundingClientRect();const ndc=new THREE.Vecto
   enterStore(rec);
 }
 function collect(rec){const lot=lotOf(rec);const amt=Math.floor(lot.stock||0);if(amt<1)return;
-  lot.stock-=amt;S.coins+=amt;gainXP(amt);flyCoin(rec);flyCoins((insideRec===rec&&rec.intCoin)?rec.intCoin:rec.coin);toast('+'+amt+' Y');refreshUI();saveSoon();updateCoin(rec);if(insideRec===rec)updateIntCoin(rec);}
+  lot.stock-=amt;S.coins+=amt;S.earnedToday=(S.earnedToday||0)+amt;S.collectsToday=(S.collectsToday||0)+1;gainXP(amt);flyCoin(rec);flyCoins((insideRec===rec&&rec.intCoin)?rec.intCoin:rec.coin);toast('+'+amt+' Y');refreshUI();saveSoon();updateCoin(rec);if(insideRec===rec)updateIntCoin(rec);refreshDailyBadges();}
 function flyCoin(rec){ if(rec.coin){rec.coin.scale.set(3.2,1.7,1);setTimeout(()=>{if(rec.coin)rec.coin.scale.set(2.6,1.32,1);},130);} }
 function gainXP(n){S.xp+=n;let lvlup=false;while(S.xp>=LEVEL_XP(S.level)){S.xp-=LEVEL_XP(S.level);S.level++;lvlup=true;}if(lvlup){toast('🎉 Level up! Lvl '+S.level);confettiBurst();}}
 function openBuild(rec){const idx=rec.i;const next=nextUnlockIndex(rec.d);
@@ -636,11 +659,11 @@ function spawnCustomer(){const rec=servingRec;if(!rec)return;const lot=lotOf(rec
   queue.push(cust);intClickable.push(p);intClickable.push(want);}
 function serveFront(){const rec=servingRec;if(!rec)return;const lot=lotOf(rec);if(lot.broke){toast('🔧 Repair the equipment to serve');return;}
   const front=queue[0];if(!front||front.state==='leaving')return;
-  const val=saleValue(lot);S.coins+=val;S.servedToday=(S.servedToday||0)+1;gainXP(1);
+  const val=saleValue(lot);S.coins+=val;S.earnedToday=(S.earnedToday||0)+val;S.servedToday=(S.servedToday||0)+1;gainXP(1);
   flyCoins(front.mesh);floatText(front.mesh,'+'+val+' Y');flyProduct(TYPES[lot.type].emoji,front.mesh);
   front.state='leaving';if(front.want)front.want.visible=false;
   queue.shift();leaving.push(front);queue.forEach((c,i)=>c.slot=i);
-  refreshServeHUD();refreshUI();saveSoon();}
+  refreshServeHUD();refreshUI();saveSoon();refreshDailyBadges();}
 function floatText(fromMesh,txt){if(!ui.wrap||!fromMesh)return;const p=worldToScreen(fromMesh);const d=document.createElement('div');d.className='bg3-float';d.textContent=txt;d.style.left=p.x+'px';d.style.top=(p.y-30)+'px';ui.wrap.appendChild(d);
   requestAnimationFrame(()=>{d.style.transform='translate(-50%,-46px)';d.style.opacity='0';});setTimeout(()=>d.remove(),820);}
 function flyProduct(emoji,toMesh){if(!toMesh)return;const m=new THREE.SpriteMaterial({map:emojiTex(emoji),transparent:true,depthTest:false});const s=new THREE.Sprite(m);s.scale.set(0.9,0.9,1);
@@ -703,8 +726,8 @@ function updateCoin(rec){if(!rec.coin)return;const lot=lotOf(rec);let t,vis;
 function ensureDaily(){const td=todayStr();if(S.lastDay===td)return;
   if(S.lastDay===yStr())S.streak=(S.streak||0)+1;else S.streak=1;S.lastDay=td;
   eachLot(l=>{if(l.built){l.rev=0;l.exp=0;}}); // reset daily books city-wide
-  S.servedToday=0;
-  const bonus=Math.min(120,20*S.streak);S.coins+=bonus;toast('Daily +'+bonus+' Y · streak '+S.streak);refreshUI();saveSoon();}
+  S.servedToday=0;S.collectsToday=0;S.earnedToday=0;S.goals=rollGoals();
+  const bonus=Math.min(120,20*S.streak);S.coins+=bonus;toast('Daily +'+bonus+' Y · streak '+S.streak);refreshUI();saveSoon();if(typeof refreshDailyBadges==='function')refreshDailyBadges();}
 
 /* ---------------- guided coach tour ---------------- */
 let tourIdx=0;
@@ -824,6 +847,60 @@ function incomingRaid(){ if(shieldActive())return; if(ui.modal&&ui.modal.classLi
   setTimeout(()=>finish(false),9000); // auto-resolve if ignored (small, capped)
 }
 
+/* ---------------- daily return loop: goals, spin, welcome-back ---------------- */
+const GOAL_DEFS={serve:{icon:'🛎️',label:n=>'Serve '+n+' customers'},collect:{icon:'💰',label:n=>'Collect '+n+' times'},earn:{icon:'🪙',label:n=>'Earn '+n+' coins'}};
+function rollGoals(){const lv=S.level||1;return {day:todayStr(),items:[
+  {type:'serve',target:10+lv*3,reward:40+lv*15,claimed:false},
+  {type:'collect',target:4+Math.floor(lv/2),reward:35+lv*10,claimed:false},
+  {type:'earn',target:120+lv*60,reward:40+lv*15,claimed:false}]};}
+function ensureGoals(){if(!S.goals||S.goals.day!==todayStr())S.goals=rollGoals();}
+function goalProg(g){return g.type==='serve'?(S.servedToday||0):g.type==='collect'?(S.collectsToday||0):(S.earnedToday||0);}
+function goalDone(g){return goalProg(g)>=g.target;}
+function goalsClaimable(){return S.goals?S.goals.items.filter(g=>goalDone(g)&&!g.claimed).length:0;}
+function goalLabel(g){const d=GOAL_DEFS[g.type];return d?d.icon+' '+d.label(g.target):g.type;}
+function refreshDailyBadges(){if(ui.goalsBadge){const n=goalsClaimable();ui.goalsBadge.style.display=n>0?'flex':'none';ui.goalsBadge.textContent=n;}
+  if(ui.spinBtn)ui.spinBtn.classList.toggle('avail',spinAvailable());}
+function openGoals(){ensureGoals();
+  let h='<h3>🦉 Biz Buddy\'s to-do list</h3><p>Finish these today for bonus coins — fresh goals every morning!</p><div class="bg3-goals">';
+  S.goals.items.forEach((g,i)=>{const p=goalProg(g),done=p>=g.target,pct=Math.min(100,Math.round(p/g.target*100));
+    h+='<div class="bg3-goal"><div class="gtop"><span class="gl">'+goalLabel(g)+'</span><span class="gr">+'+g.reward+' Y</span></div>'+
+       '<div class="gbar"><i style="width:'+pct+'%"></i></div>'+
+       '<div class="gbot"><span>'+Math.min(p,g.target)+' / '+g.target+'</span>'+
+       (g.claimed?'<span class="gdone">✓ Claimed</span>':(done?'<button class="gclaim" data-i="'+i+'">Claim</button>':'<span class="gmuted">keep going…</span>'))+'</div></div>';});
+  h+='</div>';openModal(h);
+  ui.modalbody.querySelectorAll('.gclaim').forEach(b=>b.onclick=()=>{const g=S.goals.items[+b.getAttribute('data-i')];if(!g||g.claimed||!goalDone(g))return;g.claimed=true;S.coins+=g.reward;S.earnedToday=(S.earnedToday||0)+g.reward;gainXP(6);confettiBurst();toast('🎯 Goal done! +'+g.reward+' Y');refreshUI();saveSoon();refreshDailyBadges();openGoals();});}
+const SPIN_PRIZES=[{t:'coins',v:50,label:'50',color:'#7ad03a'},{t:'coins',v:150,label:'150',color:'#E3C05A'},{t:'coins',v:80,label:'80',color:'#37A6C9'},{t:'lucky',label:'2× Hr',color:'#8a5aff'},{t:'coins',v:300,label:'300',color:'#E05aa0'},{t:'tickets',v:3,label:'3⚔',color:'#2f9e57'},{t:'coins',v:120,label:'120',color:'#E6A020'},{t:'coins',v:600,label:'600',color:'#E3242B'}];
+function spinAvailable(){return S.spinDay!==todayStr();}
+function openSpin(){if(!spinAvailable()){openModal('<h3>🎡 Daily Spin</h3><p>You\'ve already spun today. Come back tomorrow for another free spin!</p>');return;}
+  const N=SPIN_PRIZES.length,step=360/N;let grad=[],labels='';
+  SPIN_PRIZES.forEach((p,i)=>{grad.push(p.color+' '+(i*step)+'deg '+((i+1)*step)+'deg');const a=(i+0.5)*step;labels+='<div class="bg3-wlabel" style="transform:translate(-50%,-50%) rotate('+a+'deg) translateY(-66px) rotate('+(-a)+'deg)">'+p.label+'</div>';});
+  openModal('<h3>🎡 Daily Spin</h3><p>One free spin every day — good luck!</p><div class="bg3-wheelwrap"><div class="bg3-wpin"></div><div class="bg3-wheel" id="bg3wheel" style="background:conic-gradient('+grad.join(',')+')">'+labels+'</div></div><button class="bg3-btn" id="bg3spinb">SPIN!</button>');
+  const wheel=ui.modalbody.querySelector('#bg3wheel'),btn=ui.modalbody.querySelector('#bg3spinb');let spun=false;
+  btn.onclick=()=>{if(spun)return;spun=true;btn.disabled=true;btn.textContent='Spinning…';
+    const idx=Math.floor(Math.random()*N);const target=360*5+(360-((idx+0.5)*step));
+    wheel.style.transition='transform 3.4s cubic-bezier(.16,.84,.3,1)';wheel.style.transform='rotate('+target+'deg)';
+    S.spinDay=todayStr();saveSoon();
+    setTimeout(()=>{awardSpin(SPIN_PRIZES[idx]);refreshDailyBadges();btn.textContent='Come back tomorrow!';},3500);};}
+function awardSpin(p){
+  if(p.t==='coins'){S.coins+=p.v;S.earnedToday=(S.earnedToday||0)+p.v;toast('🎉 You won '+p.v+' Y!');}
+  else if(p.t==='lucky'){S.lucky=Date.now()+120000;updateLuckyUI();toast('🎉 You won a Lucky Hour! ×2 for 2 min');}
+  else if(p.t==='tickets'){S.raid.tickets=Math.min(RAID_MAX_TICKETS,(S.raid.tickets||0)+p.v);toast('🎉 You won '+p.v+' raid tickets!');}
+  confettiBurst();refreshUI();saveSoon();}
+function collectAll(){let total=0;plots.forEach(rec=>{const l=lotOf(rec);const amt=Math.floor(l.stock||0);if(l.built&&amt>=1){l.stock-=amt;total+=amt;updateCoin(rec);}});
+  if(total>0){S.coins+=total;S.earnedToday=(S.earnedToday||0)+total;S.collectsToday=(S.collectsToday||0)+1;gainXP(Math.min(30,total));toast('💰 Collected '+total+' Y!');refreshUI();saveSoon();refreshDailyBadges();}}
+function welcomeBack(){const now=Date.now();const away=now-(S.lastSeen||now);S.lastSeen=now;
+  if(away<120000||!S.districts)return;
+  let waiting=0,shops=0;eachLot(l=>{if(l.built){waiting+=Math.floor(l.stock||0);shops++;}});
+  const mins=Math.floor(away/60000);const cust=Math.max(1,Math.round(mins*0.4*Math.max(1,shops)));
+  const h='<h3>👋 Welcome back!</h3><p>While you were away'+(mins>0?(' (~'+(mins>=60?Math.floor(mins/60)+'h':mins+'m')+')'):'')+', your shops kept working.</p>'+
+    '<div style="display:flex;gap:8px;margin:6px 0 10px">'+
+    '<div class="bg3-mini"><div class="k">Waiting to collect</div><div class="v" style="color:#E3C05A">'+waiting+'</div></div>'+
+    '<div class="bg3-mini"><div class="k">Customers stopped by</div><div class="v">'+cust+'</div></div></div>'+
+    (waiting>0?'<button class="bg3-btn" id="bg3colall">💰 Collect all · '+waiting+' Y</button>':'<button class="bg3-btn" id="bg3okb">Let\'s go!</button>');
+  openModal(h);
+  const ca=ui.modalbody.querySelector('#bg3colall');if(ca)ca.onclick=()=>{collectAll();closeModal();};
+  const ok=ui.modalbody.querySelector('#bg3okb');if(ok)ok.onclick=closeModal;}
+
 /* ---------------- loop ---------------- */
 let last=performance.now(),coinAcc=0;
 function tick(now){const dt=Math.min(.1,(now-last)/1000);last=now;
@@ -878,7 +955,10 @@ function mount(el){host=el||document.getElementById('blockMount');if(!host)retur
   scheduleEvent();    // rushes / tips / restocks
   scheduleLucky();    // occasional city-wide lucky hour
   updateLuckyUI();
-  if(!S.tut){setTimeout(()=>{if(!S.tut)startTour();},1000);} // first-run coach tour
+  ensureGoals();refreshDailyBadges();
+  setTimeout(()=>{ if(!S.tut){startTour();} else { welcomeBack(); } },900); // welcome-back after tour on first run
+  setInterval(()=>{S.lastSeen=Date.now();save();},20000); // heartbeat so away-time is known next visit
+  window.addEventListener('beforeunload',()=>{S.lastSeen=Date.now();save();});
   requestAnimationFrame(tick);
 }
 function reward(n,msg){n=Math.max(0,Math.floor(n||0));S.coins+=n;if(msg)toast(msg);else toast('+'+n+' Y');refreshUI&&refreshUI();saveSoon();}
