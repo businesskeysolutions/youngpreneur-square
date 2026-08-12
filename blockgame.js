@@ -389,7 +389,8 @@ function buildUI(){
      '<div class="bg3-tourcard" id="bg3tcard"><div class="tt"></div><div class="tb"></div>'+
        '<div class="trow"><span class="tstep"></span><span class="tbtns"><button class="tskip">Skip</button><button class="tback">Back</button><button class="tnext">Next</button></span></div></div></div>'+
    '<div class="bg3-store" id="bg3store"><div class="bg3-storebar"><button class="bg3-back" id="bg3exit">‹ Back to street</button><div class="bg3-storetitle" id="bg3storetitle"></div></div>'+
-     '<div class="bg3-servehud"><div class="bg3-servehint">🛎️ Tap customers to serve them!</div><div class="bg3-servecount">Served today <b id="bg3served">0</b></div><button class="bg3-mbtn" id="bg3manage">⚙ Manage</button></div></div>'+
+     '<div class="bg3-combo" id="bg3combo"></div>'+
+     '<div class="bg3-servehud"><div class="bg3-servehint">🛎️ Tap to serve — keep the line moving for combos!</div><div class="bg3-servecount">Served today <b id="bg3served">0</b></div><button class="bg3-mbtn" id="bg3manage">⚙ Manage</button></div></div>'+
    '<div class="bg3-fade" id="bg3fade"></div>';
   host.innerHTML='';host.appendChild(wrap);
   ui.wrap=wrap;ui.canvaswrap=wrap.querySelector('.bg3-canvaswrap');
@@ -401,7 +402,7 @@ function buildUI(){
   ui.event.onclick=openEvent;
   ui.canvaswrap.appendChild(cv);
   ui.tour=wrap.querySelector('#bg3tour');ui.tourSpot=wrap.querySelector('#bg3spot');ui.tourCard=wrap.querySelector('#bg3tcard');
-  ui.store=wrap.querySelector('#bg3store');ui.storeTitle=wrap.querySelector('#bg3storetitle');ui.served=wrap.querySelector('#bg3served');ui.fade=wrap.querySelector('#bg3fade');
+  ui.store=wrap.querySelector('#bg3store');ui.storeTitle=wrap.querySelector('#bg3storetitle');ui.served=wrap.querySelector('#bg3served');ui.combo=wrap.querySelector('#bg3combo');ui.fade=wrap.querySelector('#bg3fade');
   wrap.querySelector('#bg3exit').onclick=exitStore;
   wrap.querySelector('#bg3manage').onclick=()=>{if(insideRec)openStoreManage(insideRec);};
   ui.goalsBadge=wrap.querySelector('#bg3goalsbadge');ui.spinBtn=wrap.querySelector('#bg3spin');
@@ -530,6 +531,11 @@ function injectCSS(){ if(document.getElementById('bg3css'))return;const s=docume
 .bg3-link{width:100%;background:none;border:none;color:#9AA79A;font-size:12px;font-weight:700;cursor:pointer;padding:7px 0 2px;text-align:center}
 .bg3-float{position:absolute;z-index:9;pointer-events:none;color:#7ad03a;font-weight:800;font-size:18px;text-shadow:0 1px 3px rgba(0,0,0,.6);transform:translate(-50%,0);transition:transform .8s ease-out,opacity .8s ease-out}
 .bg3-inside .bg3-travel{display:none}
+.bg3-heart{position:absolute;z-index:9;pointer-events:none;font-size:18px;transform:translate(-50%,0);transition:transform .7s ease-out,opacity .7s ease-out}
+.bg3-combo{position:absolute;left:50%;top:38%;transform:translate(-50%,-50%) scale(.6);z-index:10;pointer-events:none;font-family:Georgia,serif;font-weight:800;font-size:30px;color:#fff;text-shadow:0 2px 0 #E3242B,0 3px 8px rgba(0,0,0,.6);opacity:0;transition:opacity .2s}
+.bg3-combo.on{opacity:1}
+.bg3-combo.pop{animation:bg3combopop .5s ease-out}
+@keyframes bg3combopop{0%{transform:translate(-50%,-50%) scale(.5) rotate(-6deg)}50%{transform:translate(-50%,-50%) scale(1.25) rotate(3deg)}100%{transform:translate(-50%,-50%) scale(1) rotate(0)}}
 .bg3-dchip{position:relative;cursor:pointer;padding:6px 11px;font-size:16px}
 .bg3-badge{position:absolute;top:-5px;right:-5px;min-width:17px;height:17px;padding:0 4px;background:#E3242B;color:#fff;border-radius:9px;font-size:11px;font-weight:800;display:none;align-items:center;justify-content:center;border:1.5px solid #fffdf6}
 #bg3spin.avail{animation:bg3pulse2 1.3s ease-in-out infinite}
@@ -700,8 +706,8 @@ function enterStore(rec){if(insideRec)return;fade(()=>{insideRec=rec;themeInteri
 function exitStore(){if(!insideRec)return;fade(()=>{stopServing();insideRec=null;interiorGroup.visible=false;clearGroup(interiorGroup);intClickable.length=0;if(ui.store)ui.store.classList.remove('on');ui.wrap.classList.remove('bg3-inside');updateCam();});}
 
 /* ---- active customer-serving loop: the shop is a place you play ---- */
-const QUEUE_MAX=5, PATIENCE=13, SERVE_Z=-1.7, DOOR_Z=4.6;
-let queue=[], leaving=[], projectiles=[], spawnT=0, servingRec=null;
+const QUEUE_MAX=6, PATIENCE=10, COMBO_WINDOW=3500, SERVE_Z=-1.7, DOOR_Z=4.6;
+let queue=[], leaving=[], projectiles=[], spawnT=0, servingRec=null, combo=0, comboT=0, patSprite=null, patAcc=0, comboHideT=null;
 function slotPos(i){return {x:-0.4, z:SERVE_Z+i*1.3};}
 function saleValue(lot){return Math.max(3,Math.round(grossPerMin(lot)*condMult(lot)*eventMult(lot)*1.5*eventPerk()));}
 function makeWantBubble(emoji){const c=document.createElement('canvas');c.width=96;c.height=112;const x=c.getContext('2d');x.clearRect(0,0,96,112);
@@ -709,8 +715,13 @@ function makeWantBubble(emoji){const c=document.createElement('canvas');c.width=
   x.fillStyle='rgba(255,253,246,.97)';x.beginPath();x.moveTo(40,68);x.lineTo(58,68);x.lineTo(46,86);x.closePath();x.fill();
   x.font='42px serif';x.textAlign='center';x.textBaseline='middle';x.fillText(emoji,48,38);
   const tx=new THREE.CanvasTexture(c);const m=new THREE.SpriteMaterial({map:tx,transparent:true,depthTest:false});const s=new THREE.Sprite(m);s.scale.set(1.5,1.75,1);return s;}
-function startServing(rec){stopServing();servingRec=rec;spawnT=1.6;refreshServeHUD();spawnCustomer();spawnCustomer();}
-function stopServing(){queue=[];leaving=[];projectiles=[];servingRec=null;}
+function makePatienceBar(){const c=document.createElement('canvas');c.width=100;c.height=18;const s=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),transparent:true,depthTest:false}));s.userData.canvas=c;s.scale.set(1.6,0.29,1);s.visible=false;return s;}
+function drawPatience(spr,frac){const c=spr.userData.canvas,x=c.getContext('2d');x.clearRect(0,0,100,18);
+  x.fillStyle='rgba(0,0,0,.5)';rr(x,1,1,98,16,8);x.fill();
+  const col=frac>0.5?'#7ad03a':frac>0.25?'#E6C020':'#ff5a4a',w=Math.max(4,Math.round(96*frac));x.fillStyle=col;rr(x,2,2,w,14,7);x.fill();
+  spr.material.map.needsUpdate=true;}
+function startServing(rec){stopServing();servingRec=rec;spawnT=0.8;combo=0;comboT=0;refreshServeHUD();patSprite=makePatienceBar();interiorGroup.add(patSprite);spawnCustomer();spawnCustomer();spawnCustomer();}
+function stopServing(){queue=[];leaving=[];projectiles=[];servingRec=null;patSprite=null;combo=0;if(ui.combo)ui.combo.classList.remove('on');}
 function spawnCustomer(){const rec=servingRec;if(!rec)return;const lot=lotOf(rec);if(lot.broke||queue.length>=QUEUE_MAX)return;
   const seed=(Math.floor(performance.now()/97)+queue.length)%SHIRTS.length;
   const p=makePerson(seed);const slot=queue.length;const sp=slotPos(slot);
@@ -720,27 +731,40 @@ function spawnCustomer(){const rec=servingRec;if(!rec)return;const lot=lotOf(rec
   queue.push(cust);intClickable.push(p);intClickable.push(want);}
 function serveFront(){const rec=servingRec;if(!rec)return;const lot=lotOf(rec);if(lot.broke){toast('🔧 Repair the equipment to serve');return;}
   const front=queue[0];if(!front||front.state==='leaving')return;
-  const val=saleValue(lot);S.coins+=val;S.earnedToday=(S.earnedToday||0)+val;S.servedToday=(S.servedToday||0)+1;gainXP(1);
-  flyCoins(front.mesh);floatText(front.mesh,'+'+val+' Y');flyProduct(TYPES[lot.type].emoji,front.mesh);
+  const now=performance.now();
+  combo=(now-comboT<COMBO_WINDOW)?combo+1:1;comboT=now;
+  const cmult=1+Math.min(combo-1,5)*0.2;                 // x1 → x2 for a 6-chain
+  const base=saleValue(lot);
+  const frac=Math.max(0,Math.min(1,front.t/PATIENCE));
+  const tip=Math.round(base*0.7*frac);                   // serve fast → bigger tip
+  const total=Math.round((base+tip)*cmult);
+  S.coins+=total;S.earnedToday=(S.earnedToday||0)+total;S.servedToday=(S.servedToday||0)+1;gainXP(1);
+  flyCoins(front.mesh);floatText(front.mesh,'+'+total+' Y'+(tip>0?' 💛':''),'#8ede4a');
+  flyProduct(TYPES[lot.type].emoji,front.mesh);popHearts(front.mesh);if(combo>=2)showCombo(combo);
   front.state='leaving';if(front.want)front.want.visible=false;
   queue.shift();leaving.push(front);queue.forEach((c,i)=>c.slot=i);
   addEventPoints(1);refreshServeHUD();refreshUI();saveSoon();refreshDailyBadges();}
-function floatText(fromMesh,txt){if(!ui.wrap||!fromMesh)return;const p=worldToScreen(fromMesh);const d=document.createElement('div');d.className='bg3-float';d.textContent=txt;d.style.left=p.x+'px';d.style.top=(p.y-30)+'px';ui.wrap.appendChild(d);
+function showCombo(n){if(!ui.combo)return;ui.combo.textContent='🔥 '+n+'× COMBO!';ui.combo.classList.remove('pop');void ui.combo.offsetWidth;ui.combo.classList.add('on','pop');clearTimeout(comboHideT);comboHideT=setTimeout(()=>ui.combo.classList.remove('on'),1400);}
+function popHearts(mesh){if(!ui.wrap||!mesh)return;const p=worldToScreen(mesh);for(let i=0;i<2;i++){const d=document.createElement('div');d.className='bg3-heart';d.textContent=i?'⭐':'💛';d.style.left=(p.x+(i?14:-14))+'px';d.style.top=(p.y-42)+'px';ui.wrap.appendChild(d);requestAnimationFrame(()=>{d.style.transform='translate(-50%,-42px)';d.style.opacity='0';});setTimeout(()=>d.remove(),720);}}
+function floatText(fromMesh,txt,color){if(!ui.wrap||!fromMesh)return;const p=worldToScreen(fromMesh);const d=document.createElement('div');d.className='bg3-float';d.textContent=txt;d.style.color=color||'#7ad03a';d.style.left=p.x+'px';d.style.top=(p.y-30)+'px';ui.wrap.appendChild(d);
   requestAnimationFrame(()=>{d.style.transform='translate(-50%,-46px)';d.style.opacity='0';});setTimeout(()=>d.remove(),820);}
 function flyProduct(emoji,toMesh){if(!toMesh)return;const m=new THREE.SpriteMaterial({map:emojiTex(emoji),transparent:true,depthTest:false});const s=new THREE.Sprite(m);s.scale.set(0.9,0.9,1);
   s.position.set(0,2.2,-3.2);interiorGroup.add(s);const to=toMesh.position.clone();to.y=1.6;projectiles.push({spr:s,from:s.position.clone(),to:to,t:0});}
 function removeMesh(mesh){if(mesh&&mesh.parent)mesh.parent.remove(mesh);const i=intClickable.indexOf(mesh);if(i>=0)intClickable.splice(i,1);}
 function tickServing(dt){const rec=servingRec;if(!rec)return;const lot=lotOf(rec);const now=performance.now();
-  if(!lot.broke){spawnT-=dt;const interval=(eventMult(lot)>1?1.5:3.3);if(spawnT<=0){spawnCustomer();spawnT=interval;}}
+  if(combo>0&&now-comboT>COMBO_WINDOW)combo=0; // combo cools off if you stop serving
+  if(!lot.broke){spawnT-=dt;const interval=(eventMult(lot)>1?1.1:1.9);if(spawnT<=0){spawnCustomer();spawnT=interval;}}
   for(let i=0;i<queue.length;i++){const c=queue[i];const sp=slotPos(c.slot);
     const dx=sp.x-c.mesh.position.x,dz=sp.z-c.mesh.position.z,d=Math.hypot(dx,dz);
-    if(d>0.06){const step=Math.min(3.4*dt,d);c.mesh.position.x+=dx/d*step;c.mesh.position.z+=dz/d*step;if(c.state!=='waiting')c.state='walking';}
+    if(d>0.06){const step=Math.min(3.6*dt,d);c.mesh.position.x+=dx/d*step;c.mesh.position.z+=dz/d*step;if(c.state!=='waiting')c.state='walking';}
     else if(c.state!=='waiting'){c.state='waiting';}
     c.mesh.position.y=(c.state==='walking')?Math.abs(Math.sin(now/130+i))*0.05:0;
     if(c.want){c.want.position.set(c.mesh.position.x,2.25+Math.sin(now/300+i)*0.06,c.mesh.position.z);c.want.visible=(c.state!=='leaving');}
-    if(i===0&&c.state==='waiting'){c.t-=dt;if(c.t<=0){if(c.want)c.want.visible=false;queue.shift();leaving.push(c);queue.forEach((q,j)=>q.slot=j);}}
+    if(i===0&&c.state==='waiting'){c.t-=dt;if(c.t<=0){combo=0;if(ui.combo)ui.combo.classList.remove('on');if(c.want)c.want.visible=false;queue.shift();leaving.push(c);queue.forEach((q,j)=>q.slot=j);}}
   }
-  for(let k=leaving.length-1;k>=0;k--){const c=leaving[k];c.mesh.rotation.y=0;c.mesh.position.z+=4.2*dt;if(c.want)c.want.visible=false;
+  // patience bar over the front customer
+  if(patSprite){const f=queue[0];if(f&&f.state==='waiting'){patSprite.visible=true;patSprite.position.set(f.mesh.position.x,2.98,f.mesh.position.z);patAcc+=dt;if(patAcc>0.12){patAcc=0;drawPatience(patSprite,Math.max(0,f.t/PATIENCE));}}else patSprite.visible=false;}
+  for(let k=leaving.length-1;k>=0;k--){const c=leaving[k];c.mesh.rotation.y=0;c.mesh.position.z+=4.4*dt;if(c.want)c.want.visible=false;
     if(c.mesh.position.z>DOOR_Z+1.5){removeMesh(c.mesh);if(c.want)removeMesh(c.want);leaving.splice(k,1);}}
   for(let k=projectiles.length-1;k>=0;k--){const pr=projectiles[k];pr.t+=dt*3.2;const u=Math.min(1,pr.t);
     pr.spr.position.lerpVectors(pr.from,pr.to,u);pr.spr.position.y+=Math.sin(u*Math.PI)*0.7;
