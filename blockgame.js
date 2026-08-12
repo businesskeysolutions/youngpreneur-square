@@ -90,6 +90,7 @@ function makeDistrict(i,seed){const n=districtLots(i);const lots=[];for(let k=0;
 function fresh(){return {v:3,coins:120,xp:0,level:1,streak:0,lastDay:'',tut:0,
   visited:{day:'',refs:{}},tokens:{},pid:uuid(),pname:'',district:0,
   lastSeen:0,spinDay:'',goals:null,servedToday:0,collectsToday:0,earnedToday:0,
+  cityName:'',decor:{planters:false,lights:false,banner:false,fountain:false},collected:['bakery'],collectClaimed:false,
   raid:{tickets:RAID_MAX_TICKETS,ticketsT:Date.now(),cd:{},shieldUntil:0,wins:0,losses:0},
   districts:[makeDistrict(0,true)]};}
 let S=fresh();
@@ -102,6 +103,8 @@ function load(){try{const raw=localStorage.getItem(LS);if(raw){const o=JSON.pars
   if(typeof S.district!=='number'||S.district<0||S.district>=S.districts.length)S.district=0;
   if(!S.raid)S.raid={tickets:RAID_MAX_TICKETS,ticketsT:Date.now(),cd:{},shieldUntil:0,wins:0,losses:0};
   if(!S.raid.cd)S.raid.cd={};
+  if(!S.decor)S.decor={planters:false,lights:false,banner:false,fountain:false};
+  if(!S.collected)S.collected=[];eachLot(l=>{if(l.built&&l.type&&S.collected.indexOf(l.type)<0)S.collected.push(l.type);});
   // clear stale timed events from a previous session
   eachLot(l=>{if(l.ev&&(l.ev.until||0)<Date.now())l.ev=null;});
   if((S.lucky||0)<Date.now())S.lucky=0;
@@ -225,6 +228,26 @@ function buildDistrict(i){
     const rec={group:g,d:i,i:k,building:null,coin:null,coinBaseY:8};
     plots.push(rec);renderPlot(rec);
   }
+  makeDecorations(dg,baseW);
+}
+function makeDecorations(dg,baseW){const D=S.decor||{};
+  if(D.planters){for(let k=0;k<3;k++){const px=-baseW/2+3.5+k*(baseW-7)/2;
+    dg.add(mesh(new THREE.BoxGeometry(1.3,0.5,0.5),std({color:0x8a5a30,roughness:.9}),px,0.2,5.5));
+    for(let f=0;f<3;f++){const col=[0xE05aa0,0xE3242B,0xE6A020,0x8a5aff,0xffffff][(k*3+f)%5];
+      dg.add(mesh(new THREE.CylinderGeometry(.03,.03,.22,5),std({color:0x2f7a1a}),px-0.32+f*0.32,0.55,5.5));
+      dg.add(mesh(new THREE.SphereGeometry(.13,8,8),std({color:col}),px-0.32+f*0.32,0.68,5.5));}}}
+  if(D.lights){const cols=[0xE3242B,0xE6C020,0x2f9e57,0x37A6C9,0xE05aa0];for(let k=0;k<12;k++){const lx=-baseW/2+1+k*(baseW-2)/11;const sag=Math.sin(k/11*Math.PI)*0.5;
+    const b=mesh(new THREE.SphereGeometry(0.16,8,8),std({color:cols[k%5],emissive:cols[k%5],emissiveIntensity:1}),lx,6.5-sag,4.7);dg.add(b);emisMats.push(b.material);}}
+  if(D.fountain){const fx=baseW/2-2.6;
+    dg.add(mesh(new THREE.CylinderGeometry(1.1,1.3,0.5,16),std({color:0x8a8478}),fx,0.25,6.2));
+    dg.add(mesh(new THREE.CylinderGeometry(0.9,0.9,0.14,16),std({color:0x6fc0e0,emissive:0x2a6a9a,emissiveIntensity:.35,transparent:true,opacity:.85}),fx,0.55,6.2));
+    dg.add(mesh(new THREE.CylinderGeometry(0.4,0.55,0.8,12),std({color:0x9a948a}),fx,0.8,6.2));
+    dg.add(mesh(new THREE.SphereGeometry(0.22,10,10),std({color:0x9fdcff,emissive:0x5fbfff,emissiveIntensity:.5}),fx,1.35,6.2));}
+  if(D.banner){const nm=(S.cityName||'MY BLOCK').toUpperCase();const c=document.createElement('canvas');c.width=512;c.height=104;const x=c.getContext('2d');
+    x.fillStyle='#B0122a';rr(x,4,4,504,96,12);x.fill();x.strokeStyle='#F4E3A6';x.lineWidth=6;rr(x,4,4,504,96,12);x.stroke();
+    x.fillStyle='#fff7d8';x.font='800 46px Georgia';x.textAlign='center';x.textBaseline='middle';x.fillText(nm,256,54);
+    const t=new THREE.CanvasTexture(c);const m=std({map:t,emissiveMap:t,emissive:0xffffff,emissiveIntensity:.5,transparent:true});
+    dg.add(mesh(new THREE.PlaneGeometry(baseW*0.78,baseW*0.78*104/512),m,0,7.7,3.2));emisMats.push(m);}
 }
 function districtSign(i){const c=document.createElement('canvas');c.width=256;c.height=96;const x=c.getContext('2d');
   x.fillStyle='#0c120e';rr(x,4,4,248,88,12);x.fill();x.strokeStyle=districtAccent(i);x.lineWidth=6;rr(x,4,4,248,88,12);x.stroke();
@@ -350,6 +373,7 @@ function buildUI(){
      '<button class="bg3-chip" id="bg3rivals" style="cursor:pointer" title="Rivals & raids">🏆 <b id="bg3rank">#1</b></button>'+
      '<button class="bg3-chip bg3-dchip" id="bg3goals" title="Daily goals">🎯<span class="bg3-badge" id="bg3goalsbadge">0</span></button>'+
      '<button class="bg3-chip bg3-dchip" id="bg3spin" title="Daily spin">🎡</button>'+
+     '<button class="bg3-chip bg3-dchip" id="bg3myblock" title="My city">🎨</button>'+
      '<div class="bg3-lvl"><div class="bg3-lvlrow"><span id="bg3lvl">Lvl 1</span><span id="bg3xp">0/50 XP</span></div><div class="bg3-bar"><i id="bg3xpbar"></i></div></div>'+
      '<button class="bg3-icon" id="bg3help" title="How to play">?</button>'+
      '<button class="bg3-icon" id="bg3fs" title="Fullscreen">⤢</button>'+
@@ -382,6 +406,7 @@ function buildUI(){
   wrap.querySelector('#bg3rivals').onclick=openRivals;
   wrap.querySelector('#bg3goals').onclick=openGoals;
   wrap.querySelector('#bg3spin').onclick=openSpin;
+  wrap.querySelector('#bg3myblock').onclick=openMyBlock;
   wrap.querySelector('#bg3help').onclick=startTour;
   ui.tourCard.querySelector('.tnext').onclick=()=>tourStep(tourIdx+1);
   ui.tourCard.querySelector('.tback').onclick=()=>tourStep(tourIdx-1);
@@ -507,6 +532,17 @@ function injectCSS(){ if(document.getElementById('bg3css'))return;const s=docume
 .bg3-wheel{position:absolute;inset:0;border-radius:50%;border:5px solid #fffdf6;box-shadow:0 8px 24px rgba(0,0,0,.5),inset 0 0 0 3px rgba(0,0,0,.2);transform:rotate(0deg)}
 .bg3-wlabel{position:absolute;left:50%;top:50%;font-size:12px;font-weight:800;color:#14231a;text-shadow:0 1px 1px rgba(255,255,255,.4);white-space:nowrap}
 .bg3-wpin{position:absolute;top:-10px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:11px solid transparent;border-right:11px solid transparent;border-top:20px solid #fffdf6;z-index:3;filter:drop-shadow(0 2px 2px rgba(0,0,0,.5))}
+.bg3-sec{font-size:12px;font-weight:800;color:#9AA79A;text-transform:uppercase;letter-spacing:.03em;margin:12px 0 7px;overflow:hidden}
+.bg3-decor{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.bg3-dcell{background:rgba(255,255,255,.05);border:1px solid rgba(227,192,90,.25);border-radius:12px;padding:9px;text-align:center}
+.bg3-dcell.owned{border-color:rgba(122,208,58,.5);background:rgba(122,208,58,.08)}
+.bg3-dcell .e{font-size:24px}.bg3-dcell .n{font-size:11.5px;color:#cdd6cd;margin:3px 0 6px}
+.bg3-dbuy{background:linear-gradient(180deg,#F4D06A,#C89A34);color:#3a2a06;border:none;border-radius:8px;padding:5px 12px;font-weight:800;font-size:12px;cursor:pointer;box-shadow:0 2px 0 #8a6a2a}
+.bg3-dbuy:disabled{filter:grayscale(.6);opacity:.55;cursor:not-allowed}
+.bg3-dcell .own{color:#7ad03a;font-weight:800;font-size:12px}
+.bg3-collect{display:grid;grid-template-columns:repeat(8,1fr);gap:6px}
+.bg3-ccell{aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:20px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:10px;opacity:.5}
+.bg3-ccell.got{opacity:1;background:rgba(227,192,90,.15);border-color:rgba(227,192,90,.45)}
 .bg3-fade{position:absolute;inset:0;z-index:30;background:#0a0f0c;opacity:0;pointer-events:none;transition:opacity .24s ease}
 .bg3-fade.on{opacity:1}
 `;document.head.appendChild(s);}
@@ -585,7 +621,9 @@ function openBuild(rec){const idx=rec.i;const next=nextUnlockIndex(rec.d);
     const can=S.coins>=cost;btn.disabled=!can;btn.textContent=can?('Build '+TYPES[sel].name+' · Y '+cost):('Need Y '+cost);});
   btn.onclick=()=>{if(!sel||S.coins<cost)return;S.coins-=cost;const t=TYPES[sel];lotBuild(rec,sel);toast('Opened '+t.name+'!');closeModal();refreshUI();saveSoon();updateDistrictUI();};
 }
-function lotBuild(rec,type){const lot=lotOf(rec);lot.built=true;lot.unlocked=true;lot.type=type;lot.name=TYPES[type].name;lot.lvl=1;lot.stock=0;lot.t=Date.now();lot.cond=100;lot.broke=false;lot.rev=0;lot.exp=0;renderPlot(rec);applyMode(mode);}
+function lotBuild(rec,type){const lot=lotOf(rec);lot.built=true;lot.unlocked=true;lot.type=type;lot.name=TYPES[type].name;lot.lvl=1;lot.stock=0;lot.t=Date.now();lot.cond=100;lot.broke=false;lot.rev=0;lot.exp=0;
+  if(!S.collected)S.collected=[];if(S.collected.indexOf(type)<0){S.collected.push(type);toast('🎉 New shop collected: '+TYPES[type].name+'!');}
+  renderPlot(rec);applyMode(mode);}
 /* ---- inside the store: 3D interior + docked management panel ---- */
 function storeTopHTML(rec){const lot=lotOf(rec);const em=eventMult(lot);
   const gMin=grossPerMin(lot)*condMult(lot)*em, netMin=Math.max(0,gMin-gMin*SUPPLY_RATE-(gMin>0?rentPerMin(lot):0));
@@ -900,6 +938,28 @@ function welcomeBack(){const now=Date.now();const away=now-(S.lastSeen||now);S.l
   openModal(h);
   const ca=ui.modalbody.querySelector('#bg3colall');if(ca)ca.onclick=()=>{collectAll();closeModal();};
   const ok=ui.modalbody.querySelector('#bg3okb');if(ok)ok.onclick=closeModal;}
+
+/* ---------------- make it yours: name, decorate, collect ---------------- */
+const DECOR=[{key:'planters',name:'Flower planters',emoji:'🌷',cost:150},{key:'lights',name:'String lights',emoji:'✨',cost:400},{key:'banner',name:'Welcome banner',emoji:'🎊',cost:500},{key:'fountain',name:'Fountain',emoji:'⛲',cost:900}];
+const BADNAME=/(f+u+c+k|sh[i1]t|b[i1]tch|cunt|d[i1]ck|p[o0]rn|\bsex\b|nazi|rape|penis|vagina)/i;
+function ensureCollected(){if(!S.collected)S.collected=[];eachLot(l=>{if(l.built&&l.type&&S.collected.indexOf(l.type)<0)S.collected.push(l.type);});}
+function openMyBlock(){ensureCollected();const have=S.collected||[];const nm=(S.cityName||'').replace(/"/g,'&quot;');
+  let h='<h3>🎨 My City</h3><p>Make your block yours — name it, decorate it, and collect every shop.</p>';
+  h+='<div style="display:flex;gap:6px;margin:2px 0 12px"><input id="bg3cname" maxlength="18" placeholder="Name your city…" value="'+nm+'" style="flex:1;background:rgba(255,255,255,.08);border:1px solid rgba(227,192,90,.4);border-radius:9px;color:#F5F1E6;padding:9px 11px;font-size:14px"><button class="bg3-btn" id="bg3savename" style="width:auto;margin:0;padding:9px 15px">Save</button></div>';
+  h+='<div class="bg3-sec">Decorate your block</div><div class="bg3-decor">';
+  DECOR.forEach(d=>{const owned=S.decor&&S.decor[d.key];h+='<div class="bg3-dcell'+(owned?' owned':'')+'"><div class="e">'+d.emoji+'</div><div class="n">'+d.name+'</div>'+(owned?'<div class="own">✓ Placed</div>':'<button class="bg3-dbuy" data-k="'+d.key+'" '+(S.coins>=d.cost?'':'disabled')+'>Y '+d.cost+'</button>')+'</div>';});
+  h+='</div>';
+  h+='<div class="bg3-sec">Shop collection <b style="color:#E3C05A;float:right">'+have.length+' / '+TYPE_ORDER.length+'</b></div><div class="bg3-collect">';
+  TYPE_ORDER.forEach(k=>{const t=TYPES[k];const got=have.indexOf(k)>=0;h+='<div class="bg3-ccell'+(got?' got':'')+'" title="'+t.name+'">'+(got?t.emoji:'❔')+'</div>';});
+  h+='</div>';
+  const allShops=have.length>=TYPE_ORDER.length;
+  if(allShops&&!S.collectClaimed)h+='<button class="bg3-btn" id="bg3colreward">🏆 Collection complete! Claim +1000 Y</button>';
+  else if(allShops)h+='<p style="text-align:center;color:#7ad03a;font-size:13px;font-weight:700;margin-top:8px">🏆 Full collection — nice work!</p>';
+  openModal(h);
+  const sv=ui.modalbody.querySelector('#bg3savename');if(sv)sv.onclick=()=>{const v=(ui.modalbody.querySelector('#bg3cname').value||'').trim().slice(0,18);if(v&&BADNAME.test(v)){toast('Please pick a friendlier name');return;}S.cityName=v;toast('City name saved!');if(S.decor&&S.decor.banner){buildCity();applyMode(mode);}saveSoon();};
+  ui.modalbody.querySelectorAll('.bg3-dbuy').forEach(b=>b.onclick=()=>{const k=b.getAttribute('data-k');const d=DECOR.find(z=>z.key===k);if(!d||S.coins<d.cost)return;S.coins-=d.cost;S.decor=S.decor||{};S.decor[k]=true;toast(d.emoji+' '+d.name+' placed!');buildCity();applyMode(mode);refreshUI();saveSoon();openMyBlock();});
+  const cr=ui.modalbody.querySelector('#bg3colreward');if(cr)cr.onclick=()=>{S.coins+=1000;S.collectClaimed=true;confettiBurst();toast('🏆 Collection reward! +1000 Y');refreshUI();saveSoon();openMyBlock();};
+}
 
 /* ---------------- loop ---------------- */
 let last=performance.now(),coinAcc=0;
