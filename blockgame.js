@@ -43,7 +43,7 @@ const RIVALS=[
 const RAID_MAX_TICKETS=5, RAID_REFILL=25*60*1000, RAID_CD=45*60*1000;
 const SHIELD_COST=120, SHIELD_DUR=60*60*1000;
 function hash01(str){let h=2166136261;for(let i=0;i<str.length;i++){h^=str.charCodeAt(i);h=Math.imul(h,16777619);}return ((h>>>0)%100000)/100000;}
-function playerWorth(){let w=Math.floor(S.coins||0);eachLot(l=>{if(l.built)w+=140+(l.lvl||1)*80;});w+=(S.districts.length-1)*900+ (S.level||1)*120;return w;}
+function playerWorth(){let w=Math.floor(S.coins||0);eachLot(l=>{if(l.built)w+=140+(l.lvl||1)*80;});w+=(S.districts.length-1)*900+ (S.level||1)*120;if(typeof lifestyleWorth==='function')w+=lifestyleWorth();return w;}
 function rivalWorth(r){const pw=Math.max(300,playerWorth());const j=0.86+0.22*hash01(r.id+todayStr());
   // base lead early (something to chase) that fades so a committed player can climb to #1
   return Math.round(r.mult*(1600+0.5*pw)*j);}
@@ -92,6 +92,8 @@ function fresh(){return {v:3,coins:120,xp:0,level:1,streak:0,lastDay:'',tut:0,
   lastSeen:0,spinDay:'',goals:null,servedToday:0,collectsToday:0,earnedToday:0,
   cityName:'',decor:{planters:false,lights:false,banner:false,fountain:false},collected:['bakery'],collectClaimed:false,rank:0,event:null,
   spins:30,spinsT:0,stickers:{},stickerClaimed:false,journey:{ch:0},servedTotal:0,
+  insuredUntil:0,newsSeen:false,newsLast:'',
+  lifestyle:{home:0,ride:0,gear:0},mission:null,missionsDone:0,squareSeen:false,
   raid:{tickets:RAID_MAX_TICKETS,ticketsT:Date.now(),cd:{},shieldUntil:0,wins:0,losses:0},
   districts:[makeDistrict(0,true)]};}
 let S=fresh();
@@ -379,6 +381,8 @@ function buildUI(){
      '<button class="bg3-chip bg3-dchip" id="bg3spin" title="Daily spin">🎡</button>'+
      '<button class="bg3-chip bg3-dchip" id="bg3slots" title="Lucky Slots">🎰<b id="bg3energy" style="margin-left:2px;font-size:12px">30</b></button>'+
      '<button class="bg3-chip bg3-dchip" id="bg3myblock" title="My city">🎨</button>'+
+     '<button class="bg3-chip bg3-dchip" id="bg3life" title="Your lifestyle">🏡</button>'+
+     '<button class="bg3-chip bg3-dchip" id="bg3jobs" title="Jobs on the Square">📋<span class="bg3-badge" id="bg3jobsbadge">!</span></button>'+
      '<div class="bg3-lvl"><div class="bg3-lvlrow"><span id="bg3lvl">Lvl 1</span><span id="bg3xp">0/50 XP</span></div><div class="bg3-bar"><i id="bg3xpbar"></i></div></div>'+
      '<button class="bg3-icon" id="bg3help" title="How to play">?</button>'+
      '<button class="bg3-icon" id="bg3fs" title="Fullscreen">⤢</button>'+
@@ -388,6 +392,7 @@ function buildUI(){
      '<button class="bg3-nav" id="bg3next" title="Next district">›</button></div>'+
    '<button class="bg3-event" id="bg3event"><b>🎪 Event</b><i>ends —</i></button>'+
    '<div class="bg3-lucky" id="bg3lucky"><b>✨ ×2</b></div>'+
+   '<div class="bg3-sqe" id="bg3sqe"></div>'+
    '<div class="bg3-toast" id="bg3toast"></div>'+
    '<div class="bg3-modal" id="bg3modal"><div class="bg3-box"><button class="bg3-x" id="bg3x">✕</button><div id="bg3modalbody"></div></div></div>'+
    '<div class="bg3-tour" id="bg3tour"><div class="bg3-spot" id="bg3spot"></div>'+
@@ -418,6 +423,9 @@ function buildUI(){
   wrap.querySelector('#bg3spin').onclick=openSpin;
   wrap.querySelector('#bg3slots').onclick=openSlots;
   wrap.querySelector('#bg3myblock').onclick=openMyBlock;
+  wrap.querySelector('#bg3life').onclick=openLifestyle;
+  wrap.querySelector('#bg3jobs').onclick=openMissions;
+  ui.jobsBadge=wrap.querySelector('#bg3jobsbadge');ui.sqe=wrap.querySelector('#bg3sqe');
   wrap.querySelector('#bg3help').onclick=startTour;
   ui.tourCard.querySelector('.tnext').onclick=()=>tourStep(tourIdx+1);
   ui.tourCard.querySelector('.tback').onclick=()=>tourStep(tourIdx-1);
@@ -613,6 +621,7 @@ function refreshUI(){
   if(ui.rank){const pw=playerWorth();let above=0;RIVALS.forEach(r=>{if(rivalWorth(r)>pw)above++;});ui.rank.textContent='#'+(above+1);}
   if(typeof checkRank==='function')checkRank();
   if(typeof refreshDailyBadges==='function')refreshDailyBadges();
+  if(typeof refreshExtras==='function')refreshExtras();
 }
 let toastT;
 function toast(msg){ui.toast.textContent=msg;ui.toast.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>ui.toast.classList.remove('on'),2000);}
@@ -640,6 +649,7 @@ function tap(cx,cy){const r=cv.getBoundingClientRect();const ndc=new THREE.Vecto
   const hits=ray.intersectObjects(clickable,false);if(!hits.length)return;
   const obj=hits[0].object;let o=obj;while(o&&!(o.userData&&o.userData.rec))o=o.parent;if(!o)return;const rec=o.userData.rec;const lot=lotOf(rec);
   ensureDaily();
+  if(typeof bg3TreasureTapCheck==='function'&&bg3TreasureTapCheck(rec))return; // treasure hunt: tap the clued shop
   if(rec.d!==S.district) travelTo(rec.d); // clicked a shop in another district — go there
   if(!lot.built){ openBuild(rec); return; }
   // tap an event bubble: rush -> collect the boosted earnings; tip/restock -> claim the bonus
@@ -1174,6 +1184,210 @@ function openMyBlock(){ensureCollected();const have=S.collected||[];const nm=(S.
   const cr=ui.modalbody.querySelector('#bg3colreward');if(cr)cr.onclick=()=>{S.coins+=1000;S.collectClaimed=true;confettiBurst();toast('🏆 Collection reward! +1000 Y');refreshUI();saveSoon();openMyBlock();};
 }
 
+/* ---------------- Word on the Square: choice-driven random events ---------------- */
+/* Surprises (viral / investor / celebrity) and emergencies with real trade-offs
+   (fridge breaks, rent due, bad review, competitor, insurance, taxes). Layered on
+   the existing economy: nudges S.coins, lot.ev rushes, condition, XP. */
+const RED='background:linear-gradient(180deg,#d97a6a,#a8483a);color:#fff;box-shadow:0 4px 0 #7a3226,0 6px 12px rgba(0,0,0,.3)';
+const GHOST='background:linear-gradient(180deg,#4a5450,#333b38);color:#EAE6DA;box-shadow:0 4px 0 #232927,0 6px 12px rgba(0,0,0,.3)';
+function bg3BuiltLots(){const a=[];eachLot((l,di,li)=>{if(l&&l.built)a.push({l:l,di:di,li:li});});return a;}
+function bg3RandLot(){const a=bg3BuiltLots();return a.length?a[Math.floor(Math.random()*a.length)]:null;}
+function bg3BestLot(){const a=bg3BuiltLots();if(!a.length)return null;a.sort((x,y)=>grossPerMin(y.l)-grossPerMin(x.l));return a[0];}
+function bg3Eco(){const b=bg3BestLot();const g=b?grossPerMin(b.l):3;return Math.max(45,Math.round(g*6));}
+function bg3Insured(){return (S.insuredUntil||0)>Date.now();}
+function bg3Rush(l,mult,ms){l.ev={type:'rush',mult:mult,until:Date.now()+ms};}
+function bg3Hurt(l,d){l.cond=Math.max(0,condOf(l)-d);}
+function bg3Nm(t){return t?(t.l.name||TYPES[t.l.type].name):'your shop';}
+// Render an event as a modal with 1–3 action buttons. Each action.run() does its own effects + closeModal().
+function bg3Show(ev){
+  let h='<h3>'+ev.emoji+' '+ev.title+'</h3>';
+  h+='<p style="margin-top:-2px">'+ev.body+'</p>';
+  if(ev.sub)h+='<div style="font-size:11.5px;color:#9AA79A;margin:-2px 0 2px">💡 '+ev.sub+'</div>';
+  ev.actions.forEach((a,i)=>{h+='<button class="bg3-btn" data-ni="'+i+'"'+(a.dis?' disabled':'')+(a.style?(' style="'+a.style+'"'):'')+'>'+a.label+'</button>';});
+  openModal(h);
+  ev.actions.forEach((a,i)=>{if(a.dis)return;const b=ui.modalbody.querySelector('[data-ni="'+i+'"]');if(b)b.onclick=()=>{try{a.run();}catch(e){}refreshUI();saveSoon();};});
+}
+// The event pool. Each factory returns an ev object given a scaling unit `u`.
+function bg3NewsPool(u){
+  const best=bg3BestLot(),rnd=bg3RandLot();
+  const P=[];
+  // ---- good surprises ----
+  P.push({id:'viral',w:12,good:1,make:()=>{const t=best||rnd;const nm=bg3Nm(t);return {emoji:'🔥',title:'You went viral!',body:'A clip of <b>'+nm+'</b> is blowing up online and customers are lining up.',sub:'Marketing and word-of-mouth bring more customers.',actions:[{label:'Ride the wave — sales ×3! 🚀',run:()=>{if(t)bg3Rush(t.l,3,120000);closeModal();confettiBurst();gainXP(8);toast('🔥 '+nm+' is going viral — ×3 sales!');}}]};}});
+  P.push({id:'investor',w:10,good:1,make:()=>{const amt=Math.round(u*3+playerWorth()*0.04)+60;return {emoji:'💰',title:'A surprise investor',body:'A Youngpreneur Square investor believes in your hustle and hands you a check.',sub:'Investors give money to help a business grow.',actions:[{label:'Accept +Y '+amt.toLocaleString()+' 🤝',run:()=>{S.coins+=amt;closeModal();confettiBurst();toast('🤝 Investor backed you: +'+amt+' Y!');}}]};}});
+  P.push({id:'celeb',w:9,good:1,make:()=>{const t=rnd||best;const nm=bg3Nm(t);return {emoji:'⭐',title:'A celebrity dropped by!',body:'A local star was spotted at <b>'+nm+'</b> and a crowd is forming.',sub:'Buzz brings foot traffic.',actions:[{label:'Snap a photo — sales ×2! 📸',run:()=>{if(t)bg3Rush(t.l,2,90000);closeModal();gainXP(6);confettiBurst();toast('⭐ Crowd rush at '+nm+' — ×2 sales!');}}]};}});
+  P.push({id:'bizweek',w:8,good:1,make:()=>{const amt=Math.round(u*2)+40;return {emoji:'🏆',title:'Business of the Week',body:'The Square newsletter named your block <b>Business of the Week</b>!',sub:'A good reputation pays off.',actions:[{label:'Claim +Y '+amt.toLocaleString()+' 🎉',run:()=>{S.coins+=amt;closeModal();gainXP(6);confettiBurst();toast('🏆 Business of the Week: +'+amt+' Y!');}}]};}});
+  P.push({id:'sunny',w:7,good:1,make:()=>{return {emoji:'☀️',title:'Perfect weather',body:'Blue skies over the Square — everybody\'s out shopping.',sub:'Good weather means more foot traffic.',actions:[{label:'Open the doors — block-wide ×2! 🌤️',run:()=>{bg3BuiltLots().forEach(x=>bg3Rush(x.l,2,60000));closeModal();confettiBurst();toast('☀️ Foot traffic up all over your block!');}}]};}});
+  // ---- emergencies & decisions ----
+  P.push({id:'fridge',w:10,good:0,need:1,make:()=>{const t=rnd;if(!t)return null;const nm=bg3Nm(t);const cost=Math.round(u*1.4);const acts=[];
+    if(bg3Insured()){acts.push({label:'✅ Covered by your insurance',run:()=>{closeModal();gainXP(4);toast('🛡️ Insurance covered the repair — Y 0!');}});}
+    acts.push({label:'🔧 Repair now · Y '+cost,dis:S.coins<cost,run:()=>{S.coins-=cost;closeModal();gainXP(5);toast('🔧 Fixed! '+nm+' is running again.');}});
+    acts.push({label:'🙈 Ignore it',style:RED,run:()=>{t.l.broke=true;t.l.stock=Math.floor((t.l.stock||0)*0.5);closeModal();toast('💸 '+nm+' broke down — tap it to repair.');}});
+    return {emoji:'🚨',title:'Equipment broke!',body:'The fridge at <b>'+nm+'</b> just died. Spoiled stock unless you act.',sub:'Insurance turns a big surprise cost into a small planned one.',actions:acts};}});
+  P.push({id:'rent',w:8,good:0,need:1,make:()=>{const cost=Math.round(u*1.7);const t=rnd;const nm=bg3Nm(t);return {emoji:'📅',title:'Rent is due',body:'The landlord is collecting rent on your block this month.',sub:'Rent is a fixed cost you pay whether business is busy or slow.',actions:[
+    {label:'💵 Pay rent · Y '+cost,dis:S.coins<cost,run:()=>{S.coins-=cost;closeModal();gainXP(5);toast('💵 Rent paid — you\'re in good standing.');}},
+    {label:'⏭️ Skip it this month',style:RED,run:()=>{if(t){t.l.broke=true;}closeModal();toast('⚠️ Skipped rent — '+nm+' got shut down. Tap to reopen.');}}]};}});
+  P.push({id:'review',w:8,good:0,need:1,make:()=>{const t=rnd;if(!t)return null;const nm=bg3Nm(t);const cost=Math.round(u*0.9);const jokes=['"Too much sprinkle-to-cookie ratio." — 1★','"The line was long because it\'s GOOD. Annoying." — 2★','"My kid won\'t stop asking to come back. Send help." — 3★'];const joke=jokes[Math.floor(Math.random()*jokes.length)];return {emoji:'📝',title:'A funny bad review',body:'Someone reviewed <b>'+nm+'</b>:<br><i style="color:#cbb98a">'+joke+'</i>',sub:'How you respond to feedback shapes your reputation.',actions:[
+    {label:'😊 Reply kindly (free)',run:()=>{closeModal();gainXP(5);toast('😊 You replied with class — reputation intact.');}},
+    {label:'📣 Turn it into a promo · Y '+cost,dis:S.coins<cost,run:()=>{S.coins-=cost;bg3Rush(t.l,2,80000);closeModal();confettiBurst();toast('📣 You made it a promo — sales ×2 at '+nm+'!');}},
+    {label:'🙄 Ignore it',style:GHOST,run:()=>{bg3Hurt(t.l,18);closeModal();toast('👀 Ignoring it dinged '+nm+'\'s condition.');}}]};}});
+  P.push({id:'rival',w:8,good:0,need:1,make:()=>{const t=rnd;if(!t)return null;const nm=bg3Nm(t);const cost=Math.round(u*1.1);return {emoji:'🏪',title:'A competitor moved in',body:'A copycat shop opened right next to <b>'+nm+'</b>, eyeing your customers.',sub:'Competition pushes you to give customers a reason to choose you.',actions:[
+    {label:'🎈 Run a promo · Y '+cost,dis:S.coins<cost,run:()=>{S.coins-=cost;bg3Rush(t.l,2,90000);closeModal();confettiBurst();toast('🎈 Promo pulled the crowd back — ×2 at '+nm+'!');}},
+    {label:'😴 Do nothing',style:GHOST,run:()=>{bg3Hurt(t.l,14);closeModal();toast('📉 Some regulars wandered off from '+nm+'.');}}]};}});
+  P.push({id:'insure',w:7,good:0,make:()=>{const cost=Math.round(u*1.3);const already=bg3Insured();return {emoji:'🛡️',title:'Insurance agent visits',body:already?'Your shops are already insured for today — nice and safe.':'An agent offers to insure your block against surprise breakdowns for the day.',sub:'Insurance costs a little now to avoid a big cost later.',actions:already?[{label:'👍 Great, thanks',run:()=>{closeModal();}}]:[
+    {label:'🛡️ Insure my block · Y '+cost,dis:S.coins<cost,run:()=>{S.coins-=cost;S.insuredUntil=Date.now()+24*3600*1000;closeModal();gainXP(5);toast('🛡️ Insured for the day — breakdowns are covered.');}},
+    {label:'Not right now',style:GHOST,run:()=>{closeModal();}}]};}});
+  P.push({id:'tax',w:6,good:0,make:()=>{const cost=Math.max(20,Math.round((S.earnedToday||0)*0.08)+Math.round(u*0.5));const t=rnd;const nm=bg3Nm(t);return {emoji:'🧾',title:'Tax day on the Square',body:'It\'s time to pay a little tax on the profit your block made.',sub:'Businesses pay taxes on what they earn.',actions:[
+    {label:'✅ Pay taxes · Y '+cost,dis:S.coins<cost,run:()=>{S.coins-=cost;closeModal();gainXP(6);toast('✅ Taxes paid — squeaky clean books!');}},
+    {label:'🙈 Skip it',style:RED,run:()=>{if(t)bg3Hurt(t.l,12);closeModal();toast('⚠️ Skipping taxes caused a headache at '+nm+'.');}}]};}});
+  return P;
+}
+function bg3FireNews(forceId){
+  const built=bg3BuiltLots();if(!built.length)return false;
+  const u=bg3Eco();
+  let pool=bg3NewsPool(u);
+  if(forceId){const f=pool.find(p=>p.id===forceId);if(!f)return false;const ev=f.make();if(!ev)return false;S.newsLast=f.id;bg3Show(ev);return true;}
+  pool=pool.filter(p=>(!p.need||built.length>=1)&&p.id!==S.newsLast);
+  let total=pool.reduce((s,p)=>s+p.w,0),r=Math.random()*total,pick=pool[0];
+  for(const p of pool){r-=p.w;if(r<=0){pick=p;break;}}
+  const ev=pick.make();if(!ev){return bg3FireNews();}
+  S.newsLast=pick.id;bg3Show(ev);saveSoon();return true;
+}
+function bg3NewsIntro(){
+  openModal('<h3>📰 Word on the Square</h3><p>Running a business means surprises. From now on, little events will pop up — some are lucky breaks, some are problems to solve. <b>Your choices matter</b>: play it smart and your block grows faster.</p><button class="bg3-btn" id="bg3newsok">Bring it on! 💪</button>');
+  const b=ui.modalbody.querySelector('#bg3newsok');if(b)b.onclick=()=>{closeModal();setTimeout(()=>{if(!(ui.modal&&ui.modal.classList.contains('on')))bg3FireNews();},1200);};
+}
+let newsTO=null;
+function bg3ModalOpen(){return ui.modal&&ui.modal.classList.contains('on');}
+function bg3Busy(){try{if(servingRec)return true;}catch(e){}return bg3ModalOpen();}
+function bg3TryNews(){
+  if(!bg3BuiltLots().length){return;}
+  if(bg3Busy()){newsTO=setTimeout(bg3TryNews,25000);return;}
+  if(!S.newsSeen){S.newsSeen=true;saveSoon();bg3NewsIntro();return;}
+  bg3FireNews();
+}
+function scheduleNews(first){clearTimeout(newsTO);const t=first?70000:(150000+Math.random()*130000);newsTO=setTimeout(()=>{bg3TryNews();scheduleNews(false);},t);}
+
+/* ================= Own cool stuff: Lifestyle status ladder ================= */
+const HOMES=[{n:'Cardboard Fort',e:'📦',c:0},{n:'Studio Apartment',e:'🛏️',c:1200},{n:'Cozy House',e:'🏠',c:6000},{n:'Big House',e:'🏡',c:22000},{n:'Mansion',e:'🏰',c:80000},{n:'Sky Penthouse',e:'🌆',c:220000}];
+const RIDES=[{n:'Old Sneakers',e:'👟',c:0},{n:'Bicycle',e:'🚲',c:900},{n:'Scooter',e:'🛵',c:4000},{n:'Nice Car',e:'🚗',c:16000},{n:'Sports Car',e:'🏎️',c:65000},{n:'Supercar',e:'🚀',c:180000}];
+const GEAR=[{n:'Plain Tee',e:'👕',c:0},{n:'Fresh Kicks',e:'👟',c:1500},{n:'Gold Watch',e:'⌚',c:9000},{n:'Diamond Chain',e:'💎',c:40000},{n:'Royal Crown',e:'👑',c:130000}];
+const LIFE=[{key:'home',name:'🏠 Home',tiers:HOMES},{key:'ride',name:'🚗 Ride',tiers:RIDES},{key:'gear',name:'💎 Style',tiers:GEAR}];
+function lifeIdx(k){return (S.lifestyle&&S.lifestyle[k])||0;}
+function lifestyleWorth(){let w=0;LIFE.forEach(t=>{const idx=lifeIdx(t.key);for(let i=1;i<=idx&&i<t.tiers.length;i++)w+=t.tiers[i].c;});return w;}
+function openLifestyle(){if(!S.lifestyle)S.lifestyle={home:0,ride:0,gear:0};
+  let h='<h3>🏡 Your Lifestyle</h3><p style="margin-top:-2px">Spend your coins on the good life. Everything you own adds to your <b>net worth</b> — and shows the Square how far you\'ve come.</p>';
+  h+='<div class="bg3-stat" style="border:none;margin-bottom:4px"><span>Lifestyle value</span><b style="color:#E3C05A">Y '+lifestyleWorth().toLocaleString()+'</b></div>';
+  LIFE.forEach(tr=>{const idx=lifeIdx(tr.key);const cur=tr.tiers[idx];const nxt=tr.tiers[idx+1];
+    h+='<div class="bg3-sec">'+tr.name+'</div><div class="bg3-life"><div class="lf-cur"><span class="lf-e">'+cur.e+'</span><span class="lf-n">'+cur.n+'</span></div>';
+    if(nxt)h+='<button class="bg3-lbuy" data-k="'+tr.key+'"'+(S.coins>=nxt.c?'':' disabled')+'>'+nxt.e+' '+nxt.n+' · Y '+nxt.c.toLocaleString()+'</button>';
+    else h+='<span class="lf-max">🌟 Maxed!</span>';
+    h+='</div>';});
+  openModal(h);
+  ui.modalbody.querySelectorAll('.bg3-lbuy').forEach(b=>b.onclick=()=>{const k=b.getAttribute('data-k');const tr=LIFE.find(z=>z.key===k);const idx=lifeIdx(k);const nxt=tr.tiers[idx+1];if(!nxt||S.coins<nxt.c)return;S.coins-=nxt.c;S.lifestyle[k]=idx+1;confettiBurst();toast(nxt.e+' '+nxt.n+' — living large!');refreshUI();saveSoon();openLifestyle();});
+}
+
+/* ================= NPC missions: Jobs on the Square ================= */
+const NPCS=[{n:'Baker Bea',e:'👩‍🍳'},{n:'Coach Cal',e:'🧢'},{n:'Auntie Rose',e:'🌷'},{n:'DJ Marcus',e:'🎧'},{n:'Old Man Tan',e:'🧓'},{n:'Little Kofi',e:'🧒'},{n:'Ms. Rivera',e:'👩🏽‍🏫'}];
+const MTYPES=[
+  {type:'serve',  ctr:()=>S.servedToday||0,   say:n=>'My line is out the door! Can you help me serve <b>'+n+' customers</b>?', unit:n=>n+' served'},
+  {type:'collect',ctr:()=>S.collectsToday||0, say:n=>'I lost track of the register — collect from <b>'+n+' shops</b> for me?', unit:n=>n+' collected'},
+  {type:'earn',   ctr:()=>S.earnedToday||0,   say:n=>'Payroll is due! Help me pull in <b>Y '+n+'</b> today?', unit:n=>'Y '+n}
+];
+function missionTarget(type){const lv=S.level||1;if(type==='serve')return 3+Math.floor(lv/2);if(type==='collect')return 2+Math.floor(lv/3);return 120+lv*45;}
+function missionReward(type,target){if(type==='earn')return Math.round(target*0.55)+50;if(type==='serve')return target*20+40;return target*55+40;}
+function mtypeOf(t){return MTYPES.find(m=>m.type===t);}
+function missionProg(){if(!S.mission)return 0;const m=mtypeOf(S.mission.type);return Math.max(0,m.ctr()-(S.mission.base||0));}
+function offerMission(forceType){
+  if(S.mission)return false;
+  const mt=(forceType&&mtypeOf(forceType))||MTYPES[Math.floor(Math.random()*MTYPES.length)];const npc=NPCS[Math.floor(Math.random()*NPCS.length)];
+  const target=missionTarget(mt.type);const reward=missionReward(mt.type,target);
+  openModal('<h3>'+npc.e+' '+npc.n+' needs a hand</h3><p style="margin-top:-2px"><i style="color:#cbb98a">“'+mt.say(target)+'”</i></p><div class="bg3-stat" style="border:none"><span>Reward</span><b style="color:#7ad03a">+'+reward+' Y</b></div><button class="bg3-btn" id="bg3macc">✅ Accept the job</button><button class="bg3-btn" id="bg3mdec" style="'+GHOST+'">Maybe later</button>');
+  const a=ui.modalbody.querySelector('#bg3macc');if(a)a.onclick=()=>{S.mission={type:mt.type,target:target,base:mt.ctr(),reward:reward,npc:npc.n,emoji:npc.e};closeModal();toast(npc.e+' Job accepted! '+jobUnit());refreshUI();saveSoon();};
+  const d=ui.modalbody.querySelector('#bg3mdec');if(d)d.onclick=closeModal;
+  return true;
+}
+function jobUnit(){if(!S.mission)return '';const m=mtypeOf(S.mission.type);return m.unit(missionProg())+' / '+m.unit(S.mission.target).replace(/^Y /,'Y ');}
+function completeMission(){const M=S.mission;if(!M)return;S.coins+=M.reward;S.missionsDone=(S.missionsDone||0)+1;gainXP(8);S.mission=null;confettiBurst();
+  if(!bg3ModalOpen())openModal('<h3>'+M.emoji+' Job done!</h3><p>'+M.npc+' thanks you for the help.</p><div class="bg3-stat" style="border:none"><span>You earned</span><b style="color:#7ad03a">+'+M.reward+' Y</b></div><button class="bg3-btn" id="bg3mok">You\'re welcome!</button>');
+  const b=ui.modalbody&&ui.modalbody.querySelector('#bg3mok');if(b)b.onclick=closeModal;
+  toast(M.emoji+' Job complete! +'+M.reward+' Y');refreshUI();saveSoon();refreshExtras();}
+function refreshMission(){if(!S.mission)return;if(missionProg()>=S.mission.target)completeMission();refreshExtras();}
+function openMissions(){
+  if(S.mission){const M=S.mission;const m=mtypeOf(M.type);const p=Math.min(M.target,missionProg());const pct=Math.round(p/M.target*100);
+    openModal('<h3>📋 Jobs on the Square</h3><p><b>'+M.emoji+' '+M.npc+'</b> is counting on you.</p><div class="bg3-jobbar"><i style="width:'+pct+'%"></i></div><div style="text-align:center;font-weight:700;color:#E3C05A;margin:4px 0 2px">'+m.unit(p)+' / '+m.unit(M.target)+'</div><div class="bg3-stat" style="border:none"><span>Reward on finish</span><b style="color:#7ad03a">+'+M.reward+' Y</b></div><button class="bg3-btn" id="bg3mgiveup" style="'+GHOST+'">Give up this job</button>');
+    const g=ui.modalbody.querySelector('#bg3mgiveup');if(g)g.onclick=()=>{S.mission=null;closeModal();toast('Job dropped — a new one will come along.');refreshUI();saveSoon();refreshExtras();};
+  } else {
+    openModal('<h3>📋 Jobs on the Square</h3><p>No jobs right now. Neighbors will wander over with work as you play — keep your shops busy and check back soon!</p>'+(S.missionsDone?'<div class="bg3-stat" style="border:none"><span>Jobs completed</span><b style="color:#E3C05A">'+S.missionsDone+'</b></div>':'')+'<button class="bg3-btn" id="bg3mfind">Look for work now 🔎</button>');
+    const f=ui.modalbody.querySelector('#bg3mfind');if(f)f.onclick=()=>{closeModal();if(!offerMission())toast('No neighbors nearby — try again soon.');};
+  }
+}
+
+/* ================= Live Square events: Gold Rush & Treasure Hunt ================= */
+const TREASURE_CLUES={bakery:'Find the shop where fresh bread bakes.',lemonade:'Where something sour turns sweet.',sneakers:'Where fresh kicks find new feet.',books:'Where quiet pages turn.',flowers:'Where petals greet the morning.',pizza:'Where hot slices come round.',coffee:'Where the morning gets its buzz.',games:'Where thumbs go to play.'};
+let sqeType=null,sqeUntil=0,treasureTarget=null,sqeBannerT=null;
+function sqeActive(){return sqeUntil>Date.now();}
+function showSqeBanner(){if(!ui.sqe)return;ui.sqe.style.display='flex';updateSqeBanner();clearInterval(sqeBannerT);sqeBannerT=setInterval(updateSqeBanner,1000);}
+function hideSqeBanner(){if(ui.sqe)ui.sqe.style.display='none';clearInterval(sqeBannerT);sqeBannerT=null;}
+function updateSqeBanner(){if(!ui.sqe)return;if(!sqeActive()){hideSqeBanner();if(sqeType==='treasure'&&treasureTarget){treasureTarget=null;toast('🗺️ The treasure hunt ended — next time!');}sqeType=null;return;}
+  const secs=Math.ceil((sqeUntil-Date.now())/1000);
+  ui.sqe.innerHTML=(sqeType==='gold'?'💰 <b>GOLD RUSH</b> — sales ×4!':'🗺️ <b>TREASURE HUNT</b> — find the chest!')+' <i>'+secs+'s</i>';}
+function startGoldRush(){const secs=90;sqeType='gold';sqeUntil=Date.now()+secs*1000;
+  bg3BuiltLots().forEach(x=>bg3Rush(x.l,4,secs*1000));
+  if(!bg3ModalOpen()){openModal('<h3>💰 GOLD RUSH!</h3><p>For the next <b>'+secs+' seconds</b>, every shop on your block earns <b>×4</b>! Collect and serve as fast as you can — go go go!</p><button class="bg3-btn" id="bg3grgo">Let\'s gooo! 💨</button>');
+    const b=ui.modalbody.querySelector('#bg3grgo');if(b)b.onclick=closeModal;}
+  showSqeBanner();saveSoon();}
+function startTreasure(){const t=bg3RandLot();if(!t)return;treasureTarget={di:t.di,li:t.li};sqeType='treasure';sqeUntil=Date.now()+80*1000;
+  const clue=TREASURE_CLUES[t.l.type]||('Find the '+TYPES[t.l.type].name+'.');
+  if(!bg3ModalOpen()){openModal('<h3>🗺️ Treasure Hunt!</h3><p>A treasure chest is hidden somewhere on the Square. Tap the shop that matches the clue:</p><p style="text-align:center;font-size:15.5px;color:#E3C05A;font-weight:800;margin:6px 0">“'+clue+'”</p><button class="bg3-btn" id="bg3thgo">Start hunting! 🔍</button>');
+    const b=ui.modalbody.querySelector('#bg3thgo');if(b)b.onclick=closeModal;}
+  showSqeBanner();saveSoon();}
+function bg3TreasureTapCheck(rec){
+  if(sqeType!=='treasure'||!sqeActive()||!treasureTarget)return false;
+  if(rec.d===treasureTarget.di&&rec.i===treasureTarget.li){
+    const rw=Math.round(bg3Eco()*3)+80;S.coins+=rw;gainXP(10);confettiBurst();
+    const nm=bg3Nm({l:lotOf(rec)});treasureTarget=null;sqeUntil=0;sqeType=null;hideSqeBanner();
+    openModal('<h3>🏆 You found it!</h3><p>The treasure chest was hidden at <b>'+nm+'</b>! Sharp eyes.</p><div class="bg3-stat" style="border:none"><span>Treasure</span><b style="color:#7ad03a">+'+rw+' Y</b></div><button class="bg3-btn" id="bg3thok">Sweet! 💰</button>');
+    const b=ui.modalbody.querySelector('#bg3thok');if(b)b.onclick=closeModal;
+    refreshUI();saveSoon();return true;
+  }
+  toast('❌ Nothing here — read the clue again!');return true;
+}
+function fireSquareEvent(force){
+  if(!bg3BuiltLots().length)return false;
+  const pick=force||(((S.missionsDone||0)+Math.floor(Date.now()/1000))%2===0?'gold':'treasure');
+  if(pick==='treasure'&&bg3BuiltLots().length<1)return startGoldRush(),true;
+  if(pick==='gold')startGoldRush();else startTreasure();
+  return true;
+}
+let squareTO=null;
+function trySquare(){
+  if(!bg3BuiltLots().length||sqeActive()){squareTO=setTimeout(trySquare,30000);return;}
+  if(bg3Busy()){squareTO=setTimeout(trySquare,25000);return;}
+  if(!S.squareSeen){S.squareSeen=true;saveSoon();
+    openModal('<h3>🎪 Live on the Square</h3><p>Every so often the whole Square lights up with a <b>Gold Rush</b> (×4 sales!) or a <b>Treasure Hunt</b>. They only last a minute or two — when one starts, drop what you\'re doing and cash in!</p><button class="bg3-btn" id="bg3sqok">Can\'t wait! ⚡</button>');
+    const b=ui.modalbody.querySelector('#bg3sqok');if(b)b.onclick=()=>{closeModal();setTimeout(()=>{if(!bg3Busy())fireSquareEvent();},1500);};
+    return;}
+  fireSquareEvent();
+}
+function scheduleSquare(first){clearTimeout(squareTO);const t=first?150000:(300000+Math.random()*180000);squareTO=setTimeout(()=>{trySquare();scheduleSquare(false);},t);}
+
+/* ================= shared: mission-offer scheduler + extra HUD + CSS ================= */
+let missionTO=null;
+function tryMission(){if(S.mission||bg3Busy()||!bg3BuiltLots().length){missionTO=setTimeout(tryMission,25000);return;}offerMission();}
+function scheduleMissions(first){clearTimeout(missionTO);const t=first?105000:(180000+Math.random()*150000);missionTO=setTimeout(()=>{tryMission();scheduleMissions(false);},t);}
+function refreshExtras(){if(ui.jobsBadge){if(S.mission){const done=missionProg()>=S.mission.target;ui.jobsBadge.style.display='flex';ui.jobsBadge.style.background=done?'#2fa84f':'#E3242B';ui.jobsBadge.textContent=done?'✓':'!';}else ui.jobsBadge.style.display='none';}}
+function bg3ExtraCSS(){if(document.getElementById('bg3xcss'))return;const s=document.createElement('style');s.id='bg3xcss';s.textContent=`
+.bg3-sqe{position:absolute;top:92px;left:50%;transform:translateX(-50%);z-index:7;display:none;align-items:center;gap:6px;background:linear-gradient(180deg,#F4D06A,#C0392b);color:#2a1400;font-weight:800;font-size:13px;padding:6px 15px;border-radius:20px;box-shadow:0 4px 16px rgba(0,0,0,.45);border:2px solid #fff2c8;animation:bg3pulse 1.1s ease-in-out infinite}
+.bg3-sqe i{font-style:normal;font-weight:800;background:rgba(0,0,0,.22);color:#fff;border-radius:10px;padding:1px 7px;font-size:12px}
+.bg3-life{display:flex;align-items:center;justify-content:space-between;gap:10px;background:rgba(255,255,255,.06);border:1px solid rgba(227,192,90,.25);border-radius:12px;padding:9px 12px;margin:2px 0 4px}
+.lf-cur{display:flex;align-items:center;gap:9px}.lf-e{font-size:26px}.lf-n{font-weight:700;color:#F5F1E6;font-size:14px}
+.lf-max{color:#7ad03a;font-weight:800;font-size:13px}
+.bg3-lbuy{background:linear-gradient(180deg,#F4D06A,#C89A34);color:#3a2a06;border:none;border-radius:11px;padding:9px 13px;font-weight:800;font-size:12.5px;cursor:pointer;box-shadow:0 3px 0 #8a6a2a;white-space:nowrap}
+.bg3-lbuy:disabled{filter:grayscale(.6);opacity:.5;cursor:not-allowed;box-shadow:0 3px 0 rgba(0,0,0,.2)}
+.bg3-jobbar{height:12px;background:rgba(255,255,255,.1);border-radius:7px;overflow:hidden;margin:8px 0 2px;border:1px solid rgba(227,192,90,.3)}
+.bg3-jobbar i{display:block;height:100%;background:linear-gradient(90deg,#7ad03a,#4fa524);transition:width .4s}
+`;document.head.appendChild(s);}
+
 /* ---------------- loop ---------------- */
 let last=performance.now(),coinAcc=0;
 function tick(now){const dt=Math.min(.1,(now-last)/1000);last=now;
@@ -1227,6 +1441,13 @@ function mount(el){host=el||document.getElementById('blockMount');if(!host)retur
   scheduleIncoming(); // rivals start trying to raid after a couple minutes
   scheduleEvent();    // rushes / tips / restocks
   scheduleLucky();    // occasional city-wide lucky hour
+  if(S.insuredUntil==null)S.insuredUntil=0;if(S.newsSeen==null)S.newsSeen=false;
+  if(!S.lifestyle)S.lifestyle={home:0,ride:0,gear:0};if(S.mission===undefined)S.mission=null;if(S.missionsDone==null)S.missionsDone=0;if(S.squareSeen==null)S.squareSeen=false;
+  scheduleNews(true); // Word on the Square: choice-driven random events
+  bg3ExtraCSS();refreshExtras();
+  scheduleMissions(true);   // neighbors wander over with jobs
+  scheduleSquare(true);     // Gold Rush / Treasure Hunt live moments
+  setInterval(refreshMission,1500); // poll active job progress
   updateLuckyUI();
   ensureGoals();ensureEvent();refreshDailyBadges();refreshEventUI();refreshSpinChip();
   if((S.journey&&S.journey.ch||0)===0&&S.tut){setTimeout(()=>{if(!ui.modal.classList.contains('on'))openJourney();},1400);} // introduce the story after onboarding
@@ -1244,5 +1465,7 @@ function rewardToken(key){key=String(key||'');S.tokens=S.tokens||{};if(S.tokens[
 function share(){const url=location.origin+'/block.html';try{if(navigator.share){navigator.share({title:'My Block · Youngpreneur Square',url});}else{navigator.clipboard&&navigator.clipboard.writeText(url);toast('Link copied!');}}catch(e){}}
 function get(){return JSON.parse(JSON.stringify(S));}
 
-window.SquareGame={mount,reward,add,get,rewardVisit,rewardToken,share};
+window.SquareGame={mount,reward,add,get,rewardVisit,rewardToken,share,_news:bg3FireNews,_mission:offerMission,_square:fireSquareEvent,_life:openLifestyle,
+  _dbg:{prog:()=>missionProg(),setEarned:n=>{S.earnedToday=n;},worth:()=>playerWorth(),life:()=>lifestyleWorth(),poll:()=>refreshMission(),tt:()=>treasureTarget,sqe:()=>({type:sqeType,left:Math.max(0,sqeUntil-Date.now())}),
+    hitTreasure:()=>{const t=treasureTarget;return t?bg3TreasureTapCheck({d:t.di,i:t.li}):false;},missTreasure:()=>bg3TreasureTapCheck({d:-1,i:-1})}};
 })();
