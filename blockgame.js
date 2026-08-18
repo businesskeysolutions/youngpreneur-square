@@ -13,7 +13,7 @@ if(typeof THREE==='undefined'){ console.warn('BlockGame: THREE not loaded'); }
 /* ---------------- game config (matches the original) ---------------- */
 const LS='yps_block_v1';
 const CFG={ratePerMin:1.5, upgradeBase:140};
-const LOT_COST=[0,180,650,1800,4200];
+const LOT_COST=[0,320,1200,3400,7800];
 const NLOTS=5;
 /* ---- city / districts: the never-ending expansion ---- */
 const LOTS_PER=5;              // base lots in a district
@@ -91,7 +91,7 @@ function fresh(){return {v:3,coins:120,xp:0,level:1,streak:0,lastDay:'',tut:0,
   visited:{day:'',refs:{}},tokens:{},pid:uuid(),pname:'',district:0,
   lastSeen:0,spinDay:'',goals:null,servedToday:0,collectsToday:0,earnedToday:0,
   cityName:'',decor:{planters:false,lights:false,banner:false,fountain:false},collected:['bakery'],collectClaimed:false,rank:0,event:null,
-  spins:30,spinsT:0,stickers:{},stickerClaimed:false,journey:{ch:0},servedTotal:0,
+  spins:12,spinsT:0,stickers:{},stickerClaimed:false,journey:{ch:0},servedTotal:0,
   insuredUntil:0,newsSeen:false,newsLast:'',
   lifestyle:{home:0,ride:0,gear:0},mission:null,missionsDone:0,squareSeen:false,
   raid:{tickets:RAID_MAX_TICKETS,ticketsT:Date.now(),cd:{},shieldUntil:0,wins:0,losses:0},
@@ -108,7 +108,7 @@ function load(){try{const raw=localStorage.getItem(LS);if(raw){const o=JSON.pars
   if(!S.raid.cd)S.raid.cd={};
   if(!S.decor)S.decor={planters:false,lights:false,banner:false,fountain:false};
   if(!S.collected)S.collected=[];eachLot(l=>{if(l.built&&l.type&&S.collected.indexOf(l.type)<0)S.collected.push(l.type);});
-  if(S.spins==null)S.spins=30;if(!S.spinsT)S.spinsT=Date.now();if(!S.stickers)S.stickers={};
+  if(S.spins==null)S.spins=12;if(!S.spinsT)S.spinsT=Date.now();if(!S.stickers)S.stickers={};
   if(!S.journey)S.journey={ch:0};if(S.servedTotal==null)S.servedTotal=0;
   // clear stale timed events from a previous session
   eachLot(l=>{if(l.ev&&(l.ev.until||0)<Date.now())l.ev=null;});
@@ -846,7 +846,7 @@ function ensureDaily(){const td=todayStr();if(S.lastDay===td)return;
   if(S.lastDay===yStr())S.streak=(S.streak||0)+1;else S.streak=1;S.lastDay=td;
   eachLot(l=>{if(l.built){l.rev=0;l.exp=0;}}); // reset daily books city-wide
   S.servedToday=0;S.collectsToday=0;S.earnedToday=0;S.goals=rollGoals();
-  S.spins=Math.min(SPIN_MAX,(S.spins||0)+15); // free daily spins to bring you back
+  S.spins=Math.min(SPIN_MAX,(S.spins||0)+8); // free daily spins to bring you back
   const bonus=Math.min(120,20*S.streak);S.coins+=bonus;toast('Daily +'+bonus+' Y · streak '+S.streak);refreshUI();saveSoon();if(typeof refreshDailyBadges==='function')refreshDailyBadges();}
 
 /* ---------------- guided coach tour ---------------- */
@@ -1220,9 +1220,9 @@ function bg3NewsPool(u){
   const P=[];
   // ---- good surprises ----
   P.push({id:'viral',w:12,good:1,make:()=>{const t=best||rnd;const nm=bg3Nm(t);return {emoji:'🔥',title:'You went viral!',body:'A clip of <b>'+nm+'</b> is blowing up online and customers are lining up.',sub:'Marketing and word-of-mouth bring more customers.',actions:[{label:'Ride the wave — sales ×3! 🚀',run:()=>{if(t)bg3Rush(t.l,3,120000);closeModal();confettiBurst();gainXP(8);toast('🔥 '+nm+' is going viral — ×3 sales!');}}]};}});
-  P.push({id:'investor',w:10,good:1,make:()=>{const amt=Math.round(u*3+playerWorth()*0.04)+60;return {emoji:'💰',title:'A surprise investor',body:'A Youngpreneur Square investor believes in your hustle and hands you a check.',sub:'Investors give money to help a business grow.',actions:[{label:'Accept +Y '+amt.toLocaleString()+' 🤝',run:()=>{S.coins+=amt;closeModal();confettiBurst();toast('🤝 Investor backed you: +'+amt+' Y!');}}]};}});
+  P.push({id:'investor',w:10,good:1,make:()=>{const amt=Math.round(u*1.6+playerWorth()*0.03)+40;return {emoji:'💰',title:'A surprise investor',body:'A Youngpreneur Square investor believes in your hustle and hands you a check.',sub:'Investors give money to help a business grow.',actions:[{label:'Accept +Y '+amt.toLocaleString()+' 🤝',run:()=>{S.coins+=amt;closeModal();confettiBurst();toast('🤝 Investor backed you: +'+amt+' Y!');}}]};}});
   P.push({id:'celeb',w:9,good:1,make:()=>{const t=rnd||best;const nm=bg3Nm(t);return {emoji:'⭐',title:'A celebrity dropped by!',body:'A local star was spotted at <b>'+nm+'</b> and a crowd is forming.',sub:'Buzz brings foot traffic.',actions:[{label:'Snap a photo — sales ×2! 📸',run:()=>{if(t)bg3Rush(t.l,2,90000);closeModal();gainXP(6);confettiBurst();toast('⭐ Crowd rush at '+nm+' — ×2 sales!');}}]};}});
-  P.push({id:'bizweek',w:8,good:1,make:()=>{const amt=Math.round(u*2)+40;return {emoji:'🏆',title:'Business of the Week',body:'The Square newsletter named your block <b>Business of the Week</b>!',sub:'A good reputation pays off.',actions:[{label:'Claim +Y '+amt.toLocaleString()+' 🎉',run:()=>{S.coins+=amt;closeModal();gainXP(6);confettiBurst();toast('🏆 Business of the Week: +'+amt+' Y!');}}]};}});
+  P.push({id:'bizweek',w:8,good:1,make:()=>{const amt=Math.round(u*1.1)+30;return {emoji:'🏆',title:'Business of the Week',body:'The Square newsletter named your block <b>Business of the Week</b>!',sub:'A good reputation pays off.',actions:[{label:'Claim +Y '+amt.toLocaleString()+' 🎉',run:()=>{S.coins+=amt;closeModal();gainXP(6);confettiBurst();toast('🏆 Business of the Week: +'+amt+' Y!');}}]};}});
   P.push({id:'sunny',w:7,good:1,make:()=>{return {emoji:'☀️',title:'Perfect weather',body:'Blue skies over the Square — everybody\'s out shopping.',sub:'Good weather means more foot traffic.',actions:[{label:'Open the doors — block-wide ×2! 🌤️',run:()=>{bg3BuiltLots().forEach(x=>bg3Rush(x.l,2,60000));closeModal();confettiBurst();toast('☀️ Foot traffic up all over your block!');}}]};}});
   // ---- emergencies & decisions ----
   P.push({id:'fridge',w:10,good:0,need:1,make:()=>{const t=rnd;if(!t)return null;const nm=bg3Nm(t);const cost=Math.round(u*1.4);const acts=[];
@@ -1301,7 +1301,7 @@ const MTYPES=[
   {type:'earn',   ctr:()=>S.earnedToday||0,   say:n=>'Payroll is due! Help me pull in <b>Y '+n+'</b> today?', unit:n=>'Y '+n}
 ];
 function missionTarget(type){const lv=S.level||1;if(type==='serve')return 3+Math.floor(lv/2);if(type==='collect')return 2+Math.floor(lv/3);return 120+lv*45;}
-function missionReward(type,target){if(type==='earn')return Math.round(target*0.55)+50;if(type==='serve')return target*20+40;return target*55+40;}
+function missionReward(type,target){if(type==='earn')return Math.round(target*0.4)+40;if(type==='serve')return target*12+30;return target*35+30;}
 function mtypeOf(t){return MTYPES.find(m=>m.type===t);}
 function missionProg(){if(!S.mission)return 0;const m=mtypeOf(S.mission.type);return Math.max(0,m.ctr()-(S.mission.base||0));}
 function offerMission(forceType){
@@ -1337,10 +1337,10 @@ function showSqeBanner(){if(!ui.sqe)return;ui.sqe.style.display='flex';updateSqe
 function hideSqeBanner(){if(ui.sqe)ui.sqe.style.display='none';clearInterval(sqeBannerT);sqeBannerT=null;}
 function updateSqeBanner(){if(!ui.sqe)return;if(!sqeActive()){hideSqeBanner();if(sqeType==='treasure'&&treasureTarget){treasureTarget=null;toast('🗺️ The treasure hunt ended — next time!');}sqeType=null;return;}
   const secs=Math.ceil((sqeUntil-Date.now())/1000);
-  ui.sqe.innerHTML=(sqeType==='gold'?'💰 <b>GOLD RUSH</b> — sales ×4!':'🗺️ <b>TREASURE HUNT</b> — find the chest!')+' <i>'+secs+'s</i>';}
+  ui.sqe.innerHTML=(sqeType==='gold'?'💰 <b>GOLD RUSH</b> — sales ×3!':'🗺️ <b>TREASURE HUNT</b> — find the chest!')+' <i>'+secs+'s</i>';}
 function startGoldRush(){const secs=90;sqeType='gold';sqeUntil=Date.now()+secs*1000;
-  bg3BuiltLots().forEach(x=>bg3Rush(x.l,4,secs*1000));
-  if(!bg3ModalOpen()){openModal('<h3>💰 GOLD RUSH!</h3><p>For the next <b>'+secs+' seconds</b>, every shop on your block earns <b>×4</b>! Collect and serve as fast as you can — go go go!</p><button class="bg3-btn" id="bg3grgo">Let\'s gooo! 💨</button>');
+  bg3BuiltLots().forEach(x=>bg3Rush(x.l,3,secs*1000));
+  if(!bg3ModalOpen()){openModal('<h3>💰 GOLD RUSH!</h3><p>For the next <b>'+secs+' seconds</b>, every shop on your block earns <b>×3</b>! Collect and serve as fast as you can — go go go!</p><button class="bg3-btn" id="bg3grgo">Let\'s gooo! 💨</button>');
     const b=ui.modalbody.querySelector('#bg3grgo');if(b)b.onclick=closeModal;}
   showSqeBanner();saveSoon();}
 function startTreasure(){const t=bg3RandLot();if(!t)return;treasureTarget={di:t.di,li:t.li};sqeType='treasure';sqeUntil=Date.now()+80*1000;
@@ -1351,7 +1351,7 @@ function startTreasure(){const t=bg3RandLot();if(!t)return;treasureTarget={di:t.
 function bg3TreasureTapCheck(rec){
   if(sqeType!=='treasure'||!sqeActive()||!treasureTarget)return false;
   if(rec.d===treasureTarget.di&&rec.i===treasureTarget.li){
-    const rw=Math.round(bg3Eco()*3)+80;S.coins+=rw;gainXP(10);confettiBurst();
+    const rw=Math.round(bg3Eco()*1.6)+60;S.coins+=rw;gainXP(10);confettiBurst();
     const nm=bg3Nm({l:lotOf(rec)});treasureTarget=null;sqeUntil=0;sqeType=null;hideSqeBanner();
     openModal('<h3>🏆 You found it!</h3><p>The treasure chest was hidden at <b>'+nm+'</b>! Sharp eyes.</p><div class="bg3-stat" style="border:none"><span>Treasure</span><b style="color:#7ad03a">+'+rw+' Y</b></div><button class="bg3-btn" id="bg3thok">Sweet! 💰</button>');
     const b=ui.modalbody.querySelector('#bg3thok');if(b)b.onclick=closeModal;
