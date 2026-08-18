@@ -1327,6 +1327,27 @@ function openMissions(){
     openModal('<h3>📋 Jobs on the Square</h3><p>No jobs right now. Neighbors will wander over with work as you play — keep your shops busy and check back soon!</p>'+(S.missionsDone?'<div class="bg3-stat" style="border:none"><span>Jobs completed</span><b style="color:#E3C05A">'+S.missionsDone+'</b></div>':'')+'<button class="bg3-btn" id="bg3mfind">Look for work now 🔎</button>');
     const f=ui.modalbody.querySelector('#bg3mfind');if(f)f.onclick=()=>{closeModal();if(!offerMission())toast('No neighbors nearby — try again soon.');};
   }
+  bg3AppendSquare();
+}
+/* Field trips to the Square: explore real businesses (visits are credited by yps-bridge.js on the directory) */
+const SQ_TIERS=[{n:3,rw:200},{n:6,rw:350},{n:10,rw:600}];
+function bg3AppendSquare(){
+  if(!ui.modalbody)return;
+  const sv=(S.sqVisit&&S.sqVisit.day===todayStr())?S.sqVisit:{count:0};
+  const c=sv.count||0; let next=null; for(const t of SQ_TIERS){ if(c<t.n){ next=t; break; } }
+  const pct=next?Math.round(c/next.n*100):100;
+  let h='<div class="bg3-sec">🗺️ Field trips to the Square</div>';
+  h+='<p style="font-size:12.5px;color:#cdd6cd;margin:-2px 0 6px">Explore real businesses on the Square. Spend about 30 seconds at a shop and it counts — visit a few and earn coins for your Block.</p>';
+  h+='<div class="bg3-jobbar"><i style="width:'+pct+'%"></i></div>';
+  h+='<div style="text-align:center;font-weight:700;color:#E3C05A;margin:4px 0 2px">'+c+' visited today'+(next?(' · '+(next.n-c)+' more → +'+next.rw+' Y'):' · all rewards claimed!')+'</div>';
+  h+='<a class="bg3-btn" href="directory.html" style="display:block;text-align:center;text-decoration:none">Go to the Square →</a>';
+  ui.modalbody.insertAdjacentHTML('beforeend',h);
+}
+function bg3AbsorbSquare(){
+  if(!S.sqLog||!S.sqLog.length)return;
+  let total=0;S.sqLog.forEach(e=>total+=(e.n||0));
+  S.sqLog=[];saveSoon();
+  if(total>0)setTimeout(()=>{toast('🗺️ Your Square trips earned +'+total+' Y!');if(typeof confettiBurst==='function')confettiBurst();},1600);
 }
 
 /* ================= Live Square events: Gold Rush & Treasure Hunt ================= */
@@ -1479,6 +1500,7 @@ function mount(el){host=el||document.getElementById('blockMount');if(!host)retur
   scheduleMissions(true);   // neighbors wander over with jobs
   scheduleSquare(true);     // Gold Rush / Treasure Hunt live moments
   setInterval(refreshMission,1500); // poll active job progress
+  bg3AbsorbSquare();        // credit + announce coins earned visiting the Square
   updateLuckyUI();
   ensureGoals();ensureEvent();refreshDailyBadges();refreshEventUI();refreshSpinChip();
   if((S.journey&&S.journey.ch||0)===0&&S.tut){setTimeout(()=>{if(!ui.modal.classList.contains('on'))openJourney();},1400);} // introduce the story after onboarding
