@@ -181,7 +181,7 @@ function buildScene(){
   interiorGroup=new THREE.Group();interiorGroup.position.set(0,400,0);interiorGroup.visible=false;scene.add(interiorGroup);
   buildCity();
   applyMode(autoMode());
-  camAngle=0.4; focusX=districtX(S.district); focusXTarget=focusX; updateCam();
+  camAngle=0.4; focusX=districtX(S.district); focusXTarget=focusX; panX=0; updateCam();
 }
 let starPts,moon;
 function districtX(i){return i*DGAP;}
@@ -345,17 +345,18 @@ const emojiCache={};
 function emojiTex(e){if(emojiCache[e])return emojiCache[e];const c=document.createElement('canvas');c.width=64;c.height=64;const x=c.getContext('2d');x.font='48px serif';x.textAlign='center';x.textBaseline='middle';x.fillText(e,32,36);const t=new THREE.CanvasTexture(c);emojiCache[e]=t;return t;}
 
 /* ---------------- camera + modes + travel ---------------- */
-let camAngle=0.4, camDist=22, camH=12, focusX=0, focusXTarget=0, traveling=false;
+let camAngle=0.4, camDist=22, camH=12, focusX=0, focusXTarget=0, traveling=false, panX=0;
+function maxPanX(){const nl=districtLots((S&&S.district)||0);return Math.max(7,(nl-1)/2*5+3);}
 let interiorGroup=null, insideRec=null, intAngle=0, intDist=12.5; const intClickable=[];
-function updateCam(){const cz=6, fx=focusX;
+function updateCam(){const cz=6, fx=focusX+panX;
   // Pull the camera back on narrow / portrait screens so the whole block fits (fixes "can't see the block / bakery" on phones)
   const asp=(camera&&camera.aspect)||1.6;
-  const fit=asp<1.35?(1+(1.35-asp)*1.05):1;   // asp~0.5 (tall phone) -> ~1.9x distance
+  const fit=asp<1.35?(1+(1.35-asp)*1.15):1;   // asp~0.5 (tall phone) -> ~2x distance
   const dist=camDist*fit, h=camH*(1+(fit-1)*0.55);
   camera.position.set(fx+Math.sin(camAngle)*dist, h, Math.cos(camAngle)*dist + cz);
   camera.lookAt(fx,3.2,0);
   if(sky)sky.position.x=fx; if(starPts)starPts.position.x=fx; if(moon)moon.position.x=fx-70;}
-function travelTo(i){if(i<0||i>=S.districts.length)return;S.district=i;focusXTarget=districtX(i);traveling=true;updateDistrictUI();saveSoon();}
+function travelTo(i){if(i<0||i>=S.districts.length)return;S.district=i;focusXTarget=districtX(i);traveling=true;panX=0;updateDistrictUI();saveSoon();}
 function autoMode(){const h=new Date().getHours();return (h>=6&&h<20)?'day':((h>=20&&h<22)||(h>=5&&h<6)?'dusk':'night');}
 function applyMode(m){mode=m;const c=S3[m];
   sky.material.map=skyTex(c.sky[0],c.sky[1]);sky.material.needsUpdate=true;
@@ -640,7 +641,7 @@ function bindInput(){
   cv.addEventListener('pointerdown',e=>{dragId=e.pointerId;dragX=e.clientX;downX=e.clientX;downY=e.clientY;moved=0;});
   cv.addEventListener('pointermove',e=>{if(e.pointerId!==dragId)return;const dx=e.clientX-dragX;
     if(insideRec){intAngle=Math.max(-0.6,Math.min(0.6,intAngle-dx*0.005));updateIntCam();}
-    else{camAngle=Math.max(-0.9,Math.min(0.9,camAngle-dx*0.006));updateCam();}
+    else{const mp=maxPanX();panX=Math.max(-mp,Math.min(mp,panX-dx*0.055));updateCam();} // drag to pan along the block
     dragX=e.clientX;moved+=Math.abs(dx);});
   cv.addEventListener('pointerup',e=>{if(e.pointerId!==dragId)return;if(moved<6&&Math.hypot(e.clientX-downX,e.clientY-downY)<8)tap(e.clientX,e.clientY);dragId=null;});
   cv.addEventListener('wheel',e=>{if(insideRec){intDist=Math.max(9,Math.min(18,intDist+Math.sign(e.deltaY)*1.1));updateIntCam();}else{camDist=Math.max(13,Math.min(30,camDist+Math.sign(e.deltaY)*1.4));updateCam();}e.preventDefault();},{passive:false});
@@ -1387,6 +1388,7 @@ function bg3ExtraCSS(){if(document.getElementById('bg3xcss'))return;const s=docu
 .bg3-event{position:relative!important;top:auto!important;left:auto!important;transform:none!important;margin:0!important}
 .bg3-lucky{position:relative!important;top:auto!important;left:auto!important;transform:none!important;margin:0!important;animation:bg3pulse2 1.4s ease-in-out infinite!important}
 .bg3-inside .bg3-banners{display:none}
+.bg3-inside .bg3-top{display:none}
 .bg3-sqe{position:relative;display:none;align-items:center;gap:6px;background:linear-gradient(180deg,#F4D06A,#C0392b);color:#2a1400;font-weight:800;font-size:13px;padding:6px 15px;border-radius:20px;box-shadow:0 4px 16px rgba(0,0,0,.45);border:2px solid #fff2c8;animation:bg3pulse2 1.1s ease-in-out infinite}
 .bg3-sqe i{font-style:normal;font-weight:800;background:rgba(0,0,0,.22);color:#fff;border-radius:10px;padding:1px 7px;font-size:12px}
 .bg3-life{display:flex;align-items:center;justify-content:space-between;gap:10px;background:rgba(255,255,255,.06);border:1px solid rgba(227,192,90,.25);border-radius:12px;padding:9px 12px;margin:2px 0 4px}
@@ -1496,5 +1498,6 @@ function get(){return JSON.parse(JSON.stringify(S));}
 
 window.SquareGame={mount,reward,add,get,rewardVisit,rewardToken,share,_news:bg3FireNews,_mission:offerMission,_square:fireSquareEvent,_life:openLifestyle,
   _dbg:{prog:()=>missionProg(),setEarned:n=>{S.earnedToday=n;},worth:()=>playerWorth(),life:()=>lifestyleWorth(),poll:()=>refreshMission(),tt:()=>treasureTarget,sqe:()=>({type:sqeType,left:Math.max(0,sqeUntil-Date.now())}),
-    hitTreasure:()=>{const t=treasureTarget;return t?bg3TreasureTapCheck({d:t.di,i:t.li}):false;},missTreasure:()=>bg3TreasureTapCheck({d:-1,i:-1})}};
+    hitTreasure:()=>{const t=treasureTarget;return t?bg3TreasureTapCheck({d:t.di,i:t.li}):false;},missTreasure:()=>bg3TreasureTapCheck({d:-1,i:-1}),
+    panX:()=>panX,camX:()=>(camera?camera.position.x:0),maxPan:()=>maxPanX(),setInside:v=>{if(v)ui.wrap.classList.add('bg3-inside');else ui.wrap.classList.remove('bg3-inside');}}};
 })();
