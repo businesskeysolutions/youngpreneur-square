@@ -348,7 +348,11 @@ function emojiTex(e){if(emojiCache[e])return emojiCache[e];const c=document.crea
 let camAngle=0.4, camDist=22, camH=12, focusX=0, focusXTarget=0, traveling=false;
 let interiorGroup=null, insideRec=null, intAngle=0, intDist=12.5; const intClickable=[];
 function updateCam(){const cz=6, fx=focusX;
-  camera.position.set(fx+Math.sin(camAngle)*camDist, camH, Math.cos(camAngle)*camDist + cz);
+  // Pull the camera back on narrow / portrait screens so the whole block fits (fixes "can't see the block / bakery" on phones)
+  const asp=(camera&&camera.aspect)||1.6;
+  const fit=asp<1.35?(1+(1.35-asp)*1.05):1;   // asp~0.5 (tall phone) -> ~1.9x distance
+  const dist=camDist*fit, h=camH*(1+(fit-1)*0.55);
+  camera.position.set(fx+Math.sin(camAngle)*dist, h, Math.cos(camAngle)*dist + cz);
   camera.lookAt(fx,3.2,0);
   if(sky)sky.position.x=fx; if(starPts)starPts.position.x=fx; if(moon)moon.position.x=fx-70;}
 function travelTo(i){if(i<0||i>=S.districts.length)return;S.district=i;focusXTarget=districtX(i);traveling=true;updateDistrictUI();saveSoon();}
@@ -390,9 +394,11 @@ function buildUI(){
    '<div class="bg3-travel"><button class="bg3-nav" id="bg3prev" title="Previous district">‹</button>'+
      '<div class="bg3-dname" id="bg3dname">Founders Row</div>'+
      '<button class="bg3-nav" id="bg3next" title="Next district">›</button></div>'+
-   '<button class="bg3-event" id="bg3event"><b>🎪 Event</b><i>ends —</i></button>'+
-   '<div class="bg3-lucky" id="bg3lucky"><b>✨ ×2</b></div>'+
-   '<div class="bg3-sqe" id="bg3sqe"></div>'+
+   '<div class="bg3-banners">'+
+     '<button class="bg3-event" id="bg3event"><b>🎪 Event</b><i>ends —</i></button>'+
+     '<div class="bg3-lucky" id="bg3lucky"><b>✨ ×2</b></div>'+
+     '<div class="bg3-sqe" id="bg3sqe"></div>'+
+   '</div>'+
    '<div class="bg3-toast" id="bg3toast"></div>'+
    '<div class="bg3-modal" id="bg3modal"><div class="bg3-box"><button class="bg3-x" id="bg3x">✕</button><div id="bg3modalbody"></div></div></div>'+
    '<div class="bg3-tour" id="bg3tour"><div class="bg3-spot" id="bg3spot"></div>'+
@@ -1377,7 +1383,11 @@ function tryMission(){if(S.mission||bg3Busy()||!bg3BuiltLots().length){missionTO
 function scheduleMissions(first){clearTimeout(missionTO);const t=first?105000:(180000+Math.random()*150000);missionTO=setTimeout(()=>{tryMission();scheduleMissions(false);},t);}
 function refreshExtras(){if(ui.jobsBadge){if(S.mission){const done=missionProg()>=S.mission.target;ui.jobsBadge.style.display='flex';ui.jobsBadge.style.background=done?'#2fa84f':'#E3242B';ui.jobsBadge.textContent=done?'✓':'!';}else ui.jobsBadge.style.display='none';}}
 function bg3ExtraCSS(){if(document.getElementById('bg3xcss'))return;const s=document.createElement('style');s.id='bg3xcss';s.textContent=`
-.bg3-sqe{position:absolute;top:92px;left:50%;transform:translateX(-50%);z-index:7;display:none;align-items:center;gap:6px;background:linear-gradient(180deg,#F4D06A,#C0392b);color:#2a1400;font-weight:800;font-size:13px;padding:6px 15px;border-radius:20px;box-shadow:0 4px 16px rgba(0,0,0,.45);border:2px solid #fff2c8;animation:bg3pulse 1.1s ease-in-out infinite}
+.bg3-banners{position:absolute;left:8px;right:8px;bottom:66px;display:flex;flex-direction:column;align-items:center;gap:6px;z-index:6;pointer-events:none}
+.bg3-event{position:relative!important;top:auto!important;left:auto!important;transform:none!important;margin:0!important}
+.bg3-lucky{position:relative!important;top:auto!important;left:auto!important;transform:none!important;margin:0!important;animation:bg3pulse2 1.4s ease-in-out infinite!important}
+.bg3-inside .bg3-banners{display:none}
+.bg3-sqe{position:relative;display:none;align-items:center;gap:6px;background:linear-gradient(180deg,#F4D06A,#C0392b);color:#2a1400;font-weight:800;font-size:13px;padding:6px 15px;border-radius:20px;box-shadow:0 4px 16px rgba(0,0,0,.45);border:2px solid #fff2c8;animation:bg3pulse2 1.1s ease-in-out infinite}
 .bg3-sqe i{font-style:normal;font-weight:800;background:rgba(0,0,0,.22);color:#fff;border-radius:10px;padding:1px 7px;font-size:12px}
 .bg3-life{display:flex;align-items:center;justify-content:space-between;gap:10px;background:rgba(255,255,255,.06);border:1px solid rgba(227,192,90,.25);border-radius:12px;padding:9px 12px;margin:2px 0 4px}
 .lf-cur{display:flex;align-items:center;gap:9px}.lf-e{font-size:26px}.lf-n{font-weight:700;color:#F5F1E6;font-size:14px}
@@ -1428,8 +1438,27 @@ function tick(now){const dt=Math.min(.1,(now-last)/1000);last=now;
   }
   renderer.render(scene,camera);requestAnimationFrame(tick);
 }
-function resize(){if(!ui.canvaswrap)return;const w=ui.canvaswrap.clientWidth||800,h=ui.canvaswrap.clientHeight||500;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();}
-function toggleFs(){ui.wrap.classList.toggle('fs');setTimeout(resize,60);}
+function resize(){if(!ui.canvaswrap)return;const w=ui.canvaswrap.clientWidth||800,h=ui.canvaswrap.clientHeight||500;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();
+  if(insideRec){if(typeof updateIntCam==='function')updateIntCam();}else{updateCam();}}
+function toggleFs(){
+  // Reparent the game to <body> when going fullscreen so a transformed/filtered page ancestor can't
+  // break position:fixed and let page text bleed through the middle (mobile fullscreen bug).
+  const goingFs=!ui.wrap.classList.contains('fs');
+  if(goingFs){
+    ui._fsPh=document.createComment('bg3-fs');
+    if(ui.wrap.parentNode)ui.wrap.parentNode.insertBefore(ui._fsPh,ui.wrap);
+    document.body.appendChild(ui.wrap);
+    ui.wrap.classList.add('fs');
+    ui._htmlOv=document.documentElement.style.overflow;ui._bodyOv=document.body.style.overflow;
+    document.documentElement.style.overflow='hidden';document.body.style.overflow='hidden';
+  }else{
+    ui.wrap.classList.remove('fs');
+    document.documentElement.style.overflow=ui._htmlOv||'';document.body.style.overflow=ui._bodyOv||'';
+    if(ui._fsPh&&ui._fsPh.parentNode)ui._fsPh.parentNode.replaceChild(ui.wrap,ui._fsPh);
+    ui._fsPh=null;
+  }
+  setTimeout(resize,60);
+}
 
 /* ---------------- public API ---------------- */
 function mount(el){host=el||document.getElementById('blockMount');if(!host)return;
